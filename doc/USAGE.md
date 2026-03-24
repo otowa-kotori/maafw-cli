@@ -10,15 +10,20 @@ uv sync
 ## 快速开始
 
 ```bash
-# 1. 连接设备
-maafw-cli connect adb emulator-5554           # Android 模拟器
-maafw-cli connect win32 "记事本"               # Win32 窗口
+# 1. 连接设备（自动启动 daemon）
+maafw-cli connect adb 127.0.0.1:16384           # Android 模拟器
+maafw-cli connect win32 "记事本" --as notepad    # Win32 窗口，命名为 notepad
 
-# 2. 截图 / OCR / 点击
-maafw-cli screenshot                           # 截图保存到文件
-maafw-cli ocr                                  # OCR，输出带 TextRef
-maafw-cli click t3                             # 按引用点击
-maafw-cli click 452,387                        # 按坐标点击
+# 2. 操作（通过 daemon，零重连）
+maafw-cli ocr                                    # OCR，输出带 TextRef
+maafw-cli click t3                               # 按引用点击
+maafw-cli click 452,387                          # 按坐标点击
+maafw-cli screenshot                             # 截图保存到当前目录
+
+# 3. 多设备
+maafw-cli --on notepad ocr                       # 指定会话
+maafw-cli session list                           # 查看所有会话
+maafw-cli daemon status                          # 查看 daemon 状态
 ```
 
 ## 全局选项
@@ -29,6 +34,8 @@ maafw-cli click 452,387                        # 按坐标点击
 | `--quiet` | 抑制非错误输出 |
 | `-v` / `--verbose` | 显示 DEBUG 级别日志（含耗时） |
 | `--observe` | 动作命令执行后自动 OCR，输出识别结果 |
+| `--on SESSION` | 指定目标 daemon 会话（默认使用最近连接的） |
+| `--no-daemon` | 跳过 daemon，使用 直连模式（每次重连） |
 
 ## 命令参考
 
@@ -49,6 +56,12 @@ maafw-cli device list --win32      # Win32 窗口
 | 选项 | 默认 | 说明 |
 |------|------|------|
 | `--screenshot-size` | 720 | 截图短边分辨率 |
+| `--as NAME` | 设备地址 | 命名此会话（daemon 模式） |
+
+```bash
+maafw-cli connect adb 127.0.0.1:16384               # 会话名 = 设备地址
+maafw-cli connect adb 127.0.0.1:16384 --as phone     # 会话名 = phone
+```
 
 ### `connect win32 <WINDOW>`
 
@@ -58,6 +71,7 @@ maafw-cli device list --win32      # Win32 窗口
 |------|------|------|
 | `--screencap-method` | FramePool | 截图方式 |
 | `--input-method` | PostMessage | 输入方式 |
+| `--as NAME` | 窗口标题 | 命名此会话（daemon 模式） |
 
 **截图方式**：
 
@@ -204,6 +218,41 @@ maafw> click t1
 maafw> observe on        # 开启 --observe 模式
 maafw> click t2          # 点击后自动 OCR
 maafw> quit
+```
+
+### `daemon start`
+
+启动后台 daemon（如未运行）。
+
+### `daemon stop`
+
+停止后台 daemon。
+
+### `daemon status`
+
+查看 daemon 状态（PID、端口、uptime、活跃会话）。
+
+```bash
+maafw-cli daemon status
+maafw-cli --json daemon status
+```
+
+### `session list`
+
+列出所有活跃的 daemon 会话。`*` 标记默认会话。
+
+### `session default <NAME>`
+
+设置默认会话。
+
+### `session close <NAME>`
+
+关闭并销毁一个会话。
+
+```bash
+maafw-cli session list
+maafw-cli session default phone
+maafw-cli session close tablet
 ```
 
 ## `--observe` 模式

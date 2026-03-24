@@ -1,59 +1,35 @@
 # maafw-cli 工程结构
 
-```
-maafw-cli/
-├── pyproject.toml
-├── doc/
-│   ├── SPEC.md              # 设计规格（愿景、架构决策、分阶段计划）
-│   ├── USAGE.md             # 使用指南（命令参考、参数说明）
-│   ├── ARCHITECTURE.md      # 本文件（工程结构、模块职责）
-│   └── TODO.md              # 待办事项
-├── src/maafw_cli/
-│   ├── __init__.py          # 版本号 (0.1.0)
-│   ├── __main__.py          # python -m 入口
-│   ├── cli.py               # Click 根命令、全局选项、子命令注册
-│   ├── paths.py             # 跨平台路径（MaaXYZ/maafw-cli）
-│   ├── download.py          # OCR 模型下载
-│   ├── commands/            # CLI 命令层（依赖 core/ 和 maafw/）
-│   │   ├── device.py        # device list [--adb|--win32]
-│   │   ├── connect.py       # connect adb|win32
-│   │   ├── ocr.py           # ocr [--roi] [--text-only]
-│   │   ├── screenshot.py    # screenshot [-o FILE]
-│   │   └── click_cmd.py     # click TARGET
-│   ├── core/                # 共享基础设施（不依赖 MaaFW）
-│   │   ├── session.py       # SessionInfo 序列化 + 文件读写
-│   │   ├── reconnect.py     # 从 session.json 重建 Controller
-│   │   ├── textref.py       # TextRef 系统 (t1, t2, ...)
-│   │   ├── target.py        # 目标解析 (t3 / 452,387)
-│   │   ├── output.py        # OutputFormatter (human/json/quiet)
-│   │   └── log.py           # 日志 + Timer 计时器
-│   └── maafw/               # MaaFramework 薄封装（不依赖 CLI）
-│       ├── adb.py           # ADB 设备发现 + 连接
-│       ├── win32.py         # Win32 窗口发现 + 连接
-│       ├── vision.py        # 截图 + OCR
-│       └── control.py       # 点击（post_click）
-└── tests/
-    ├── test_cli.py           # CLI 结构测试（CliRunner，无需真实设备）
-    ├── test_textref.py       # TextRef 单元测试
-    ├── test_target.py        # 目标解析单元测试
-    ├── test_adb_manual.py    # ADB 手动集成测试（pytest -m manual）
-    ├── test_win32_manual.py  # Win32 手动集成测试（pytest -m manual）
-    └── mock_win32_window.py  # Win32 测试用 tkinter mock 窗口
-```
-
-## 分层职责
+## 分层概览
 
 ```
-commands/    →  CLI 参数解析、调用 core/ 和 maafw/、格式化输出
-core/        →  会话管理、TextRef、目标解析、输出格式、日志
-maafw/       →  MaaFramework API 封装（可独立于 CLI 使用）
+src/maafw_cli/
+├── cli.py               # Click 根命令 + 全局选项 + CliContext（daemon/direct 路由）
+├── paths.py             # 跨平台路径（MaaXYZ/maafw-cli）
+├── commands/            # CLI 薄壳：调用 services/，格式化输出
+├── services/            # 纯业务逻辑：@service 注册到 DISPATCH table
+├── core/                # 共享基础设施：IPC、会话、TextRef、日志、keymap
+├── daemon/              # 后台守护进程：持久连接 + 命名会话 + JSON-line IPC
+└── maafw/               # MaaFramework API 薄封装
 ```
 
-- `commands/` 依赖 `core/` 和 `maafw/`
-- `core/` 不依赖 `maafw/`（reconnect.py 除外，它桥接两层）
-- `maafw/` 不依赖 `commands/`，仅依赖 `core/log.py`
+依赖方向：`commands/ → services/ → core/ + maafw/`，`daemon/ → services/ + core/`，禁止反向引用。
 
 ## 数据流
+
+### 默认模式（daemon）
+
+```
+connect adb "..." ──→ ensure_daemon() ──→ daemon._connect_adb_inner()
+                                              ↓
+                                    SessionManager.add("device", controller)
+                                              ↓
+ocr / click / ... ──→ DaemonClient.send() ──→ daemon.execute(action, session)
+                                              ↓
+                                    SessionManager.get(session).controller → MaaFW
+```
+
+### --no-daemon 模式
 
 ```
 connect → session.json
@@ -63,10 +39,92 @@ ocr → reconnect → Controller → screencap → OCR → textrefs.json
 click → parse_target(t3) → resolve from textrefs → reconnect → post_click
 ```
 
-## 会话机制（Phase 1）
+## 会话机制
+
+### Daemon 模式（默认）
+
+- `connect` 自动启动 daemon，创建命名会话（`--as name` 或默认用设备地址）
+- Controller 在 daemon 进程中持久存在，零重连开销
+- 每个 session 有独立的 TextRefStore（内存模式）和 asyncio Lock
+- Idle watchdog：5 分钟无活动自动退出
+- PID/port 文件：`~data_dir/daemon.pid`、`~data_dir/daemon.port`
+- 日志：`~data_dir/daemon.log`（每次启动清空）
+
+### --no-daemon 模式
 
 文件持久化，每条命令独立重连：
-- `connect` 写 `session.json`（连接参数）
-- `ocr` / `screenshot` / `click` 读 `session.json` → 重新发现设备 → 重建 Controller
-- Win32 重连按窗口标题匹配（hwnd 不稳定）
-- ADB 重连按设备名或地址匹配
+- `connect` 写 `session.json`
+- 后续命令读 `session.json` → 重新发现设备 → 重建 Controller
+
+---
+
+## 完整目录树
+
+```
+maafw-cli/
+├── pyproject.toml
+├── AGENTS.md                      # AI agent 协作指南
+├── doc/
+│   ├── SPEC.md                    # 设计规格（愿景、架构决策）
+│   ├── ARCHITECTURE.md            # 本文件
+│   ├── USAGE.md                   # 命令参考
+│   └── TODO.md                    # 待办事项
+├── src/maafw_cli/
+│   ├── __init__.py                # 版本号
+│   ├── __main__.py                # python -m 入口
+│   ├── cli.py                     # Click 根命令 + 全局选项 + CliContext.run()
+│   ├── paths.py                   # 跨平台路径（MaaXYZ/maafw-cli）
+│   ├── download.py                # OCR 模型下载
+│   ├── commands/
+│   │   ├── connection.py          # device list, connect adb/win32
+│   │   ├── vision.py              # ocr, screenshot
+│   │   ├── interaction.py         # click, swipe, scroll, type, key
+│   │   ├── resource.py            # resource download-ocr, resource status
+│   │   ├── repl_cmd.py            # REPL 模式
+│   │   ├── daemon_cmd.py          # daemon start/stop/status
+│   │   └── session_cmd.py         # session list/default/close
+│   ├── services/
+│   │   ├── connection.py          # do_connect_adb/win32, _connect_*_inner()
+│   │   ├── vision.py              # do_ocr, do_screenshot
+│   │   ├── interaction.py         # do_click, do_swipe, do_scroll, do_type, do_key
+│   │   ├── resource.py            # do_download_ocr, do_resource_status
+│   │   ├── context.py             # ServiceContext (controller 缓存 + target 解析)
+│   │   └── registry.py            # @service decorator + DISPATCH table
+│   ├── core/
+│   │   ├── errors.py              # MaafwError / ActionError / RecognitionError / ConnectionError
+│   │   ├── ipc.py                 # DaemonClient, ensure_daemon(), 进程生命周期
+│   │   ├── keymap.py              # VK_MAP / AK_MAP / resolve_keycode
+│   │   ├── session.py             # SessionInfo + 文件持久化（--no-daemon 模式）
+│   │   ├── reconnect.py           # 从 session.json 重建 Controller（--no-daemon 模式）
+│   │   ├── textref.py             # TextRef 系统，支持内存模式
+│   │   ├── target.py              # 目标解析 (t3 / 452,387)
+│   │   ├── output.py              # OutputFormatter (human/json/quiet)
+│   │   └── log.py                 # 日志 + Timer
+│   ├── daemon/
+│   │   ├── __main__.py            # python -m maafw_cli.daemon 入口
+│   │   ├── protocol.py            # JSON-line IPC 协议
+│   │   ├── server.py              # asyncio TCP server + idle watchdog
+│   │   ├── session_mgr.py         # SessionManager（命名会话 + Controller 持久连接）
+│   │   └── log.py                 # daemon 专用日志（RotatingFileHandler）
+│   └── maafw/
+│       ├── adb.py                 # ADB 设备发现 + 连接
+│       ├── win32.py               # Win32 窗口发现 + 连接
+│       ├── vision.py              # 截图 + OCR
+│       └── control.py             # click/swipe/scroll/type/key
+└── tests/
+    ├── conftest.py                # 共享 fixtures
+    ├── mock_controller.py         # MockController
+    ├── mock_win32_window.py       # tkinter mock 窗口
+    ├── test_cli.py                # CLI 结构 + help + keymap
+    ├── test_services.py           # Service 层业务逻辑
+    ├── test_repl.py               # REPL dispatch
+    ├── test_target.py             # 目标解析
+    ├── test_textref.py            # TextRef
+    ├── test_protocol.py           # IPC 协议
+    ├── test_session_mgr.py        # SessionManager
+    ├── test_daemon_server.py      # Daemon server (in-process)
+    ├── test_ipc.py                # Client IPC + 进程生命周期
+    ├── test_daemon_e2e.py         # Daemon E2E (manual)
+    ├── test_win32_manual.py       # Win32 集成 (manual)
+    └── test_adb_manual.py         # ADB 集成 (manual)
+```

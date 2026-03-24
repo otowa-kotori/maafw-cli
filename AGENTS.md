@@ -9,11 +9,12 @@ MaaFramework 命令行界面。让 Human / AI / Script / Cron 都能直接操作
 ```
 commands/    CLI 薄壳：Click 参数声明 + 输出格式化。调用 services/。
 services/    纯业务逻辑：入参简单类型，返回 dict，抛异常。不碰 Click / OutputFormatter / sys.exit。
-core/        共享基础设施：会话、TextRef、目标解析、日志、keymap、错误类型。不依赖 maafw/（reconnect.py 例外）。
+core/        共享基础设施：会话、IPC、TextRef、目标解析、日志、keymap、错误类型。不依赖 maafw/（reconnect.py 例外）。
+daemon/      后台守护进程：持久 Controller 连接，命名会话，JSON-line IPC。依赖 services/ + core/。
 maafw/       MaaFramework API 薄封装。不依赖 commands/ 或 services/。
 ```
 
-依赖方向：`commands/ → services/ → core/ + maafw/`，禁止反向引用。
+依赖方向：`commands/ → services/ → core/ + maafw/`，`daemon/ → services/ + core/`，禁止反向引用。
 
 ## 目录布局
 
@@ -33,7 +34,9 @@ maafw-cli/
 │   │   ├── vision.py              # ocr, screenshot
 │   │   ├── interaction.py         # click, swipe, scroll, type, key
 │   │   ├── resource.py            # resource download-ocr, resource status
-│   │   └── repl_cmd.py            # REPL 模式
+│   │   ├── repl_cmd.py            # REPL 模式
+│   │   ├── daemon_cmd.py          # daemon start/stop/status
+│   │   └── session_cmd.py         # session list/default/close
 │   ├── services/                  # 业务逻辑（与 commands/ 结构对齐）
 │   │   ├── connection.py          # do_connect_adb, do_connect_win32, do_device_list
 │   │   ├── vision.py              # do_ocr, do_screenshot
@@ -43,13 +46,20 @@ maafw-cli/
 │   │   └── registry.py            # @service decorator + DISPATCH table
 │   ├── core/
 │   │   ├── errors.py              # MaafwError / ActionError / RecognitionError / ConnectionError
+│   │   ├── ipc.py                 # DaemonClient, ensure_daemon(), 进程生命周期
 │   │   ├── keymap.py              # VK_MAP / AK_MAP / resolve_keycode / method lists
-│   │   ├── session.py             # SessionInfo + 文件持久化
-│   │   ├── reconnect.py           # 从 session.json 重建 Controller
-│   │   ├── textref.py             # TextRef 系统
+│   │   ├── session.py             # SessionInfo + 文件持久化（--no-daemon 模式）
+│   │   ├── reconnect.py           # 从 session.json 重建 Controller（--no-daemon 模式）
+│   │   ├── textref.py             # TextRef 系统，支持内存模式 (path=None)
 │   │   ├── target.py              # 目标解析 (t3 / 452,387)
 │   │   ├── output.py              # OutputFormatter (human/json/quiet)
 │   │   └── log.py                 # 日志 + Timer
+│   ├── daemon/                    # 后台守护进程
+│   │   ├── __main__.py            # python -m maafw_cli.daemon 入口
+│   │   ├── protocol.py            # JSON-line IPC 协议
+│   │   ├── server.py              # asyncio TCP server + idle watchdog
+│   │   ├── session_mgr.py         # SessionManager（命名会话 + Controller 持久连接）
+│   │   └── log.py                 # daemon 专用日志（RotatingFileHandler）
 │   └── maafw/                     # MaaFW 封装
 │       ├── adb.py                 # ADB 设备发现 + 连接
 │       ├── win32.py               # Win32 窗口发现 + 连接
@@ -64,6 +74,11 @@ maafw-cli/
     ├── test_repl.py               # REPL dispatch 测试
     ├── test_target.py             # 目标解析测试
     ├── test_textref.py            # TextRef 测试
+    ├── test_protocol.py           # IPC 协议测试
+    ├── test_session_mgr.py        # SessionManager 单元测试
+    ├── test_daemon_server.py      # Daemon server 测试（in-process asyncio）
+    ├── test_ipc.py                # Client IPC + 进程生命周期测试
+    ├── test_daemon_e2e.py         # Daemon E2E 测试（Win32, manual）
     ├── test_win32_manual.py       # Win32 自动化集成测试
     └── test_adb_manual.py         # ADB 集成测试（需真机，manual 标记）
 ```
@@ -100,14 +115,14 @@ def click_cmd(ctx: CliContext, target: str) -> None:
     ctx.run(do_click, target=target)
 ```
 
-`ctx.run()` 统一处理：ServiceContext 构建 → 调用 service → 异常→退出码 → 输出 → --observe 追加 OCR。
+`ctx.run()` 统一处理：daemon 路由（默认）或 direct 模式（`--no-daemon`）→ 调用 service → 异常→退出码 → 输出 → --observe 追加 OCR。
 
-### 三种运行模式
+### 运行模式
 
 ```
-CLI oneshot:  ctx.run(do_click, ...) → reconnect 每次
-REPL:         repl.execute_line("click t1") → controller 缓存复用
-Daemon (未来): handler(do_click, ...) → 连接池
+CLI (default): ctx.run(do_click, ...) → DaemonClient → daemon.execute() → Controller
+CLI --no-daemon: ctx.run(do_click, ...) → reconnect from session.json → Controller
+REPL:          repl.execute_line("click t1") → controller 缓存复用（in-process）
 ```
 
 ### 输出约定
@@ -139,7 +154,12 @@ Daemon (未来): handler(do_click, ...) → 连接池
 | Unit | `test_cli.py`, `test_target.py`, `test_textref.py` | CLI 结构、keymap、解析 | ✅ |
 | Service | `test_services.py` | MockController，纯业务逻辑 | ✅ |
 | REPL | `test_repl.py` | dispatch、observe 切换 | ✅ |
+| Protocol | `test_protocol.py` | JSON-line encode/decode | ✅ |
+| SessionMgr | `test_session_mgr.py` | 命名会话增删查改 + execute | ✅ |
+| Daemon | `test_daemon_server.py` | server in-process asyncio | ✅ |
+| IPC | `test_ipc.py` | client 往返 + 进程生命周期 | ✅ |
 | Win32 集成 | `test_win32_manual.py` | mock tkinter 窗口，OCR→交互→OCR 闭环 | ✅ (Windows) |
+| Daemon E2E | `test_daemon_e2e.py` | daemon → connect → ocr/click/key/type/swipe | ❌ manual |
 | ADB 集成 | `test_adb_manual.py` | 需真实设备 | ❌ manual |
 
 ## 新增功能 checklist
