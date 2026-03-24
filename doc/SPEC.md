@@ -112,54 +112,28 @@ $ maafw-cli pipeline run workflow.json --on phone --json | process_results.py
 
 ## 4. 命令层级（完整规划）
 
+> 已实现的命令标 ✅，其余为规划中。
+> 实际参数以 `maafw-cli <cmd> --help` 和 [USAGE.md](USAGE.md) 为准。
+
 ```
 maafw-cli
 ├── device                           # 设备发现
-│   └── list [--adb] [--win32]
+│   └── list [--adb] [--win32]       ✅
 │
 ├── connect                          # 连接
-│   ├── adb <device> [--as <name>] [--screenshot-size 720]
-│   └── win32 <window> [--as <name>] [--screencap ...] [--mouse ...] [--keyboard ...]
+│   ├── adb <device>                 ✅ [--screenshot-size]
+│   └── win32 <window>               ✅ [--screencap-method] [--input-method]
 │
-├── session                          # 会话管理
-│   ├── list
-│   ├── default [<name>]
-│   └── close [<name>|--all]
+├── ocr                              ✅ [--roi] [--text-only]
+├── screenshot                       ✅ [--output]
+├── click <target>                   ✅ (t引用 / x,y坐标)
 │
-├── ocr                              # OCR 感知（核心）
-│   [--on <session>] [--json] [--roi x,y,w,h] [--text-only]
-│
-├── reco <pipeline_node_json>        # MaaFW 原生感知接口
-│   [--on <session>] [--json]
-│   # 执行一个 Pipeline 节点的识别部分，返回匹配结果
-│   # 支持 OCR / TemplateMatch / ColorMatch 等所有识别类型
-│
-├── screenshot                       # 截图
-│   [--on <session>] [--output <file>]
-│
-├── click <target>                   # 点击
-│   [--on <session>] [--long <ms>] [--observe]
-├── dblclick <target>
-├── swipe <from> <to> [--duration <ms>] [--observe]
-├── scroll <x> <y> [--dx <n>] [--dy <n>] [--observe]
-├── type <text> [--observe]          # 输入文字
-├── key <keycode> [--observe]        # 按键
-├── shortcut <keys> [--observe]      # 组合键 (ctrl+c, alt+tab)
-│
-├── pipeline                         # Pipeline 工作流
-│   ├── run <file> [--entry <node>] [--on <session>]
-│   ├── validate <file>
-│   ├── show <file>                  # 浏览器可视化
-│   └── list
-│
-├── resource                         # 资源管理
-│   ├── download-ocr
-│   └── status
-│
-└── daemon                           # 守护进程管理
-    ├── start [--port <port>]
-    ├── stop
-    └── status
+├── session list/default/close       （Phase 3: 命名会话）
+├── reco <type> [params...]          （Phase 2: 原生感知）
+├── swipe / scroll / type / key      （Phase 2: 交互命令）
+├── pipeline run/validate            （Phase 4: 工作流）
+├── resource download-ocr/status     （Phase 2）
+└── daemon start/stop/status         （Phase 3: 守护进程）
 ```
 
 ### 4.1 `reco` 命令详解（Phase 2）
@@ -495,43 +469,8 @@ $ maafw-cli connect win32 "游戏" --screencap-method FramePool --input-method S
 
 ---
 
-## 8. 项目文件结构
+## 8. 相关文档
 
-```
-maafw-cli/
-├── pyproject.toml
-├── src/
-│   └── maafw_cli/
-│       ├── __init__.py          # 版本号
-│       ├── __main__.py          # python -m maafw_cli 入口
-│       ├── cli.py               # click 根命令 + 全局选项
-│       ├── paths.py             # 跨平台路径管理
-│       ├── download.py          # OCR 资源下载
-│       ├── commands/
-│       │   ├── __init__.py
-│       │   ├── device.py        # device list
-│       │   ├── connect.py       # connect adb/win32
-│       │   ├── ocr.py           # ocr
-│       │   ├── screenshot.py    # screenshot
-│       │   └── click_cmd.py     # click
-│       ├── core/
-│       │   ├── __init__.py
-│       │   ├── session.py       # 会话管理（V1: 单会话文件）
-│       │   ├── textref.py       # TextRef 引用系统
-│       │   ├── output.py        # 输出格式化（human/json/quiet）
-│       │   ├── target.py        # 目标解析（t3 / 452,387 / text:设置）
-│       │   └── reconnect.py     # 共享重连逻辑
-│       └── maafw/
-│           ├── __init__.py
-│           ├── adb.py           # ADB 设备操作
-│           ├── win32.py         # Win32 窗口操作
-│           ├── vision.py        # 截图 + OCR
-│           └── control.py       # 点击等控制操作
-└── tests/
-    ├── test_cli.py              # CliRunner 集成测试
-    ├── test_textref.py          # TextRef 单元测试
-    ├── test_target.py           # 目标解析单元测试
-    ├── test_adb_manual.py       # ADB 手动集成测试
-    ├── test_win32_manual.py     # Win32 手动集成测试
-    └── mock_win32_window.py     # Win32 测试用 tkinter mock 窗口
-```
+- [USAGE.md](USAGE.md) — 命令参考与使用指南
+- [ARCHITECTURE.md](ARCHITECTURE.md) — 工程结构与模块职责
+- [TODO.md](TODO.md) — 待办事项

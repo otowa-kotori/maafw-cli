@@ -68,8 +68,6 @@ class OutputFormatter:
         target.buffer.write(b"\n")
         target.buffer.flush()
 
-    # ── helpers ─────────────────────────────────────────────────
-
     def _print_json(self, obj: Any) -> None:
         text = json.dumps(obj, ensure_ascii=False, indent=2)
         sys.stdout.buffer.write(text.encode("utf-8"))
