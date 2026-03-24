@@ -3,6 +3,7 @@ Vision operations — screenshot + OCR via MaaFramework.
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Optional
 
@@ -13,16 +14,24 @@ from maa.resource import Resource
 from maa.tasker import Tasker, TaskDetail
 from maa.pipeline import JRecognitionType, JOCR
 
+from maafw_cli.core.log import Timer
 from maafw_cli.download import check_ocr_files_exist
 from maafw_cli.paths import get_resource_dir, get_screenshots_dir
+
+_log = logging.getLogger("maafw_cli.vision")
 
 
 def _get_resource() -> Optional[Resource]:
     """Create a Resource instance, loading the OCR model bundle."""
     resource_path = get_resource_dir()
     resource = Resource()
-    if not resource.post_bundle(str(resource_path)).wait().succeeded:
-        return None
+
+    if not resource.use_directml():
+        _log.debug("DirectML not available, falling back to CPU inference")
+
+    with Timer("resource bundle load", log=_log):
+        if not resource.post_bundle(str(resource_path)).wait().succeeded:
+            return None
     return resource
 
 
@@ -43,7 +52,8 @@ def screencap(controller: Controller) -> Any:
 
     Returns ``None`` on failure.
     """
-    return controller.post_screencap().wait().get()
+    with Timer("screencap", log=_log):
+        return controller.post_screencap().wait().get()
 
 
 def screencap_to_file(controller: Controller, output: str | Path | None = None) -> Optional[Path]:
@@ -76,21 +86,23 @@ def ocr(controller: Controller) -> Optional[list[OCRResult]]:
     Returns a list of ``OCRResult`` (with ``.text``, ``.box``, ``.score``),
     or ``None`` on failure.
     """
-    if not check_ocr_files_exist():
-        return None
+    with Timer("total OCR pipeline", log=_log):
+        if not check_ocr_files_exist():
+            return None
 
-    tasker = _get_tasker(controller)
-    if tasker is None:
-        return None
+        tasker = _get_tasker(controller)
+        if tasker is None:
+            return None
 
-    image = screencap(controller)
-    if image is None:
-        return None
+        image = screencap(controller)
+        if image is None:
+            return None
 
-    info: TaskDetail | None = (
-        tasker.post_recognition(JRecognitionType.OCR, JOCR(), image).wait().get()
-    )
-    if not info:
-        return None
+        with Timer("OCR inference", log=_log):
+            info: TaskDetail | None = (
+                tasker.post_recognition(JRecognitionType.OCR, JOCR(), image).wait().get()
+            )
+        if not info:
+            return None
 
-    return info.nodes[0].recognition.all_results  # type: ignore[return-value]
+        return info.nodes[0].recognition.all_results  # type: ignore[return-value]

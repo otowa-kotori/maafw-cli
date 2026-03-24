@@ -7,6 +7,7 @@ from __future__ import annotations
 import click
 
 from maafw_cli.cli import pass_ctx, CliContext, EXIT_CONNECTION_ERROR
+from maafw_cli.core.log import logger
 
 
 @click.group()
@@ -26,7 +27,7 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int) -> None:
     DEVICE is the device name as shown by ``device list --adb``.
     """
     fmt = ctx.fmt
-    fmt.info(f"Connecting to ADB device '{device}'…")
+    logger.info("Connecting to ADB device '%s'…", device)
 
     # Initialise MaaFW toolkit
     try:

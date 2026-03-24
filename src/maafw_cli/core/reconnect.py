@@ -6,11 +6,15 @@ and reconnects.  Phase 3 will replace this with daemon IPC.
 """
 from __future__ import annotations
 
+import logging
+
 from maa.controller import Controller
 
+from maafw_cli.core.log import Timer
 from maafw_cli.core.output import OutputFormatter
 from maafw_cli.core.session import load_session
 
+_log = logging.getLogger("maafw_cli.reconnect")
 
 _EXIT_CONNECTION_ERROR = 3
 
@@ -21,20 +25,24 @@ def reconnect(fmt: OutputFormatter) -> Controller:
     Calls ``fmt.error(…)`` (which exits) if anything goes wrong,
     so callers can assume the return value is always a live Controller.
     """
-    session = load_session()
-    if session is None:
-        fmt.error(
-            "No active session. Run 'maafw-cli connect adb <device>' first.",
-            exit_code=_EXIT_CONNECTION_ERROR,
-        )
+    with Timer("total reconnect", log=_log):
+        session = load_session()
+        if session is None:
+            fmt.error(
+                "No active session. Run 'maafw-cli connect adb <device>' first.",
+                exit_code=_EXIT_CONNECTION_ERROR,
+            )
 
-    # Initialise MaaFW toolkit (idempotent)
-    _init_toolkit()
+        _log.debug("session loaded from file")
 
-    if session.type == "adb":
-        return _reconnect_adb(fmt, session)
+        # Initialise MaaFW toolkit (idempotent)
+        with Timer("toolkit init", log=_log):
+            _init_toolkit()
 
-    fmt.error(f"Unsupported session type: {session.type}", exit_code=_EXIT_CONNECTION_ERROR)
+        if session.type == "adb":
+            return _reconnect_adb(fmt, session)
+
+        fmt.error(f"Unsupported session type: {session.type}", exit_code=_EXIT_CONNECTION_ERROR)
 
 
 def _init_toolkit() -> None:
@@ -51,7 +59,9 @@ def _init_toolkit() -> None:
 def _reconnect_adb(fmt: OutputFormatter, session) -> Controller:
     from maafw_cli.maafw.adb import find_adb_devices, connect_adb
 
-    devices = find_adb_devices()
+    with Timer("device discovery", log=_log):
+        devices = find_adb_devices()
+
     match = None
     for d in devices:
         if d.name == session.device or d.address == session.address:
@@ -64,7 +74,9 @@ def _reconnect_adb(fmt: OutputFormatter, session) -> Controller:
             exit_code=_EXIT_CONNECTION_ERROR,
         )
 
-    controller = connect_adb(match, screenshot_short_side=session.screenshot_short_side)
+    with Timer("ADB connection", log=_log):
+        controller = connect_adb(match, screenshot_short_side=session.screenshot_short_side)
+
     if controller is None:
         fmt.error(
             f"Failed to reconnect to '{session.device}'.",

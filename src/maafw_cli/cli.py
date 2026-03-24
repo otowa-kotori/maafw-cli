@@ -9,6 +9,7 @@ from __future__ import annotations
 import click
 
 from maafw_cli import __version__
+from maafw_cli.core.log import setup_logging
 from maafw_cli.core.output import OutputFormatter
 
 
@@ -17,8 +18,9 @@ from maafw_cli.core.output import OutputFormatter
 class CliContext:
     """Carries global state through Click's context."""
 
-    def __init__(self, *, json_mode: bool = False, quiet: bool = False):
+    def __init__(self, *, json_mode: bool = False, quiet: bool = False, verbose: bool = False):
         self.fmt = OutputFormatter(json_mode=json_mode, quiet=quiet)
+        self.verbose = verbose
 
 
 pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
@@ -30,11 +32,13 @@ pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
 @click.version_option(version=__version__, prog_name="maafw-cli")
 @click.option("--json", "json_mode", is_flag=True, default=False, help="Output strict JSON to stdout.")
 @click.option("--quiet", is_flag=True, default=False, help="Suppress non-error output.")
+@click.option("--verbose", "-v", is_flag=True, default=False, help="Show detailed timing and debug info.")
 @click.pass_context
-def cli(ctx: click.Context, json_mode: bool, quiet: bool) -> None:
+def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool) -> None:
     """maafw-cli — MaaFramework command-line interface."""
     ctx.ensure_object(dict)
-    ctx.obj = CliContext(json_mode=json_mode, quiet=quiet)
+    setup_logging(verbose=verbose, quiet=quiet)
+    ctx.obj = CliContext(json_mode=json_mode, quiet=quiet, verbose=verbose)
 
 
 # ── exit codes ──────────────────────────────────────────────────

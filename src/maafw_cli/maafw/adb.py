@@ -5,11 +5,16 @@ This module is independent of the CLI layer and can be used by any caller.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from maa.toolkit import Toolkit
 from maa.controller import AdbController
+
+from maafw_cli.core.log import Timer
+
+_log = logging.getLogger("maafw_cli.adb")
 
 
 @dataclass
@@ -25,7 +30,8 @@ class AdbDeviceInfo:
 
 def find_adb_devices() -> list[AdbDeviceInfo]:
     """Scan for connected ADB devices.  Returns a list of device info."""
-    device_list = Toolkit.find_adb_devices()
+    with Timer("device discovery", log=_log):
+        device_list = Toolkit.find_adb_devices()
     return [
         AdbDeviceInfo(
             name=str(d.name),
@@ -52,6 +58,7 @@ def connect_adb(device: AdbDeviceInfo, screenshot_short_side: int = 720) -> Opti
         device.config,
     )
     ctrl.set_screenshot_target_short_side(screenshot_short_side)
-    if not ctrl.post_connection().wait().succeeded:
-        return None
+    with Timer("ADB connection", log=_log):
+        if not ctrl.post_connection().wait().succeeded:
+            return None
     return ctrl

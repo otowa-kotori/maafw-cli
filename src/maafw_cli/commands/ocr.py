@@ -3,11 +3,10 @@
 """
 from __future__ import annotations
 
-import time
-
 import click
 
 from maafw_cli.cli import pass_ctx, CliContext, EXIT_RECOGNITION_FAILED
+from maafw_cli.core.log import Timer
 
 
 @click.command()
@@ -21,12 +20,11 @@ def ocr(ctx: CliContext, roi: str | None, text_only: bool) -> None:
     from maafw_cli.core.reconnect import reconnect
     controller = reconnect(fmt)
 
-    t0 = time.time()
+    with Timer("ocr command") as t:
+        from maafw_cli.maafw.vision import ocr as do_ocr
+        results = do_ocr(controller)
 
-    from maafw_cli.maafw.vision import ocr as do_ocr
-    results = do_ocr(controller)
-
-    elapsed_ms = int((time.time() - t0) * 1000)
+    elapsed_ms = t.elapsed_ms
 
     if results is None:
         from maafw_cli.download import check_ocr_files_exist

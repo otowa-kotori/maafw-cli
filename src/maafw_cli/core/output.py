@@ -49,9 +49,14 @@ class OutputFormatter:
         sys.exit(exit_code)
 
     def info(self, message: str) -> None:
-        """Print informational / progress text to stderr (never captured by pipes)."""
-        if not self.quiet:
-            self._print_text(message, file=sys.stderr)
+        """Print informational / progress text to stderr (never captured by pipes).
+
+        Delegates to the unified ``maafw_cli`` logger so that ``--verbose``
+        and ``--quiet`` are handled in one place.
+        """
+        from maafw_cli.core.log import logger
+
+        logger.info(message)
 
     # ── helpers ─────────────────────────────────────────────────
 
