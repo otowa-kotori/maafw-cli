@@ -1,0 +1,39 @@
+"""
+Resource services — OCR model download and status.
+"""
+from __future__ import annotations
+
+from maafw_cli.core.errors import ActionError
+from maafw_cli.core.log import logger
+from maafw_cli.services.registry import service
+
+
+@service(name="resource_download_ocr", human=lambda r: f"OCR model ready at {r['path']}")
+def do_download_ocr() -> dict:
+    """Download OCR model if not already present."""
+    from maafw_cli.download import check_ocr_files_exist, download_and_extract_ocr
+    from maafw_cli.paths import get_ocr_dir
+
+    ocr_dir = get_ocr_dir()
+
+    if check_ocr_files_exist(ocr_dir):
+        return {"downloaded": False, "already_exists": True, "path": str(ocr_dir)}
+
+    logger.info("Downloading OCR model...")
+    ok = download_and_extract_ocr(ocr_dir)
+    if not ok:
+        raise ActionError("OCR model download failed. Check network and retry.")
+
+    return {"downloaded": True, "already_exists": False, "path": str(ocr_dir)}
+
+
+@service(name="resource_status")
+def do_resource_status() -> dict:
+    """Check status of all downloadable resources."""
+    from maafw_cli.download import check_ocr_files_exist
+    from maafw_cli.paths import get_ocr_dir
+
+    ocr_dir = get_ocr_dir()
+    ocr_ready = check_ocr_files_exist(ocr_dir)
+
+    return {"ocr_model": ocr_ready, "ocr_path": str(ocr_dir)}

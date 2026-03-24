@@ -80,8 +80,8 @@ def screencap_to_file(controller: Controller, output: str | Path | None = None) 
     return output
 
 
-def ocr(controller: Controller) -> Optional[list[OCRResult]]:
-    """Run full-screen OCR.
+def ocr(controller: Controller, roi: tuple[int, int, int, int] | None = None) -> Optional[list[OCRResult]]:
+    """Run OCR, optionally restricted to *roi* ``(x, y, w, h)``.
 
     Returns a list of ``OCRResult`` (with ``.text``, ``.box``, ``.score``),
     or ``None`` on failure.
@@ -98,9 +98,13 @@ def ocr(controller: Controller) -> Optional[list[OCRResult]]:
         if image is None:
             return None
 
+        ocr_params = JOCR()
+        if roi is not None:
+            ocr_params.roi = roi
+
         with Timer("OCR inference", log=_log):
             info: TaskDetail | None = (
-                tasker.post_recognition(JRecognitionType.OCR, JOCR(), image).wait().get()
+                tasker.post_recognition(JRecognitionType.OCR, ocr_params, image).wait().get()
             )
         if not info:
             return None

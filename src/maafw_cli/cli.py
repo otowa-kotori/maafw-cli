@@ -20,9 +20,11 @@ from maafw_cli.core.output import OutputFormatter
 class CliContext:
     """Carries global state through Click's context."""
 
-    def __init__(self, *, json_mode: bool = False, quiet: bool = False, verbose: bool = False):
+    def __init__(self, *, json_mode: bool = False, quiet: bool = False,
+                 verbose: bool = False, observe: bool = False):
         self.fmt = OutputFormatter(json_mode=json_mode, quiet=quiet)
         self.verbose = verbose
+        self.observe = observe
 
     def _make_service_context(self):
         """Build a :class:`ServiceContext` for the current session."""
@@ -56,7 +58,37 @@ class CliContext:
         human_fn = getattr(service_fn, "human_fmt", None)
         human = human_fn(result) if human_fn else None
         self.fmt.success(result, human=human)
+
+        # --observe: auto-OCR after action commands
+        if self.observe and result.get("action"):
+            self._run_observe(svc_ctx, result)
+
         return result
+
+    def _run_observe(self, svc_ctx, action_result: dict) -> None:
+        """Run OCR after an action and output the results."""
+        from maafw_cli.services.vision import do_ocr
+
+        try:
+            ocr_result = do_ocr(svc_ctx)
+        except MaafwError:
+            return  # observe is best-effort
+
+        refs = ocr_result["results"]
+        elapsed_ms = ocr_result["elapsed_ms"]
+
+        if self.fmt.json_mode:
+            self.fmt.success(ocr_result)
+        elif refs:
+            lines: list[str] = ["\u2500" * 60]
+            for r in refs:
+                box = r["box"]
+                box_str = f"[{box[0]:>4},{box[1]:>4},{box[2]:>4},{box[3]:>4}]"
+                score_str = f"{r['score'] * 100:.0f}%"
+                lines.append(f" {r['ref']:<4s} {r['text']:<20s} {box_str}  {score_str}")
+            lines.append("\u2500" * 60)
+            lines.append(f"{len(refs)} results | {elapsed_ms}ms")
+            self.fmt.success(ocr_result, human="\n".join(lines))
 
 
 pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
@@ -69,12 +101,13 @@ pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
 @click.option("--json", "json_mode", is_flag=True, default=False, help="Output strict JSON to stdout.")
 @click.option("--quiet", is_flag=True, default=False, help="Suppress non-error output.")
 @click.option("--verbose", "-v", is_flag=True, default=False, help="Show detailed timing and debug info.")
+@click.option("--observe", is_flag=True, default=False, help="Auto-OCR after action commands.")
 @click.pass_context
-def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool) -> None:
+def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool, observe: bool) -> None:
     """maafw-cli — MaaFramework command-line interface."""
     ctx.ensure_object(dict)
     setup_logging(verbose=verbose, quiet=quiet)
-    ctx.obj = CliContext(json_mode=json_mode, quiet=quiet, verbose=verbose)
+    ctx.obj = CliContext(json_mode=json_mode, quiet=quiet, verbose=verbose, observe=observe)
 
 
 # ── exit codes (kept for backward compat imports) ────────────────
@@ -89,6 +122,7 @@ EXIT_CONNECTION_ERROR = 3
 from maafw_cli.commands.connection import device, connect  # noqa: E402
 from maafw_cli.commands.vision import ocr, screenshot  # noqa: E402
 from maafw_cli.commands.interaction import click_cmd, swipe_cmd, scroll_cmd, type_cmd, key_cmd  # noqa: E402
+from maafw_cli.commands.resource import resource  # noqa: E402
 from maafw_cli.commands.repl_cmd import repl_cmd  # noqa: E402
 
 cli.add_command(device)
@@ -100,4 +134,5 @@ cli.add_command(swipe_cmd, name="swipe")
 cli.add_command(scroll_cmd, name="scroll")
 cli.add_command(type_cmd, name="type")
 cli.add_command(key_cmd, name="key")
+cli.add_command(resource)
 cli.add_command(repl_cmd, name="repl")

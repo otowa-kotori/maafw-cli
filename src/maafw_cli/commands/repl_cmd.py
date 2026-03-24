@@ -28,6 +28,7 @@ class Repl:
     def __init__(self, fmt: OutputFormatter):
         self.fmt = fmt
         self._svc_ctx: ServiceContext | None = None
+        self.observe: bool = False
 
     # ── public API ──────────────────────────────────────────────
 
@@ -64,6 +65,9 @@ class Repl:
         if cmd == "status":
             self._print_status()
             return None
+        if cmd == "observe":
+            self._toggle_observe(args)
+            return None
 
         # Connection commands (special — they don't use ServiceContext)
         if cmd == "connect":
@@ -94,6 +98,11 @@ class Repl:
         human_fn = getattr(handler, "human_fmt", None)
         human = human_fn(result) if human_fn else None
         self.fmt.success(result, human=human)
+
+        # observe: auto-OCR after action commands
+        if self.observe and result.get("action"):
+            self._run_observe()
+
         return result
 
     # ── connection handling ─────────────────────────────────────
@@ -230,7 +239,15 @@ class Repl:
 
     @staticmethod
     def _parse_ocr(args: list[str]) -> dict | None:
-        return {}
+        kw: dict = {}
+        i = 0
+        while i < len(args):
+            if args[i] == "--roi" and i + 1 < len(args):
+                kw["roi"] = args[i + 1]
+                i += 2
+            else:
+                i += 1
+        return kw
 
     @staticmethod
     def _parse_screenshot(args: list[str]) -> dict | None:
@@ -247,13 +264,14 @@ class Repl:
         cmds = [
             "connect adb <device>         Connect to ADB device",
             "connect win32 <window>       Connect to Win32 window",
-            "ocr                          Run OCR",
+            "ocr [--roi x,y,w,h]         Run OCR",
             "screenshot [-o FILE]         Take screenshot",
             "click <target>               Click (t3 or 452,387)",
             "swipe <from> <to>            Swipe between targets",
             "scroll <dx> <dy>             Scroll",
             "type <text>                  Input text",
             "key <keycode>                Press key",
+            "observe on|off               Toggle auto-OCR after actions",
             "status                       Show session info",
             "help                         Show this help",
             "quit                         Exit REPL",
@@ -269,6 +287,41 @@ class Repl:
             print(f"Session: {session.type} | {session.device} | {session.address}")
             has_ctrl = self._svc_ctx is not None and "controller" in self._svc_ctx.__dict__
             print(f"Controller cached: {has_ctrl}")
+            print(f"Observe: {'on' if self.observe else 'off'}")
+
+    def _toggle_observe(self, args: list[str]) -> None:
+        if not args or args[0] not in ("on", "off"):
+            print("Usage: observe on|off", file=sys.stderr)
+            return
+        self.observe = args[0] == "on"
+        print(f"Observe: {'on' if self.observe else 'off'}")
+
+    def _run_observe(self) -> None:
+        """Run OCR after an action (best-effort)."""
+        from maafw_cli.services.vision import do_ocr
+
+        try:
+            ocr_result = do_ocr(self._svc_ctx)
+        except MaafwError:
+            return
+
+        refs = ocr_result["results"]
+        elapsed_ms = ocr_result["elapsed_ms"]
+        if not refs:
+            return
+
+        if self.fmt.json_mode:
+            self.fmt.success(ocr_result)
+        else:
+            lines: list[str] = ["\u2500" * 60]
+            for r in refs:
+                box = r["box"]
+                box_str = f"[{box[0]:>4},{box[1]:>4},{box[2]:>4},{box[3]:>4}]"
+                score_str = f"{r['score'] * 100:.0f}%"
+                lines.append(f" {r['ref']:<4s} {r['text']:<20s} {box_str}  {score_str}")
+            lines.append("\u2500" * 60)
+            lines.append(f"{len(refs)} results | {elapsed_ms}ms")
+            self.fmt.success(ocr_result, human="\n".join(lines))
 
 
 @click.command("repl")

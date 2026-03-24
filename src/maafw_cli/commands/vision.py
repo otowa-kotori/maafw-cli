@@ -22,7 +22,7 @@ def ocr(ctx: CliContext, roi: str | None, text_only: bool) -> None:
 
     svc_ctx = ctx._make_service_context()
     try:
-        result = do_ocr(svc_ctx)
+        result = do_ocr(svc_ctx, roi=roi)
     except MaafwError as e:
         fmt.error(str(e), exit_code=e.exit_code)
         return

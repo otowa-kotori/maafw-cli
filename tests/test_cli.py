@@ -94,6 +94,28 @@ class TestCliStructure:
         assert result.exit_code == 0
         assert "KEYCODE" in result.output
 
+    def test_repl_help(self):
+        result = runner.invoke(cli, ["repl", "--help"])
+        assert result.exit_code == 0
+
+    def test_resource_help(self):
+        result = runner.invoke(cli, ["resource", "--help"])
+        assert result.exit_code == 0
+        assert "download-ocr" in result.output
+        assert "status" in result.output
+
+    def test_resource_download_ocr_help(self):
+        result = runner.invoke(cli, ["resource", "download-ocr", "--help"])
+        assert result.exit_code == 0
+
+    def test_resource_status_help(self):
+        result = runner.invoke(cli, ["resource", "status", "--help"])
+        assert result.exit_code == 0
+
+    def test_global_observe_flag(self):
+        result = runner.invoke(cli, ["--observe", "--help"])
+        assert result.exit_code == 0
+
     def test_global_json_flag(self):
         """Ensure --json is accepted as a global option."""
         result = runner.invoke(cli, ["--json", "--help"])

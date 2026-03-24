@@ -28,6 +28,7 @@ maafw-cli click 452,387                        # 按坐标点击
 | `--json` | 输出严格 JSON 到 stdout |
 | `--quiet` | 抑制非错误输出 |
 | `-v` / `--verbose` | 显示 DEBUG 级别日志（含耗时） |
+| `--observe` | 动作命令执行后自动 OCR，输出识别结果 |
 
 ## 命令参考
 
@@ -89,8 +90,13 @@ maafw-cli device list --win32      # Win32 窗口
 
 | 选项 | 说明 |
 |------|------|
-| `--roi x,y,w,h` | 限定识别区域（暂未实现过滤） |
+| `--roi x,y,w,h` | 限定识别区域 |
 | `--text-only` | 仅输出识别文本，不含表格格式 |
+
+```bash
+maafw-cli ocr                         # 全屏 OCR
+maafw-cli ocr --roi 0,0,400,300       # 只识别左上角区域
+```
 
 ### `screenshot`
 
@@ -169,6 +175,47 @@ maafw-cli key f5
 maafw-cli key 66             # 直传整数，不查表
 maafw-cli key 0x0D           # 直传十六进制
 ```
+
+### `resource download-ocr`
+
+下载 OCR 模型（ppocr_v5 zh_cn）。如已存在则跳过。
+
+```bash
+maafw-cli resource download-ocr
+```
+
+### `resource status`
+
+显示资源就绪状态。
+
+```bash
+maafw-cli resource status
+```
+
+### `repl`
+
+启动交互式 REPL。连接一次，后续操作复用 controller，零重连开销。
+
+```bash
+maafw-cli repl
+maafw> connect adb 127.0.0.1:16384
+maafw> ocr
+maafw> click t1
+maafw> observe on        # 开启 --observe 模式
+maafw> click t2          # 点击后自动 OCR
+maafw> quit
+```
+
+## `--observe` 模式
+
+在动作命令（click/swipe/scroll/type/key）执行后自动追加 OCR，一条命令完成"操作+感知"。
+
+```bash
+maafw-cli --observe click t3          # 点击后立即输出 OCR 结果
+maafw-cli --observe --json click t3   # JSON 中含 OCR 结果
+```
+
+REPL 中用 `observe on` / `observe off` 切换。
 
 ## 退出码
 

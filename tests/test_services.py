@@ -235,3 +235,42 @@ class TestServiceContext:
         ctx = _make_ctx()
         with pytest.raises(ActionError):
             ctx.resolve_target("???")
+
+
+# ── ROI parsing ──────────────────────────────────────────────────
+
+
+class TestRoiParsing:
+    def test_parse_roi_valid(self):
+        from maafw_cli.services.vision import _parse_roi
+        assert _parse_roi("100,200,300,400") == (100, 200, 300, 400)
+
+    def test_parse_roi_none(self):
+        from maafw_cli.services.vision import _parse_roi
+        assert _parse_roi(None) is None
+
+    def test_parse_roi_spaces(self):
+        from maafw_cli.services.vision import _parse_roi
+        assert _parse_roi("100, 200, 300, 400") == (100, 200, 300, 400)
+
+    def test_parse_roi_invalid_count(self):
+        from maafw_cli.services.vision import _parse_roi
+        with pytest.raises(ActionError, match="Invalid ROI"):
+            _parse_roi("100,200")
+
+    def test_parse_roi_non_int(self):
+        from maafw_cli.services.vision import _parse_roi
+        with pytest.raises(ActionError, match="integers"):
+            _parse_roi("a,b,c,d")
+
+
+# ── resource ─────────────────────────────────────────────────────
+
+
+class TestResourceService:
+    def test_resource_status(self):
+        from maafw_cli.services.resource import do_resource_status
+        result = do_resource_status()
+        assert "ocr_model" in result
+        assert "ocr_path" in result
+        assert isinstance(result["ocr_model"], bool)

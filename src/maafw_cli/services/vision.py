@@ -12,12 +12,26 @@ from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.registry import service
 
 
+def _parse_roi(roi: str | None) -> tuple[int, int, int, int] | None:
+    """Parse ``"x,y,w,h"`` into a tuple, or return None."""
+    if roi is None:
+        return None
+    parts = [p.strip() for p in roi.split(",")]
+    if len(parts) != 4:
+        raise ActionError(f"Invalid ROI '{roi}'. Expected format: x,y,w,h")
+    try:
+        return tuple(int(p) for p in parts)  # type: ignore[return-value]
+    except ValueError:
+        raise ActionError(f"Invalid ROI '{roi}'. All values must be integers.")
+
+
 @service(name="ocr")
-def do_ocr(ctx: ServiceContext) -> dict:
+def do_ocr(ctx: ServiceContext, roi: str | None = None) -> dict:
     with Timer("ocr service") as t:
         from maafw_cli.maafw.vision import ocr as _ocr
 
-        results = _ocr(ctx.controller)
+        roi_tuple = _parse_roi(roi)
+        results = _ocr(ctx.controller, roi=roi_tuple)
 
     elapsed_ms = t.elapsed_ms
 
