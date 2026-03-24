@@ -5,10 +5,12 @@ All sub-commands are registered here.
 """
 from __future__ import annotations
 
+from typing import Callable
 
 import click
 
 from maafw_cli import __version__
+from maafw_cli.core.errors import MaafwError
 from maafw_cli.core.log import setup_logging
 from maafw_cli.core.output import OutputFormatter
 
@@ -21,6 +23,40 @@ class CliContext:
     def __init__(self, *, json_mode: bool = False, quiet: bool = False, verbose: bool = False):
         self.fmt = OutputFormatter(json_mode=json_mode, quiet=quiet)
         self.verbose = verbose
+
+    def _make_service_context(self):
+        """Build a :class:`ServiceContext` for the current session."""
+        from maafw_cli.core.reconnect import reconnect
+        from maafw_cli.core.session import load_session, textrefs_file
+        from maafw_cli.services.context import ServiceContext
+
+        session = load_session()
+        session_type = session.type if session else "win32"
+
+        return ServiceContext(
+            get_controller=lambda: reconnect(self.fmt),
+            textrefs_path=textrefs_file(),
+            session_type=session_type,
+        )
+
+    def run(self, service_fn: Callable, **kwargs) -> dict:
+        """Call a service function with automatic context injection and error handling.
+
+        Builds a :class:`ServiceContext`, calls *service_fn(ctx, **kwargs)*,
+        catches :class:`MaafwError` → ``fmt.error()``, and on success routes
+        the result through ``fmt.success()`` using the service's ``human_fmt``.
+        """
+        svc_ctx = self._make_service_context()
+        try:
+            result = service_fn(svc_ctx, **kwargs)
+        except MaafwError as e:
+            self.fmt.error(str(e), exit_code=e.exit_code)
+            return {}  # unreachable — fmt.error exits
+
+        human_fn = getattr(service_fn, "human_fmt", None)
+        human = human_fn(result) if human_fn else None
+        self.fmt.success(result, human=human)
+        return result
 
 
 pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
@@ -41,12 +77,7 @@ def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool) -> None
     ctx.obj = CliContext(json_mode=json_mode, quiet=quiet, verbose=verbose)
 
 
-# ── exit codes ──────────────────────────────────────────────────
-# 0 = success
-# 1 = action failed
-# 2 = recognition failed
-# 3 = connection error
-
+# ── exit codes (kept for backward compat imports) ────────────────
 EXIT_SUCCESS = 0
 EXIT_ACTION_FAILED = 1
 EXIT_RECOGNITION_FAILED = 2
@@ -55,15 +86,10 @@ EXIT_CONNECTION_ERROR = 3
 
 # ── import sub-commands to register them ────────────────────────
 
-from maafw_cli.commands.device import device  # noqa: E402
-from maafw_cli.commands.connect import connect  # noqa: E402
-from maafw_cli.commands.ocr import ocr  # noqa: E402
-from maafw_cli.commands.screenshot import screenshot  # noqa: E402
-from maafw_cli.commands.click_cmd import click_cmd  # noqa: E402
-from maafw_cli.commands.swipe_cmd import swipe_cmd  # noqa: E402
-from maafw_cli.commands.scroll_cmd import scroll_cmd  # noqa: E402
-from maafw_cli.commands.type_cmd import type_cmd  # noqa: E402
-from maafw_cli.commands.key_cmd import key_cmd  # noqa: E402
+from maafw_cli.commands.connection import device, connect  # noqa: E402
+from maafw_cli.commands.vision import ocr, screenshot  # noqa: E402
+from maafw_cli.commands.interaction import click_cmd, swipe_cmd, scroll_cmd, type_cmd, key_cmd  # noqa: E402
+from maafw_cli.commands.repl_cmd import repl_cmd  # noqa: E402
 
 cli.add_command(device)
 cli.add_command(connect)
@@ -74,3 +100,4 @@ cli.add_command(swipe_cmd, name="swipe")
 cli.add_command(scroll_cmd, name="scroll")
 cli.add_command(type_cmd, name="type")
 cli.add_command(key_cmd, name="key")
+cli.add_command(repl_cmd, name="repl")

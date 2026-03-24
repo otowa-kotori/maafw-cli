@@ -138,83 +138,83 @@ class TestKeyResolver:
     # ── Win32 (default) ──────────────────────────────────────────
 
     def test_win32_enter(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("enter", "win32") == 0x0D
 
     def test_win32_case_insensitive(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("ENTER", "win32") == 0x0D
         assert resolve_keycode("Enter", "win32") == 0x0D
 
     def test_win32_tab(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("tab", "win32") == 0x09
 
     def test_win32_esc(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("esc", "win32") == 0x1B
         assert resolve_keycode("escape", "win32") == 0x1B
 
     def test_win32_f1(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("f1", "win32") == 0x70
 
     def test_win32_f12(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("f12", "win32") == 0x7B
 
     def test_win32_space(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("space", "win32") == 0x20
 
     # ── ADB / Android ────────────────────────────────────────────
 
     def test_adb_enter(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("enter", "adb") == 66
 
     def test_adb_back(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("back", "adb") == 4
 
     def test_adb_home(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("home", "adb") == 3
 
     def test_adb_tab(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("tab", "adb") == 61
 
     def test_adb_space(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("space", "adb") == 62
 
     def test_adb_esc(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("esc", "adb") == 111
 
     def test_adb_volume_up(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("volume_up", "adb") == 24
 
     def test_adb_f5(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("f5", "adb") == 135
 
     # ── Raw integer passthrough (both platforms) ─────────────────
 
     def test_hex_literal(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("0x0D", "win32") == 0x0D
         assert resolve_keycode("0x0D", "adb") == 0x0D
 
     def test_decimal_literal(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("66", "adb") == 66
         assert resolve_keycode("13", "win32") == 13
 
     def test_unknown_key(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("nonexistent", "win32") is None
         assert resolve_keycode("nonexistent", "adb") is None
 
@@ -222,10 +222,10 @@ class TestKeyResolver:
 
     def test_back_only_on_adb(self):
         """'back' is Android-specific, not in Win32 map."""
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("back", "adb") == 4
         assert resolve_keycode("back", "win32") is None
 
     def test_default_session_type_is_win32(self):
-        from maafw_cli.commands.key_cmd import resolve_keycode
+        from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("enter") == 0x0D  # default = win32

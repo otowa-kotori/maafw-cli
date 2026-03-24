@@ -1,0 +1,97 @@
+"""
+REPL dispatch tests — verify command parsing and service routing.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from maafw_cli.core.output import OutputFormatter
+from maafw_cli.commands.repl_cmd import Repl
+from maafw_cli.services.context import ServiceContext
+from mock_controller import MockController
+
+
+def _make_repl(mock: MockController | None = None, json_mode: bool = False) -> Repl:
+    """Build a Repl with a pre-wired ServiceContext backed by MockController."""
+    if mock is None:
+        mock = MockController()
+    fmt = OutputFormatter(json_mode=json_mode, quiet=True)
+    repl = Repl(fmt)
+    repl._svc_ctx = ServiceContext(
+        get_controller=lambda: mock,
+        textrefs_path=Path("/nonexistent"),
+        session_type="win32",
+    )
+    return repl
+
+
+class TestReplDispatch:
+    def test_click(self):
+        mock = MockController()
+        repl = _make_repl(mock)
+        result = repl.execute_line("click 100,200")
+        assert result is not None
+        assert result["action"] == "click"
+        assert mock.clicks == [(100, 200)]
+
+    def test_swipe(self):
+        mock = MockController()
+        repl = _make_repl(mock)
+        result = repl.execute_line("swipe 100,800 100,200 --duration 500")
+        assert result is not None
+        assert result["x1"] == 100
+        assert result["y2"] == 200
+        assert result["duration"] == 500
+
+    def test_scroll(self):
+        mock = MockController()
+        repl = _make_repl(mock)
+        result = repl.execute_line("scroll 0 -360")
+        assert result is not None
+        assert result["dx"] == 0
+        assert result["dy"] == -360
+
+    def test_type(self):
+        mock = MockController()
+        repl = _make_repl(mock)
+        result = repl.execute_line('type "Hello World"')
+        assert result is not None
+        assert result["text"] == "Hello World"
+
+    def test_key(self):
+        mock = MockController()
+        repl = _make_repl(mock)
+        result = repl.execute_line("key enter")
+        assert result is not None
+        assert result["keycode"] == 0x0D  # win32 default
+
+    def test_unknown_command(self, capsys):
+        repl = _make_repl()
+        result = repl.execute_line("nonexistent_cmd")
+        assert result is None
+
+    def test_error_does_not_exit(self):
+        """Errors in REPL should print, not sys.exit."""
+        mock = MockController(click_ok=False)
+        repl = _make_repl(mock)
+        # Should not raise SystemExit
+        result = repl.execute_line("click 100,200")
+        assert result is None
+
+    def test_help(self, capsys):
+        repl = _make_repl()
+        result = repl.execute_line("help")
+        captured = capsys.readouterr()
+        assert "click" in captured.out
+        assert "swipe" in captured.out
+
+    def test_status_no_session(self, capsys):
+        repl = _make_repl()
+        repl._svc_ctx = None
+        with patch("maafw_cli.core.session.load_session", return_value=None):
+            repl.execute_line("status")
+        captured = capsys.readouterr()
+        assert "No active session" in captured.out
