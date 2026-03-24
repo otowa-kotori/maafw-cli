@@ -11,9 +11,9 @@
 
 ## 中期
 
-- [ ] 守护进程 + 命名会话（`--as phone`, `--on notepad`）
-- [ ] `session list/default/close` 管理
-- [ ] `daemon start/stop/status`
+- [x] 守护进程 + 命名会话（`--as phone`, `--on notepad`）
+- [x] `session list/default/close` 管理
+- [x] `daemon start/stop/status`
 - [ ] TextRef 跨 OCR 稳定性（box 重叠 + 文本相似性保持引用不变）
 
 ## 远期

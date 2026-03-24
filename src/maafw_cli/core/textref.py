@@ -35,9 +35,12 @@ class TextRef:
 
 
 class TextRefStore:
-    """Manages the current set of TextRefs and persists them to disk."""
+    """Manages the current set of TextRefs and persists them to disk.
 
-    def __init__(self, path: Path):
+    When *path* is ``None``, operates in memory-only mode (no file I/O).
+    """
+
+    def __init__(self, path: Path | None):
         self._path = path
         self._refs: list[TextRef] = []
 
@@ -70,7 +73,9 @@ class TextRefStore:
     # ── persistence ─────────────────────────────────────────────
 
     def save(self) -> None:
-        """Write current refs to disk."""
+        """Write current refs to disk.  No-op if path is None (memory mode)."""
+        if self._path is None:
+            return
         self._path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "timestamp": datetime.now().isoformat(),
@@ -79,7 +84,9 @@ class TextRefStore:
         self._path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def load(self) -> list[TextRef]:
-        """Load refs from disk. Returns empty list if file missing."""
+        """Load refs from disk. Returns empty list if file missing or memory mode."""
+        if self._path is None:
+            return self._refs
         if not self._path.exists():
             return []
         try:

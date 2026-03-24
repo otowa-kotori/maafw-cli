@@ -23,22 +23,33 @@ class ServiceContext:
     def __init__(
         self,
         get_controller: Callable[[], Controller],
-        textrefs_path: Path,
+        textrefs_path: Path | None,
         session_type: str = "win32",
+        textref_store: TextRefStore | None = None,
+        session_name: str | None = None,
     ):
         self._get_controller = get_controller
         self.textrefs_path = textrefs_path
         self.session_type = session_type  # "adb" or "win32"
+        self._textref_store = textref_store  # injected store (daemon mode)
+        self.session_name = session_name
 
     @cached_property
     def controller(self) -> Controller:
         """Lazy — first access triggers connection, then reuses."""
         return self._get_controller()
 
-    def resolve_target(self, target: str) -> ResolvedTarget:
-        """Parse t3 / 452,387 into (x, y).  Raises :class:`ActionError`."""
+    def get_textref_store(self) -> TextRefStore:
+        """Return the active TextRefStore (injected or file-based)."""
+        if self._textref_store is not None:
+            return self._textref_store
         store = TextRefStore(self.textrefs_path)
         store.load()
+        return store
+
+    def resolve_target(self, target: str) -> ResolvedTarget:
+        """Parse t3 / 452,387 into (x, y).  Raises :class:`ActionError`."""
+        store = self.get_textref_store()
         result = parse_target(target, store)
         if isinstance(result, str):
             raise ActionError(result)

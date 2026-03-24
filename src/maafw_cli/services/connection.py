@@ -6,8 +6,11 @@ They interact with Toolkit and session persistence directly.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from maafw_cli.core.errors import ConnectionError
 from maafw_cli.core.log import logger
+from maafw_cli.core.session import SessionInfo, save_session
 from maafw_cli.services.registry import service
 
 
@@ -47,9 +50,17 @@ def do_device_list(*, adb: bool = True, win32: bool = False) -> dict:
     return result
 
 
-@service(name="connect_adb")
-def do_connect_adb(device: str, screenshot_size: int = 720) -> dict:
-    """Connect to an ADB device and persist session."""
+# ── inner connect functions (reusable by daemon) ──────────────
+
+
+def _connect_adb_inner(
+    device: str,
+    screenshot_size: int = 720,
+) -> tuple[dict[str, Any], Any, SessionInfo]:
+    """Connect to an ADB device.
+
+    Returns (result_dict, Controller, SessionInfo) — no side effects.
+    """
     _init_toolkit()
     logger.info("Connecting to ADB device '%s'...", device)
 
@@ -71,8 +82,6 @@ def do_connect_adb(device: str, screenshot_size: int = 720) -> dict:
     if controller is None:
         raise ConnectionError(f"Failed to connect to '{device}'.")
 
-    from maafw_cli.core.session import SessionInfo, save_session
-
     info = SessionInfo(
         type="adb",
         device=match.name,
@@ -83,23 +92,25 @@ def do_connect_adb(device: str, screenshot_size: int = 720) -> dict:
         config=match.config,
         screenshot_short_side=screenshot_size,
     )
-    save_session(info)
 
-    return {
-        "session": "default",
+    result = {
         "type": "adb",
         "device": match.name,
         "address": match.address,
     }
 
+    return result, controller, info
 
-@service(name="connect_win32")
-def do_connect_win32(
+
+def _connect_win32_inner(
     window: str,
     screencap_method: str = "FramePool",
     input_method: str = "PostMessage",
-) -> dict:
-    """Connect to a Win32 window and persist session."""
+) -> tuple[dict[str, Any], Any, SessionInfo]:
+    """Connect to a Win32 window.
+
+    Returns (result_dict, Controller, SessionInfo) — no side effects.
+    """
     _init_toolkit()
     logger.info("Connecting to Win32 window '%s'...", window)
 
@@ -141,8 +152,6 @@ def do_connect_win32(
             f"Failed to connect to '{matched.window_name}' ({hex(matched.hwnd)})."
         )
 
-    from maafw_cli.core.session import SessionInfo, save_session
-
     info = SessionInfo(
         type="win32",
         device=matched.window_name,
@@ -151,12 +160,41 @@ def do_connect_win32(
         input_methods=in_val,
         window_name=matched.window_name,
     )
-    save_session(info)
 
-    return {
-        "session": "default",
+    result = {
         "type": "win32",
         "window_name": matched.window_name,
         "hwnd": hex(matched.hwnd),
         "class_name": matched.class_name,
     }
+
+    return result, controller, info
+
+
+# ── public service wrappers (thin: call inner + persist) ──────
+
+
+@service(name="connect_adb")
+def do_connect_adb(device: str, screenshot_size: int = 720) -> dict:
+    """Connect to an ADB device and persist session."""
+    result, _controller, info = _connect_adb_inner(device, screenshot_size)
+
+    save_session(info)
+
+    result["session"] = "default"
+    return result
+
+
+@service(name="connect_win32")
+def do_connect_win32(
+    window: str,
+    screencap_method: str = "FramePool",
+    input_method: str = "PostMessage",
+) -> dict:
+    """Connect to a Win32 window and persist session."""
+    result, _controller, info = _connect_win32_inner(window, screencap_method, input_method)
+
+    save_session(info)
+
+    result["session"] = "default"
+    return result

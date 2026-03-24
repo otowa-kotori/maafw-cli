@@ -1,0 +1,332 @@
+"""
+asyncio TCP server for the maafw-cli daemon.
+
+Handles JSON-line requests, dispatches to SessionManager, manages
+PID/port files, and implements an idle watchdog.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import signal
+import time
+from pathlib import Path
+from typing import Any
+
+from maafw_cli.core.errors import MaafwError
+from maafw_cli.core.session import _data_dir
+from maafw_cli.daemon.protocol import decode, encode, error_response, ok_response
+from maafw_cli.daemon.session_mgr import SessionManager
+
+_log = logging.getLogger("maafw_cli.daemon.server")
+
+
+def _summarize(d: dict[str, Any], max_len: int = 200) -> str:
+    """Compact one-line summary of a result dict for logging."""
+    import json
+    s = json.dumps(d, ensure_ascii=False, separators=(",", ":"))
+    return s if len(s) <= max_len else s[:max_len] + "…"
+
+# ── port / file constants ───────────────────────────────────────
+
+DEFAULT_PORT = 19799
+PORT_RANGE_END = 19810  # exclusive; try 19799-19809
+IDLE_CHECK_INTERVAL = 30  # seconds
+IDLE_TIMEOUT = 300  # 5 minutes
+
+
+def _pid_file() -> Path:
+    return _data_dir() / "daemon.pid"
+
+
+def _port_file() -> Path:
+    return _data_dir() / "daemon.port"
+
+
+# ── DaemonServer ────────────────────────────────────────────────
+
+
+class DaemonServer:
+    """asyncio TCP daemon server."""
+
+    def __init__(
+        self,
+        *,
+        host: str = "127.0.0.1",
+        port: int | None = None,
+        idle_timeout: float = IDLE_TIMEOUT,
+    ):
+        self.host = host
+        self.requested_port = port
+        self.port: int = 0  # set after bind
+        self.idle_timeout = idle_timeout
+        self.idle_check_interval = min(IDLE_CHECK_INTERVAL, idle_timeout / 2)
+        self.session_mgr = SessionManager()
+
+        self._server: asyncio.Server | None = None
+        self._start_time = time.monotonic()
+        self._last_activity = time.monotonic()
+        self._shutdown_event = asyncio.Event()
+        self._shutdown_reason = "unknown"
+        self._active_connections: int = 0
+
+    # ── lifecycle ───────────────────────────────────────────────
+
+    async def start(self) -> None:
+        """Bind, write PID/port files, and serve forever."""
+        self.port = await self._bind()
+        self._write_pid_port_files()
+        self._install_signal_handlers()
+
+        _log.info("Daemon listening on %s:%d", self.host, self.port)
+
+        # Start idle watchdog
+        asyncio.create_task(self._idle_watchdog())
+
+        # Serve until shutdown
+        await self._shutdown_event.wait()
+
+        _log.info("Daemon shutting down (reason: %s)", self._shutdown_reason)
+        await self._cleanup()
+
+    async def _bind(self) -> int:
+        """Find an available port and start the TCP server."""
+        if self.requested_port is not None:
+            self._server = await asyncio.start_server(
+                self._handle_client, self.host, self.requested_port,
+            )
+            return self.requested_port
+
+        # Try port range
+        last_exc = None
+        for port in range(DEFAULT_PORT, PORT_RANGE_END):
+            try:
+                self._server = await asyncio.start_server(
+                    self._handle_client, self.host, port,
+                )
+                return port
+            except OSError as e:
+                last_exc = e
+                continue
+
+        raise RuntimeError(
+            f"Cannot bind to any port in {DEFAULT_PORT}-{PORT_RANGE_END - 1}"
+        ) from last_exc
+
+    def _write_pid_port_files(self) -> None:
+        """Write daemon.pid and daemon.port files."""
+        data_dir = _data_dir()
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        _pid_file().write_text(str(os.getpid()), encoding="utf-8")
+        _port_file().write_text(str(self.port), encoding="utf-8")
+        _log.debug("PID/port files written: pid=%d port=%d", os.getpid(), self.port)
+
+    def _install_signal_handlers(self) -> None:
+        """Install SIGTERM / SIGINT handlers for graceful shutdown."""
+        loop = asyncio.get_running_loop()
+        for sig_name in ("SIGTERM", "SIGINT"):
+            sig = getattr(signal, sig_name, None)
+            if sig is not None:
+                try:
+                    loop.add_signal_handler(sig, lambda s=sig_name: self._signal_shutdown(s))
+                except NotImplementedError:
+                    # Windows doesn't support add_signal_handler for all signals
+                    pass
+
+    def _signal_shutdown(self, sig_name: str) -> None:
+        _log.info("Received %s, initiating shutdown", sig_name)
+        self._shutdown_reason = f"signal:{sig_name}"
+        self._shutdown_event.set()
+
+    async def _cleanup(self) -> None:
+        """Graceful shutdown: stop server, close sessions, remove files."""
+        # Stop accepting connections
+        if self._server is not None:
+            self._server.close()
+            await self._server.wait_closed()
+
+        # Close all sessions
+        self.session_mgr.close_all()
+
+        # Remove PID/port files
+        for f in (_pid_file(), _port_file()):
+            try:
+                f.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        _log.info("Daemon cleanup complete")
+
+    def request_shutdown(self, reason: str = "manual") -> None:
+        """Request graceful shutdown (can be called from request handler)."""
+        self._shutdown_reason = reason
+        self._shutdown_event.set()
+
+    # ── idle watchdog ───────────────────────────────────────────
+
+    async def _idle_watchdog(self) -> None:
+        """Periodically check for idle timeout."""
+        while not self._shutdown_event.is_set():
+            await asyncio.sleep(self.idle_check_interval)
+            if self._shutdown_event.is_set():
+                break
+            idle_secs = time.monotonic() - self._last_activity
+            if idle_secs >= self.idle_timeout and self._active_connections == 0:
+                _log.info("Idle timeout (%.0fs), shutting down", idle_secs)
+                self._shutdown_reason = "idle"
+                self._shutdown_event.set()
+                break
+
+    def _touch_activity(self) -> None:
+        self._last_activity = time.monotonic()
+
+    # ── client connection handler ───────────────────────────────
+
+    async def _handle_client(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+    ) -> None:
+        """Handle a single client connection (may send multiple requests)."""
+        peer = writer.get_extra_info("peername")
+        _log.debug("Client connected: %s", peer)
+        self._active_connections += 1
+        self._touch_activity()
+
+        try:
+            while True:
+                try:
+                    line = await reader.readline()
+                except (ConnectionError, asyncio.IncompleteReadError):
+                    break
+
+                if not line:
+                    break  # EOF
+
+                self._touch_activity()
+                response = await self._process_line(line)
+                if response is not None:
+                    writer.write(encode(response))
+                    await writer.drain()
+        except Exception:
+            _log.warning("Error handling client %s", peer, exc_info=True)
+        finally:
+            self._active_connections -= 1
+            self._touch_activity()
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                pass
+            _log.debug("Client disconnected: %s", peer)
+
+    async def _process_line(self, line: bytes) -> dict[str, Any] | None:
+        """Parse one JSON-line and dispatch."""
+        try:
+            request = decode(line)
+        except ValueError as e:
+            _log.warning("Malformed request: %s", e)
+            return error_response("?", str(e))
+
+        req_id = request.get("id", "?")
+        action = request.get("action", "")
+        session_name = request.get("session")
+        params = request.get("params", {})
+
+        _log.info(">>> %s session=%s params=%s", action, session_name, params)
+        t0 = time.monotonic()
+
+        try:
+            result = await self._dispatch(action, params, session_name, request)
+            elapsed = int((time.monotonic() - t0) * 1000)
+            _log.info("<<< %s OK %dms result=%s", action, elapsed, _summarize(result))
+            return ok_response(req_id, result)
+        except Exception as e:
+            elapsed = int((time.monotonic() - t0) * 1000)
+            exit_code = getattr(e, "exit_code", 1) if isinstance(e, MaafwError) else 1
+            _log.warning("<<< %s FAIL %dms: %s", action, elapsed, e)
+            return error_response(req_id, str(e), exit_code=exit_code)
+
+    async def _dispatch(
+        self,
+        action: str,
+        params: dict[str, Any],
+        session_name: str | None,
+        request: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Route an action to the appropriate handler."""
+        # ── built-in actions ────────────────────────────────────
+        if action == "ping":
+            return self._handle_ping()
+        if action == "shutdown":
+            self.request_shutdown("manual")
+            return {"message": "Daemon shutting down"}
+        if action == "session_list":
+            return {"sessions": self.session_mgr.list_sessions()}
+        if action == "session_default":
+            name = params.get("name", "")
+            self.session_mgr.set_default(name)
+            return {"default": name}
+        if action == "session_close":
+            name = params.get("name", "")
+            self.session_mgr.close(name)
+            return {"closed": name}
+
+        # ── connect actions (create sessions) ───────────────────
+        if action == "connect_adb":
+            return await self._handle_connect_adb(params, request)
+        if action == "connect_win32":
+            return await self._handle_connect_win32(params, request)
+
+        # ── regular service dispatch ────────────────────────────
+        return await self.session_mgr.execute(action, params, session_name)
+
+    def _handle_ping(self) -> dict[str, Any]:
+        uptime = int(time.monotonic() - self._start_time)
+        return {
+            "pong": True,
+            "uptime_seconds": uptime,
+            "sessions": self.session_mgr.session_names,
+            "pid": os.getpid(),
+        }
+
+    async def _handle_connect_adb(
+        self, params: dict[str, Any], request: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Handle connect_adb: create a named session via inner function."""
+        from maafw_cli.services.connection import _connect_adb_inner
+
+        device = params.get("device", "")
+        screenshot_size = params.get("screenshot_size", 720)
+        session_name = request.get("session_name") or params.get("session_name") or device
+
+        result, controller, info = await asyncio.to_thread(
+            _connect_adb_inner, device, screenshot_size,
+        )
+        info.name = session_name
+        self.session_mgr.add(session_name, controller, info)
+
+        result["session"] = session_name
+        return result
+
+    async def _handle_connect_win32(
+        self, params: dict[str, Any], request: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Handle connect_win32: create a named session via inner function."""
+        from maafw_cli.services.connection import _connect_win32_inner
+
+        window = params.get("window", "")
+        screencap_method = params.get("screencap_method", "FramePool")
+        input_method = params.get("input_method", "PostMessage")
+        session_name = request.get("session_name") or params.get("session_name") or window
+
+        result, controller, info = await asyncio.to_thread(
+            _connect_win32_inner, window, screencap_method, input_method,
+        )
+        info.name = session_name
+        self.session_mgr.add(session_name, controller, info)
+
+        result["session"] = session_name
+        return result

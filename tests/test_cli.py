@@ -126,6 +126,66 @@ class TestCliStructure:
         result = runner.invoke(cli, ["--quiet", "--help"])
         assert result.exit_code == 0
 
+    # ── Phase 3: daemon / session commands ──────────────────────
+
+    def test_daemon_help(self):
+        result = runner.invoke(cli, ["daemon", "--help"])
+        assert result.exit_code == 0
+        assert "start" in result.output
+        assert "stop" in result.output
+        assert "status" in result.output
+
+    def test_daemon_start_help(self):
+        result = runner.invoke(cli, ["daemon", "start", "--help"])
+        assert result.exit_code == 0
+
+    def test_daemon_stop_help(self):
+        result = runner.invoke(cli, ["daemon", "stop", "--help"])
+        assert result.exit_code == 0
+
+    def test_daemon_status_help(self):
+        result = runner.invoke(cli, ["daemon", "status", "--help"])
+        assert result.exit_code == 0
+
+    def test_session_help(self):
+        result = runner.invoke(cli, ["session", "--help"])
+        assert result.exit_code == 0
+        assert "list" in result.output
+        assert "default" in result.output
+        assert "close" in result.output
+
+    def test_session_list_help(self):
+        result = runner.invoke(cli, ["session", "list", "--help"])
+        assert result.exit_code == 0
+
+    def test_session_default_help(self):
+        result = runner.invoke(cli, ["session", "default", "--help"])
+        assert result.exit_code == 0
+        assert "NAME" in result.output
+
+    def test_session_close_help(self):
+        result = runner.invoke(cli, ["session", "close", "--help"])
+        assert result.exit_code == 0
+        assert "NAME" in result.output
+
+    def test_global_on_flag(self):
+        result = runner.invoke(cli, ["--on", "phone", "--help"])
+        assert result.exit_code == 0
+
+    def test_global_no_daemon_flag(self):
+        result = runner.invoke(cli, ["--no-daemon", "--help"])
+        assert result.exit_code == 0
+
+    def test_connect_adb_has_as_option(self):
+        result = runner.invoke(cli, ["connect", "adb", "--help"])
+        assert result.exit_code == 0
+        assert "--as" in result.output
+
+    def test_connect_win32_has_as_option(self):
+        result = runner.invoke(cli, ["connect", "win32", "--help"])
+        assert result.exit_code == 0
+        assert "--as" in result.output
+
 
 class TestOutputFormatter:
     """Test the output formatter directly."""

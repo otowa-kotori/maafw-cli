@@ -7,7 +7,6 @@ from typing import Optional
 
 from maafw_cli.core.errors import ActionError, RecognitionError
 from maafw_cli.core.log import Timer
-from maafw_cli.core.textref import TextRefStore
 from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.registry import service
 
@@ -42,7 +41,7 @@ def do_ocr(ctx: ServiceContext, roi: str | None = None) -> dict:
             raise RecognitionError("OCR model not found. Run: maafw-cli resource download-ocr")
         raise RecognitionError("OCR failed.")
 
-    store = TextRefStore(ctx.textrefs_path)
+    store = ctx.get_textref_store()
     refs = store.build_from_ocr(results)
     store.save()
 

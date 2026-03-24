@@ -20,15 +20,18 @@ def ocr(ctx: CliContext, roi: str | None, text_only: bool) -> None:
     """Run OCR on the connected device screen."""
     fmt = ctx.fmt
 
-    svc_ctx = ctx._make_service_context()
+    # Route through daemon or direct, but handle display ourselves
     try:
-        result = do_ocr(svc_ctx, roi=roi)
+        result = ctx.run_raw(do_ocr, roi=roi)
     except MaafwError as e:
         fmt.error(str(e), exit_code=e.exit_code)
         return
 
-    refs = result["results"]
-    elapsed_ms = result["elapsed_ms"]
+    if result is None:
+        return  # error already emitted
+
+    refs = result.get("results", [])
+    elapsed_ms = result.get("elapsed_ms", 0)
 
     if not refs:
         fmt.success(result, human="No text found.")
@@ -41,7 +44,8 @@ def ocr(ctx: CliContext, roi: str | None, text_only: bool) -> None:
             print(r["text"])
     else:
         lines: list[str] = []
-        lines.append("Screen OCR \u2014 default")
+        session_label = result.get("session", "default")
+        lines.append(f"Screen OCR \u2014 {session_label}")
         lines.append("\u2500" * 60)
         for r in refs:
             box = r["box"]

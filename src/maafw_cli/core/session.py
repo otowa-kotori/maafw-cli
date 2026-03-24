@@ -49,6 +49,7 @@ class SessionInfo:
     config: dict[str, Any] = field(default_factory=dict)
     screenshot_short_side: int = 720
     window_name: str = ""  # Win32 window title (used for reconnection)
+    name: str = ""         # Session name (daemon mode)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

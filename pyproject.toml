@@ -55,6 +55,12 @@ include = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-m 'not manual'"
+asyncio_mode = "auto"
 markers = [
     "manual: manual integration tests requiring a real device (not run by default)",
+]
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=1.3.0",
 ]
