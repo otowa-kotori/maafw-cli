@@ -40,12 +40,22 @@ class OutputFormatter:
             else:
                 self._print_json(data)
 
-    def error(self, message: str, *, exit_code: int = 1) -> NoReturn:
-        """Print an error to stderr and exit."""
+    def print_error(self, message: str) -> None:
+        """Format and print an error message (without exiting).
+
+        Use this when the caller handles the exit/flow control itself.
+        """
         if self.json_mode:
             self._print_json({"error": message})
         elif not self.quiet:
             self._print_text(f"Error: {message}", file=sys.stderr)
+
+    def error(self, message: str, *, exit_code: int = 1) -> NoReturn:
+        """Print an error to stderr and exit.
+
+        Convenience method that combines :meth:`print_error` with ``sys.exit``.
+        """
+        self.print_error(message)
         sys.exit(exit_code)
 
     def info(self, message: str) -> None:

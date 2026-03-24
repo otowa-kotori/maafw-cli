@@ -5,7 +5,7 @@ import asyncio
 
 import pytest
 
-from maafw_cli.core.errors import ConnectionError as MaafwConnectionError
+from maafw_cli.core.errors import DeviceConnectionError
 from maafw_cli.core.session import SessionInfo
 from maafw_cli.daemon.session_mgr import ManagedSession, SessionManager
 from mock_controller import MockController
@@ -40,12 +40,12 @@ class TestSessionManagerBasics:
 
     def test_get_nonexistent_raises(self):
         mgr = SessionManager()
-        with pytest.raises(MaafwConnectionError, match="No active session"):
+        with pytest.raises(DeviceConnectionError, match="No active session"):
             mgr.get("nope")
 
     def test_get_none_no_sessions_raises(self):
         mgr = SessionManager()
-        with pytest.raises(MaafwConnectionError, match="no default"):
+        with pytest.raises(DeviceConnectionError, match="no default"):
             mgr.get(None)
 
     def test_list_sessions(self):
@@ -188,32 +188,32 @@ class TestSessionManagerExecute:
 
 
 class TestSessionManagerConnectionError:
-    """Verify that session_mgr raises MaafwConnectionError (not builtin ConnectionError)."""
+    """Verify that session_mgr raises DeviceConnectionError (not builtin ConnectionError)."""
 
     def test_error_type_is_maafw(self):
-        """The raised error must be our custom MaafwConnectionError with exit_code=3."""
+        """The raised error must be our custom DeviceConnectionError with exit_code=3."""
         mgr = SessionManager()
-        with pytest.raises(MaafwConnectionError) as exc_info:
+        with pytest.raises(DeviceConnectionError) as exc_info:
             mgr.get("missing")
         assert exc_info.value.exit_code == 3
 
     def test_error_is_not_builtin(self):
         """Must NOT be the builtin ConnectionError (which is an OSError)."""
         mgr = SessionManager()
-        with pytest.raises(MaafwConnectionError):
+        with pytest.raises(DeviceConnectionError):
             mgr.get("missing")
         # Verify it's NOT an OSError (builtin ConnectionError is)
         try:
             mgr.get("missing2")
-        except MaafwConnectionError as e:
+        except DeviceConnectionError as e:
             assert not isinstance(e, OSError)
 
     def test_execute_no_session_raises_maafw(self):
-        """execute() on empty manager should raise MaafwConnectionError."""
+        """execute() on empty manager should raise DeviceConnectionError."""
         mgr = SessionManager()
         # Populate DISPATCH with at least one action
         import maafw_cli.services.interaction  # noqa: F401
-        with pytest.raises(MaafwConnectionError):
+        with pytest.raises(DeviceConnectionError):
             asyncio.get_event_loop().run_until_complete(
                 mgr.execute("click", {"target": "1,2"})
             )

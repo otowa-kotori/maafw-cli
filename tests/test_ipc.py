@@ -41,12 +41,9 @@ class TestDaemonClient:
         server, port = await _make_test_server()
         serve_task = asyncio.create_task(server._server.serve_forever())
         try:
-            # Use async send directly (can't use sync send in async test)
             client = DaemonClient(port)
-            req = make_request("ping")
-            resp = await client._async_send(req)
-            assert resp["ok"] is True
-            assert resp["data"]["pong"] is True
+            result = await asyncio.to_thread(client.send, "ping")
+            assert result["pong"] is True
         finally:
             serve_task.cancel()
             try:
@@ -61,10 +58,8 @@ class TestDaemonClient:
         serve_task = asyncio.create_task(server._server.serve_forever())
         try:
             client = DaemonClient(port)
-            req = make_request("totally_bogus")
-            resp = await client._async_send(req)
-            assert resp["ok"] is False
-            assert "Unknown action" in resp["error"]
+            with pytest.raises(MaafwError, match="Unknown action"):
+                await asyncio.to_thread(client.send, "totally_bogus")
         finally:
             serve_task.cancel()
             try:
@@ -77,12 +72,10 @@ class TestDaemonClient:
     async def test_connection_refused(self):
         client = DaemonClient(19798)  # Unlikely to be in use
         with pytest.raises((OSError, MaafwError)):
-            req = make_request("ping")
-            await client._async_send(req)
+            await asyncio.to_thread(client.send, "ping")
 
     async def test_server_disconnect(self):
         """Server closes immediately after connection → should handle gracefully."""
-        # Start a server that accepts connections but sends nothing
         async def _bad_handler(reader, writer):
             writer.close()
             await writer.wait_closed()
@@ -92,9 +85,8 @@ class TestDaemonClient:
 
         try:
             client = DaemonClient(port)
-            req = make_request("ping")
-            with pytest.raises((ValueError, MaafwError, ConnectionError)):
-                await client._async_send(req)
+            with pytest.raises((ValueError, MaafwError, OSError)):
+                await asyncio.to_thread(client.send, "ping")
         finally:
             test_server.close()
             await test_server.wait_closed()

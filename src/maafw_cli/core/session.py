@@ -17,16 +17,12 @@ from maafw_cli.paths import get_data_dir
 # ── paths ──────────────────────────────────────────────────────
 
 
-def _data_dir() -> Path:
-    return get_data_dir()
-
-
 def session_file() -> Path:
-    return _data_dir() / "session.json"
+    return get_data_dir() / "session.json"
 
 
 def textrefs_file() -> Path:
-    return _data_dir() / "textrefs.json"
+    return get_data_dir() / "textrefs.json"
 
 
 # ── session data ───────────────────────────────────────────────

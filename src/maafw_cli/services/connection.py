@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from maafw_cli.core.errors import ConnectionError
+from maafw_cli.core.errors import DeviceConnectionError
 from maafw_cli.core.log import logger
 from maafw_cli.core.session import SessionInfo, save_session
 from maafw_cli.maafw import init_toolkit
@@ -64,13 +64,13 @@ def _connect_adb_inner(
             break
 
     if match is None:
-        raise ConnectionError(
+        raise DeviceConnectionError(
             f"Device '{device}' not found. Available: {[d.name for d in devices]}"
         )
 
     controller = _connect(match, screenshot_short_side=screenshot_size)
     if controller is None:
-        raise ConnectionError(f"Failed to connect to '{device}'.")
+        raise DeviceConnectionError(f"Failed to connect to '{device}'.")
 
     info = SessionInfo(
         type="adb",
@@ -112,20 +112,20 @@ def _connect_win32_inner(
         try:
             target_hwnd = int(window, 16)
         except ValueError:
-            raise ConnectionError(f"Invalid hwnd: '{window}'.")
+            raise DeviceConnectionError(f"Invalid hwnd: '{window}'.")
         matches = [w for w in windows if w.hwnd == target_hwnd]
     else:
         needle = window.lower()
         matches = [w for w in windows if needle in w.window_name.lower()]
 
     if not matches:
-        raise ConnectionError(
+        raise DeviceConnectionError(
             f"No window matching '{window}'. Use 'device list --win32' to see available windows."
         )
 
     if len(matches) > 1:
         listing = "\n".join(f"  {hex(m.hwnd):<14s} {m.window_name}" for m in matches)
-        raise ConnectionError(
+        raise DeviceConnectionError(
             f"Multiple windows match '{window}'. Be more specific:\n{listing}"
         )
 
@@ -138,7 +138,7 @@ def _connect_win32_inner(
 
     controller = _connect(matched, screencap_method=sc_val, input_method=in_val)
     if controller is None:
-        raise ConnectionError(
+        raise DeviceConnectionError(
             f"Failed to connect to '{matched.window_name}' ({hex(matched.hwnd)})."
         )
 

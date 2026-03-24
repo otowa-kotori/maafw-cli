@@ -29,7 +29,7 @@ class RecognitionError(MaafwError):
         super().__init__(message, exit_code=2)
 
 
-class ConnectionError(MaafwError):  # noqa: A001 — shadows builtin intentionally
+class DeviceConnectionError(MaafwError):
     """Device / window connection failed (exit code 3)."""
 
     def __init__(self, message: str):

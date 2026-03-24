@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from maafw_cli.core.errors import ConnectionError as MaafwConnectionError
+from maafw_cli.core.errors import DeviceConnectionError
 from maafw_cli.core.session import SessionInfo
 from maafw_cli.core.textref import TextRefStore
 from maafw_cli.services.context import ServiceContext
@@ -87,7 +87,7 @@ class SessionManager:
             name = self._default
         if name is None or name not in self._sessions:
             target = name or "(no default)"
-            raise MaafwConnectionError(f"No active session '{target}'. Connect to a device first.")
+            raise DeviceConnectionError(f"No active session '{target}'. Connect to a device first.")
         return self._sessions[name]
 
     def close(self, name: str) -> None:

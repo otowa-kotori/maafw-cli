@@ -6,7 +6,6 @@ for sending requests to the daemon server.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import socket
@@ -16,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from maafw_cli.core.errors import ConnectionError as MaafwConnectionError
+from maafw_cli.core.errors import DeviceConnectionError
 from maafw_cli.paths import get_data_dir as _data_dir
 from maafw_cli.daemon.protocol import decode, encode, make_request
 
@@ -154,7 +153,7 @@ def _start_daemon_process() -> None:
 def ensure_daemon() -> int:
     """Ensure the daemon is running and return its port.
 
-    Starts a new daemon if needed. Raises :class:`MaafwConnectionError`
+    Starts a new daemon if needed. Raises :class:`DeviceConnectionError`
     if the daemon cannot be started within the timeout.
     """
     t0 = time.perf_counter()
@@ -185,7 +184,7 @@ def ensure_daemon() -> int:
             return port
 
     log_path = _data_dir() / "daemon.log"
-    raise MaafwConnectionError(
+    raise DeviceConnectionError(
         f"Failed to start daemon within timeout. Check {log_path} for details."
     )
 
@@ -210,7 +209,7 @@ class DaemonClient:
     ) -> dict[str, Any]:
         """Send a request and return the response data.
 
-        Raises :class:`MaafwConnectionError` on communication failure.
+        Raises :class:`DeviceConnectionError` on communication failure.
         Raises the appropriate :class:`MaafwError` if the daemon returns an error.
         """
         request = make_request(action, params, session=session)
@@ -219,9 +218,9 @@ class DaemonClient:
 
         t0 = time.perf_counter()
         try:
-            response = asyncio.run(self._async_send(request))
-        except (OSError, asyncio.TimeoutError) as e:
-            raise MaafwConnectionError(f"Failed to communicate with daemon: {e}")
+            response = self._sync_send(request)
+        except OSError as e:
+            raise DeviceConnectionError(f"Failed to communicate with daemon: {e}")
         elapsed = int((time.perf_counter() - t0) * 1000)
         _log.debug("IPC %s: %dms (round-trip)", action, elapsed)
 
@@ -233,19 +232,15 @@ class DaemonClient:
 
         return response.get("data", {})
 
-    async def _async_send(self, request: dict) -> dict:
-        """Connect, send request, read response."""
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(self.host, self.port),
-            timeout=5.0,
-        )
+    def _sync_send(self, request: dict) -> dict:
+        """Connect, send request, read response — pure synchronous socket."""
+        sock = socket.create_connection((self.host, self.port), timeout=5.0)
         try:
-            writer.write(encode(request))
-            await writer.drain()
-            line = await asyncio.wait_for(reader.readline(), timeout=30.0)
+            sock.settimeout(30.0)
+            sock.sendall(encode(request))
+            line = sock.makefile("rb").readline()
             if not line:
-                raise MaafwConnectionError("Daemon closed connection unexpectedly")
+                raise DeviceConnectionError("Daemon closed connection unexpectedly")
             return decode(line)
         finally:
-            writer.close()
-            await writer.wait_closed()
+            sock.close()
