@@ -234,7 +234,7 @@ pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
 @click.pass_context
 def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool,
         observe: bool, on_session: str | None, no_daemon: bool) -> None:
-    """maafw-cli — MaaFramework command-line interface."""
+    """maafw-cli - MaaFramework command-line interface."""
     ctx.ensure_object(dict)
     setup_logging(verbose=verbose, quiet=quiet)
     ctx.obj = CliContext(
