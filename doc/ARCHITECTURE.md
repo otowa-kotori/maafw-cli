@@ -10,7 +10,7 @@ src/maafw_cli/
 ├── services/            # 纯业务逻辑：@service 注册到 DISPATCH table
 ├── core/                # 共享基础设施：IPC、会话、TextRef、日志、keymap
 ├── daemon/              # 后台守护进程：持久连接 + 命名会话 + JSON-line IPC
-└── maafw/               # MaaFramework API 薄封装
+└── maafw/               # MaaFramework API 薄封装 + init_toolkit()
 ```
 
 依赖方向：`commands/ → services/ → core/ + maafw/`，`daemon/ → services/ + core/`，禁止反向引用。
@@ -25,7 +25,7 @@ connect adb "..." ──→ ensure_daemon() ──→ daemon._connect_adb_inner(
                                     SessionManager.add("device", controller)
                                               ↓
 ocr / click / ... ──→ DaemonClient.send() ──→ daemon.execute(action, session)
-                                              ↓
+                         (同步 socket)              ↓
                                     SessionManager.get(session).controller → MaaFW
 ```
 
@@ -34,9 +34,9 @@ ocr / click / ... ──→ DaemonClient.send() ──→ daemon.execute(action,
 ```
 connect → session.json
                 ↓
-ocr → reconnect → Controller → screencap → OCR → textrefs.json
+ocr → reconnect() → Controller → screencap → OCR → textrefs.json
                                                        ↓
-click → parse_target(t3) → resolve from textrefs → reconnect → post_click
+click → parse_target(t3) → resolve from textrefs → reconnect() → post_click
 ```
 
 ## 会话机制
@@ -55,6 +55,13 @@ click → parse_target(t3) → resolve from textrefs → reconnect → post_clic
 文件持久化，每条命令独立重连：
 - `connect` 写 `session.json`
 - 后续命令读 `session.json` → 重新发现设备 → 重建 Controller
+
+## IPC 架构
+
+- **Server（daemon 端）**：asyncio TCP server，处理 JSON-line 请求
+- **Client（CLI 端）**：同步 socket，发送请求等待响应，无 asyncio 依赖
+- **端口**：默认 19799-19809 范围，实际端口写入 `daemon.port`
+- **协议**：JSON-line（每条消息一行 JSON + `\n`）
 
 ---
 
@@ -91,14 +98,14 @@ maafw-cli/
 │   │   ├── context.py             # ServiceContext (controller 缓存 + target 解析)
 │   │   └── registry.py            # @service decorator + DISPATCH table
 │   ├── core/
-│   │   ├── errors.py              # MaafwError / ActionError / RecognitionError / ConnectionError
-│   │   ├── ipc.py                 # DaemonClient, ensure_daemon(), 进程生命周期
+│   │   ├── errors.py              # MaafwError / ActionError / RecognitionError / DeviceConnectionError
+│   │   ├── ipc.py                 # DaemonClient (同步 socket), ensure_daemon(), get_daemon_info()
 │   │   ├── keymap.py              # VK_MAP / AK_MAP / resolve_keycode
 │   │   ├── session.py             # SessionInfo + 文件持久化（--no-daemon 模式）
-│   │   ├── reconnect.py           # 从 session.json 重建 Controller（--no-daemon 模式）
+│   │   ├── reconnect.py           # reconnect() — 从 session.json 重建 Controller
 │   │   ├── textref.py             # TextRef 系统，支持内存模式
 │   │   ├── target.py              # 目标解析 (t3 / 452,387)
-│   │   ├── output.py              # OutputFormatter (human/json/quiet)
+│   │   ├── output.py              # OutputFormatter (human/json/quiet) + format_ocr_table()
 │   │   └── log.py                 # 日志 + Timer
 │   ├── daemon/
 │   │   ├── __main__.py            # python -m maafw_cli.daemon 入口
@@ -107,16 +114,20 @@ maafw-cli/
 │   │   ├── session_mgr.py         # SessionManager（命名会话 + Controller 持久连接）
 │   │   └── log.py                 # daemon 专用日志（RotatingFileHandler）
 │   └── maafw/
+│       ├── __init__.py            # init_toolkit() — MaaFW 全局初始化（幂等）
 │       ├── adb.py                 # ADB 设备发现 + 连接
 │       ├── win32.py               # Win32 窗口发现 + 连接
-│       ├── vision.py              # 截图 + OCR
+│       ├── vision.py              # 截图 + OCR（Resource 缓存）
 │       └── control.py             # click/swipe/scroll/type/key
 └── tests/
     ├── conftest.py                # 共享 fixtures
     ├── mock_controller.py         # MockController
     ├── mock_win32_window.py       # tkinter mock 窗口
     ├── test_cli.py                # CLI 结构 + help + keymap
-    ├── test_services.py           # Service 层业务逻辑
+    ├── test_cli_context.py        # CliContext 路由 + observe
+    ├── test_services.py           # Service 层业务逻辑 + @service 装饰器
+    ├── test_reconnect.py          # reconnect 重连逻辑（mock）
+    ├── test_output.py             # OutputFormatter + format_ocr_table
     ├── test_repl.py               # REPL dispatch
     ├── test_target.py             # 目标解析
     ├── test_textref.py            # TextRef
@@ -124,7 +135,8 @@ maafw-cli/
     ├── test_session_mgr.py        # SessionManager
     ├── test_daemon_server.py      # Daemon server (in-process)
     ├── test_ipc.py                # Client IPC + 进程生命周期
+    ├── test_ipc_and_download.py   # get_daemon_info + download 逻辑
     ├── test_daemon_e2e.py         # Daemon E2E (manual)
-    ├── test_win32_manual.py       # Win32 集成 (manual)
+    ├── test_win32_manual.py       # Win32 自动化集成测试
     └── test_adb_manual.py         # ADB 集成 (manual)
 ```

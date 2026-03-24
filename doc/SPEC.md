@@ -220,16 +220,20 @@ JSON 模式：
 3. daemon 空闲 N 分钟后自动退出
 4. `maafw-cli daemon stop` 手动停止
 
-### 6.1 IPC 方案：localhost TCP + asyncio
+### 6.1 IPC 方案：localhost TCP
 
 **选型结论**（调研对比后）：
 
 | 方案 | 优点 | 缺点 |
 |---|---|---|
-| **localhost TCP + asyncio** ✅ | 跨平台零差异，原生并发，可用 nc/curl 调试 | 需管理端口 |
+| **localhost TCP** ✅ | 跨平台零差异，可用 nc/curl 调试 | 需管理端口 |
 | `multiprocessing.Listener` | stdlib 无依赖 | Windows Named Pipe 文档差，调试困难 |
 | Unix socket + Named Pipe | 性能最优 | 需两套代码路径，Windows pipe 诡异 |
 | gRPC | 功能丰富 | 依赖重，protobuf 学习曲线 |
+
+**实现**：
+- **Server（daemon 端）**：asyncio TCP server，并发处理多客户端
+- **Client（CLI 端）**：同步 socket（`socket.create_connection`），无 asyncio 依赖，兼容所有环境（Jupyter、pytest 等）
 
 **端口管理**：
 - 默认端口 `19799`，可配置
@@ -310,7 +314,7 @@ def ensure_daemon():
 
 ### Phase 0：守护进程 IPC 调研 ✅ 已完成
 
-结论：**localhost TCP + asyncio**，详见第 6 节。约 400 行代码，Phase 3 实现。
+结论：**localhost TCP**（server 用 asyncio，client 用同步 socket），详见第 6 节。约 400 行代码，Phase 3 实现。
 
 ### Phase 1：最小可验证核心 ✅ 已完成
 
