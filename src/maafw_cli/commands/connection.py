@@ -72,7 +72,7 @@ def connect():
 @click.option("--screenshot-size", type=int, default=720,
               help="Screenshot short-side resolution (default 720).")
 @click.option("--as", "session_name", default=None,
-              help="Name this session (daemon mode).")
+              help="Name this session (default: device address).")
 @pass_ctx
 def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
                 session_name: str | None) -> None:
@@ -82,30 +82,31 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
     """
     fmt = ctx.fmt
 
-    # Daemon mode with --as
-    if session_name and not ctx.no_daemon:
+    if ctx.no_daemon:
+        # --no-daemon: Phase 1 direct mode (save to session.json)
         try:
-            from maafw_cli.core.ipc import DaemonClient, ensure_daemon
-            port = ensure_daemon()
-            client = DaemonClient(port)
-            result = client.send(
-                "connect_adb",
-                {"device": device, "screenshot_size": screenshot_size},
-                session_name=session_name,
-            )
-            fmt.success(result, human=f"Connected to {result.get('device', device)} as '{session_name}'")
-            return
+            result = do_connect_adb(device, screenshot_size=screenshot_size)
         except MaafwError as e:
             fmt.error(str(e), exit_code=e.exit_code)
             return
+        fmt.success(result, human=f"Connected to {result['device']} ({result['address']})")
+        return
 
-    # Direct mode
+    # Default: daemon mode
+    from maafw_cli.core.ipc import DaemonClient, ensure_daemon
+    name = session_name or device
     try:
-        result = do_connect_adb(device, screenshot_size=screenshot_size)
+        port = ensure_daemon()
+        client = DaemonClient(port)
+        result = client.send(
+            "connect_adb",
+            {"device": device, "screenshot_size": screenshot_size},
+            session_name=name,
+        )
     except MaafwError as e:
         fmt.error(str(e), exit_code=e.exit_code)
         return
-    fmt.success(result, human=f"Connected to {result['device']} ({result['address']})")
+    fmt.success(result, human=f"Connected to {result.get('device', device)} as '{name}'")
 
 
 @connect.command("win32")
@@ -115,7 +116,7 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
 @click.option("--input-method", type=click.Choice(INPUT_METHODS),
               default="PostMessage", show_default=True, help="Win32 input method.")
 @click.option("--as", "session_name", default=None,
-              help="Name this session (daemon mode).")
+              help="Name this session (default: window title).")
 @pass_ctx
 def connect_win32_cmd(ctx: CliContext, window: str,
                       screencap_method: str, input_method: str,
@@ -127,28 +128,30 @@ def connect_win32_cmd(ctx: CliContext, window: str,
     """
     fmt = ctx.fmt
 
-    # Daemon mode with --as
-    if session_name and not ctx.no_daemon:
+    if ctx.no_daemon:
+        # --no-daemon: Phase 1 direct mode
         try:
-            from maafw_cli.core.ipc import DaemonClient, ensure_daemon
-            port = ensure_daemon()
-            client = DaemonClient(port)
-            result = client.send(
-                "connect_win32",
-                {"window": window, "screencap_method": screencap_method,
-                 "input_method": input_method},
-                session_name=session_name,
-            )
-            fmt.success(result, human=f"Connected to {result.get('window_name', window)} as '{session_name}'")
-            return
+            result = do_connect_win32(window, screencap_method=screencap_method,
+                                      input_method=input_method)
         except MaafwError as e:
             fmt.error(str(e), exit_code=e.exit_code)
             return
+        fmt.success(result, human=f"Connected to {result['window_name']} ({result['hwnd']})")
+        return
 
-    # Direct mode
+    # Default: daemon mode
+    from maafw_cli.core.ipc import DaemonClient, ensure_daemon
+    name = session_name or window
     try:
-        result = do_connect_win32(window, screencap_method=screencap_method, input_method=input_method)
+        port = ensure_daemon()
+        client = DaemonClient(port)
+        result = client.send(
+            "connect_win32",
+            {"window": window, "screencap_method": screencap_method,
+             "input_method": input_method},
+            session_name=name,
+        )
     except MaafwError as e:
         fmt.error(str(e), exit_code=e.exit_code)
         return
-    fmt.success(result, human=f"Connected to {result['window_name']} ({result['hwnd']})")
+    fmt.success(result, human=f"Connected to {result.get('window_name', window)} as '{name}'")

@@ -191,7 +191,6 @@ class DaemonServer:
     ) -> None:
         """Handle a single client connection (may send multiple requests)."""
         peer = writer.get_extra_info("peername")
-        _log.debug("Client connected: %s", peer)
         self._active_connections += 1
         self._touch_activity()
 
@@ -220,7 +219,6 @@ class DaemonServer:
                 await writer.wait_closed()
             except Exception:
                 pass
-            _log.debug("Client disconnected: %s", peer)
 
     async def _process_line(self, line: bytes) -> dict[str, Any] | None:
         """Parse one JSON-line and dispatch."""

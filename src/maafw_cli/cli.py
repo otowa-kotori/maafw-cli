@@ -69,23 +69,12 @@ class CliContext:
         """Call a service function — routes via daemon or direct.
 
         Routing logic:
-        - ``--no-daemon`` → always direct (Phase 1 path)
-        - Default → try daemon, fallback to direct on failure
+        - ``--no-daemon`` → direct (Phase 1 path, reconnect from session.json)
+        - Default → daemon (IPC to background process)
         """
         if self.no_daemon:
             return self._run_direct(service_fn, **kwargs)
-
-        # Try daemon path — only fallback on connection/transport failures,
-        # not on legitimate action errors from the daemon.
-        from maafw_cli.core.errors import ConnectionError as MaafwConnectionError
-        try:
-            return self._run_via_daemon(service_fn, **kwargs)
-        except MaafwConnectionError:
-            _log.debug("Daemon unreachable, falling back to direct mode")
-            return self._run_direct(service_fn, **kwargs)
-        except (OSError, RuntimeError) as e:
-            _log.debug("Daemon route failed (%s), falling back to direct", e)
-            return self._run_direct(service_fn, **kwargs)
+        return self._run_via_daemon(service_fn, **kwargs)
 
     def _run_direct(self, service_fn: Callable, **kwargs) -> dict:
         """Phase 1 path: reconnect from session.json every time."""
@@ -114,16 +103,7 @@ class CliContext:
         """
         if self.no_daemon:
             return self._run_raw_direct(service_fn, **kwargs)
-
-        from maafw_cli.core.errors import ConnectionError as MaafwConnectionError
-        try:
-            return self._run_raw_daemon(service_fn, **kwargs)
-        except MaafwConnectionError:
-            _log.debug("Daemon unreachable, falling back to direct mode")
-            return self._run_raw_direct(service_fn, **kwargs)
-        except (OSError, RuntimeError) as e:
-            _log.debug("Daemon route failed (%s), falling back to direct", e)
-            return self._run_raw_direct(service_fn, **kwargs)
+        return self._run_raw_daemon(service_fn, **kwargs)
 
     def _run_raw_direct(self, service_fn: Callable, **kwargs) -> dict:
         svc_ctx = self._make_service_context()
