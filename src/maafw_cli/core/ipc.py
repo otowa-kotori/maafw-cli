@@ -122,19 +122,22 @@ def _start_daemon_process() -> None:
     cmd = [sys.executable, "-m", "maafw_cli.daemon"]
 
     if sys.platform == "win32":
-        # CREATE_NO_WINDOW — no console flash; DETACHED_PROCESS — detach
-        # from parent console so the daemon survives the CLI exiting.
-        flags = (
-            subprocess.CREATE_NO_WINDOW
-            | subprocess.CREATE_NEW_PROCESS_GROUP
-            | subprocess.DETACHED_PROCESS
-        )
+        # CREATE_NO_WINDOW prevents any console/window from appearing.
+        # Do NOT combine with DETACHED_PROCESS — they conflict and
+        # DETACHED_PROCESS takes precedence, which may allocate a
+        # new visible console.
+        # Use pythonw.exe when available (no console at all).
+        exe = sys.executable
+        pythonw = exe.replace("python.exe", "pythonw.exe")
+        if Path(pythonw).exists():
+            exe = pythonw
+
         subprocess.Popen(
-            cmd,
+            [exe, "-m", "maafw_cli.daemon"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
-            creationflags=flags,
+            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP,
             close_fds=True,
         )
     else:
