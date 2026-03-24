@@ -8,7 +8,7 @@ src/maafw_cli/
 ├── paths.py             # 跨平台路径（MaaXYZ/maafw-cli）
 ├── commands/            # CLI 薄壳：调用 services/，格式化输出
 ├── services/            # 纯业务逻辑：@service 注册到 DISPATCH table
-├── core/                # 共享基础设施：IPC、会话、TextRef、日志、keymap
+├── core/                # 共享基础设施：IPC、会话、Element、日志、keymap
 ├── daemon/              # 后台守护进程：持久连接 + 命名会话 + JSON-line IPC
 └── maafw/               # MaaFramework API 薄封装 + init_toolkit()
 ```
@@ -34,9 +34,9 @@ ocr / click / ... ──→ DaemonClient.send() ──→ daemon.execute(action,
 ```
 connect → session.json
                 ↓
-ocr → reconnect() → Controller → screencap → OCR → textrefs.json
+ocr → reconnect() → Controller → screencap → OCR → elements.json
                                                        ↓
-click → parse_target(t3) → resolve from textrefs → reconnect() → post_click
+click → parse_target(e3) → resolve from elements → reconnect() → post_click
 ```
 
 ## 会话机制
@@ -45,7 +45,7 @@ click → parse_target(t3) → resolve from textrefs → reconnect() → post_cl
 
 - `connect` 自动启动 daemon，创建命名会话（`--as name` 或默认用设备地址）
 - Controller 在 daemon 进程中持久存在，零重连开销
-- 每个 session 有独立的 TextRefStore（内存模式）和 asyncio Lock
+- 每个 session 有独立的 ElementStore（内存模式）和 asyncio Lock
 - Idle watchdog：5 分钟无活动自动退出
 - PID/port 文件：`~data_dir/daemon.pid`、`~data_dir/daemon.port`
 - 日志：`~data_dir/daemon.log`（每次启动清空）
@@ -103,8 +103,8 @@ maafw-cli/
 │   │   ├── keymap.py              # VK_MAP / AK_MAP / resolve_keycode
 │   │   ├── session.py             # SessionInfo + 文件持久化（--no-daemon 模式）
 │   │   ├── reconnect.py           # reconnect() — 从 session.json 重建 Controller
-│   │   ├── textref.py             # TextRef 系统，支持内存模式
-│   │   ├── target.py              # 目标解析 (t3 / 452,387)
+│   │   ├── element.py             # Element 系统，支持内存模式
+│   │   ├── target.py              # 目标解析 (e3 / 452,387)
 │   │   ├── output.py              # OutputFormatter (human/json/quiet) + format_ocr_table()
 │   │   └── log.py                 # 日志 + Timer
 │   ├── daemon/
@@ -130,7 +130,7 @@ maafw-cli/
     ├── test_output.py             # OutputFormatter + format_ocr_table
     ├── test_repl.py               # REPL dispatch
     ├── test_target.py             # 目标解析
-    ├── test_textref.py            # TextRef
+    ├── test_element.py            # Element
     ├── test_protocol.py           # IPC 协议
     ├── test_session_mgr.py        # SessionManager
     ├── test_daemon_server.py      # Daemon server (in-process)

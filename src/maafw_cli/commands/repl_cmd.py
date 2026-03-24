@@ -150,7 +150,7 @@ class Repl:
 
     def _ensure_service_context(self) -> None:
         """Try to build a ServiceContext from the existing session."""
-        from maafw_cli.core.session import load_session, textrefs_file
+        from maafw_cli.core.session import load_session, elements_file
         session = load_session()
         if session is None:
             print("No active session. Run 'connect adb <device>' or 'connect win32 <window>' first.",
@@ -162,7 +162,7 @@ class Repl:
         # Build a ServiceContext that connects lazily
         self._svc_ctx = ServiceContext(
             get_controller=lambda: reconnect(),
-            textrefs_path=textrefs_file(),
+            elements_path=elements_file(),
             session_type=session.type,
         )
 

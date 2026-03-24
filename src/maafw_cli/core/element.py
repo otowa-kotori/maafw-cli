@@ -1,9 +1,9 @@
 """
-TextRef system — short references (t1, t2, …) for OCR results.
+Element system — short references (e1, e2, …) for recognition results.
 
-Each OCR run assigns sequential refs. Refs are persisted to
-``~/.maafw/textrefs.json`` so later commands (e.g. ``click t2``)
-can resolve them without re-running OCR.
+Each recognition run (OCR, TemplateMatch, etc.) assigns sequential refs.
+Refs are persisted to ``elements.json`` so later commands (e.g. ``click e2``)
+can resolve them without re-running recognition.
 """
 from __future__ import annotations
 
@@ -17,12 +17,12 @@ from maa.define import OCRResult
 
 
 @dataclass
-class TextRef:
-    """A single OCR result with a short reference id."""
-    ref: str          # e.g. "t1"
-    text: str         # recognised text
-    box: list[int]    # [x, y, w, h]
-    score: float      # confidence 0-1
+class Element:
+    """A single recognition result with a short reference id."""
+    ref: str                # e.g. "e1"
+    text: str | None        # recognised text (None for non-OCR results)
+    box: list[int]          # [x, y, w, h]
+    score: float            # confidence 0-1
 
     @property
     def center(self) -> tuple[int, int]:
@@ -34,68 +34,70 @@ class TextRef:
         return asdict(self)
 
 
-class TextRefStore:
-    """Manages the current set of TextRefs and persists them to disk.
+class ElementStore:
+    """Manages the current set of Elements and persists them to disk.
 
     When *path* is ``None``, operates in memory-only mode (no file I/O).
     """
 
     def __init__(self, path: Path | None):
         self._path = path
-        self._refs: list[TextRef] = []
+        self._elements: list[Element] = []
 
     # ── building ────────────────────────────────────────────────
 
-    def build_from_ocr(self, ocr_results: list[OCRResult]) -> list[TextRef]:
-        """Convert MaaFW ``OCRResult`` objects into numbered TextRefs."""
-        refs: list[TextRef] = []
+    def build_from_ocr(self, ocr_results: list[OCRResult]) -> list[Element]:
+        """Convert MaaFW ``OCRResult`` objects into numbered Elements."""
+        elements: list[Element] = []
         for i, r in enumerate(ocr_results, start=1):
             box = list(r.box) if isinstance(r.box, (list, tuple)) else [0, 0, 0, 0]
-            ref = TextRef(
-                ref=f"t{i}",
+            elem = Element(
+                ref=f"e{i}",
                 text=str(r.text),
                 box=[int(v) for v in box],
                 score=round(float(r.score), 4),
             )
-            refs.append(ref)
-        self._refs = refs
-        return refs
+            elements.append(elem)
+        self._elements = elements
+        return elements
 
     # ── lookup ──────────────────────────────────────────────────
 
-    def resolve(self, ref_id: str) -> TextRef | None:
-        """Find a TextRef by its short id (e.g. ``"t2"``)."""
-        for r in self._refs:
-            if r.ref == ref_id:
-                return r
+    def resolve(self, ref_id: str) -> Element | None:
+        """Find an Element by its short id (e.g. ``"e2"``)."""
+        for e in self._elements:
+            if e.ref == ref_id:
+                return e
         return None
 
     # ── persistence ─────────────────────────────────────────────
 
     def save(self) -> None:
-        """Write current refs to disk.  No-op if path is None (memory mode)."""
+        """Write current elements to disk.  No-op if path is None (memory mode)."""
         if self._path is None:
             return
         self._path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "timestamp": datetime.now().isoformat(),
-            "refs": [r.to_dict() for r in self._refs],
+            "elements": [e.to_dict() for e in self._elements],
         }
         self._path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    def load(self) -> list[TextRef]:
-        """Load refs from disk. Returns empty list if file missing or memory mode."""
+    def load(self) -> list[Element]:
+        """Load elements from disk. Returns empty list if file missing or memory mode."""
         if self._path is None:
-            return self._refs
+            return self._elements
         if not self._path.exists():
             return []
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
-            self._refs = [TextRef(**r) for r in data.get("refs", [])]
-            return self._refs
+            # Support both old "refs" key and new "elements" key
+            raw = data.get("elements") or data.get("refs", [])
+            self._elements = [Element(**r) for r in raw]
+            return self._elements
         except (json.JSONDecodeError, TypeError, KeyError):
             return []
 
     @property
-    def refs(self) -> list[TextRef]:
-        return list(self._refs)
+    def elements(self) -> list[Element]:
+        return list(self._elements)

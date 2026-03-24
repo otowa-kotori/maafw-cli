@@ -21,8 +21,8 @@ def session_file() -> Path:
     return get_data_dir() / "session.json"
 
 
-def textrefs_file() -> Path:
-    return get_data_dir() / "textrefs.json"
+def elements_file() -> Path:
+    return get_data_dir() / "elements.json"
 
 
 # ── session data ───────────────────────────────────────────────

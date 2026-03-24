@@ -11,7 +11,6 @@ import logging
 import os
 import signal
 import time
-from pathlib import Path
 from typing import Any
 
 from maafw_cli.core.errors import MaafwError

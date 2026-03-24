@@ -293,11 +293,11 @@ def test_win32_swipe_json(mock_window):
     assert "duration" in data
 
 
-def test_win32_swipe_with_textrefs(mock_window):
-    """Verify swipe accepts TextRef arguments."""
+def test_win32_swipe_with_elements(mock_window):
+    """Verify swipe accepts Element arguments."""
     _ensure_connected(mock_window)
 
-    # Run OCR first to populate TextRefs
+    # Run OCR first to populate Elements
     ocr_result = runner.invoke(cli, ["--json", "ocr"])
     if ocr_result.exit_code != 0:
         pytest.skip("OCR failed")
@@ -305,8 +305,8 @@ def test_win32_swipe_with_textrefs(mock_window):
     if len(data.get("results", [])) < 2:
         pytest.skip("Need at least 2 OCR results for swipe test")
 
-    # Swipe from t1 to t2
-    result = runner.invoke(cli, ["swipe", "t1", "t2"])
+    # Swipe from e1 to e2
+    result = runner.invoke(cli, ["swipe", "e1", "e2"])
     _safe_print(result.output)
     assert result.exit_code == 0
     assert "Swiped" in result.output

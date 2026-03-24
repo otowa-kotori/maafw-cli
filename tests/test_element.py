@@ -1,10 +1,10 @@
-"""Tests for the TextRef system."""
+"""Tests for the Element system."""
 import tempfile
 from pathlib import Path
 
 from maa.define import OCRResult
 
-from maafw_cli.core.textref import TextRef, TextRefStore
+from maafw_cli.core.element import Element, ElementStore
 
 
 def _sample_ocr_results() -> list[OCRResult]:
@@ -15,30 +15,30 @@ def _sample_ocr_results() -> list[OCRResult]:
     ]
 
 
-class TestTextRef:
+class TestElement:
     def test_center(self):
-        r = TextRef(ref="t1", text="hi", box=[100, 200, 40, 20], score=0.9)
+        r = Element(ref="e1", text="hi", box=[100, 200, 40, 20], score=0.9)
         assert r.center == (120, 210)
 
     def test_to_dict(self):
-        r = TextRef(ref="t1", text="A", box=[0, 0, 10, 10], score=0.5)
+        r = Element(ref="e1", text="A", box=[0, 0, 10, 10], score=0.5)
         d = r.to_dict()
-        assert d == {"ref": "t1", "text": "A", "box": [0, 0, 10, 10], "score": 0.5}
+        assert d == {"ref": "e1", "text": "A", "box": [0, 0, 10, 10], "score": 0.5}
 
 
-class TestTextRefStore:
+class TestElementStore:
     def test_build_from_ocr(self):
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             path = Path(f.name)
 
-        store = TextRefStore(path)
+        store = ElementStore(path)
         refs = store.build_from_ocr(_sample_ocr_results())
 
         assert len(refs) == 3
-        assert refs[0].ref == "t1"
+        assert refs[0].ref == "e1"
         assert refs[0].text == "设置"
-        assert refs[1].ref == "t2"
-        assert refs[2].ref == "t3"
+        assert refs[1].ref == "e2"
+        assert refs[2].ref == "e3"
         assert refs[2].score == 0.93
 
         path.unlink(missing_ok=True)
@@ -47,13 +47,13 @@ class TestTextRefStore:
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             path = Path(f.name)
 
-        store = TextRefStore(path)
+        store = ElementStore(path)
         store.build_from_ocr(_sample_ocr_results())
 
-        assert store.resolve("t1") is not None
-        assert store.resolve("t1").text == "设置"
-        assert store.resolve("t2").text == "显示"
-        assert store.resolve("t99") is None
+        assert store.resolve("e1") is not None
+        assert store.resolve("e1").text == "设置"
+        assert store.resolve("e2").text == "显示"
+        assert store.resolve("e99") is None
 
         path.unlink(missing_ok=True)
 
@@ -61,23 +61,23 @@ class TestTextRefStore:
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             path = Path(f.name)
 
-        store = TextRefStore(path)
+        store = ElementStore(path)
         store.build_from_ocr(_sample_ocr_results())
         store.save()
 
         # Load into a new store
-        store2 = TextRefStore(path)
+        store2 = ElementStore(path)
         refs = store2.load()
 
         assert len(refs) == 3
-        assert refs[0].ref == "t1"
+        assert refs[0].ref == "e1"
         assert refs[0].text == "设置"
-        assert store2.resolve("t3").text == "亮度"
+        assert store2.resolve("e3").text == "亮度"
 
         path.unlink(missing_ok=True)
 
     def test_load_missing_file(self):
-        store = TextRefStore(Path("/nonexistent/file.json"))
+        store = ElementStore(Path("/nonexistent/file.json"))
         refs = store.load()
         assert refs == []
 
@@ -86,7 +86,7 @@ class TestTextRefStore:
             f.write("{bad json")
             path = Path(f.name)
 
-        store = TextRefStore(path)
+        store = ElementStore(path)
         refs = store.load()
         assert refs == []
 

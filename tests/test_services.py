@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from maafw_cli.core.errors import ActionError
-from maafw_cli.core.textref import TextRefStore, TextRef
+from maafw_cli.core.element import ElementStore, Element
 from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.interaction import do_click, do_swipe, do_scroll, do_type, do_key
 from mock_controller import MockController
@@ -16,7 +16,7 @@ from mock_controller import MockController
 
 def _make_ctx(
     mock: MockController | None = None,
-    textrefs_path: Path | None = None,
+    elements_path: Path | None = None,
     session_type: str = "win32",
 ) -> ServiceContext:
     """Build a ServiceContext backed by a MockController."""
@@ -24,7 +24,7 @@ def _make_ctx(
         mock = MockController()
     return ServiceContext(
         get_controller=lambda: mock,
-        textrefs_path=textrefs_path or Path("/nonexistent"),
+        elements_path=elements_path or Path("/nonexistent"),
         session_type=session_type,
     )
 
@@ -42,14 +42,14 @@ class TestClickService:
         assert result["y"] == 200
         assert mock.clicks == [(100, 200)]
 
-    def test_click_by_textref(self, tmp_path):
-        store = TextRefStore(tmp_path / "textrefs.json")
-        store._refs = [TextRef(ref="t1", text="Hello", box=[120, 40, 80, 20], score=0.95)]
+    def test_click_by_element(self, tmp_path):
+        store = ElementStore(tmp_path / "elements.json")
+        store._elements = [Element(ref="e1", text="Hello", box=[120, 40, 80, 20], score=0.95)]
         store.save()
 
         mock = MockController()
-        ctx = _make_ctx(mock, textrefs_path=tmp_path / "textrefs.json")
-        result = do_click(ctx, target="t1")
+        ctx = _make_ctx(mock, elements_path=tmp_path / "elements.json")
+        result = do_click(ctx, target="e1")
         assert result["x"] == 160  # 120 + 80//2
         assert result["y"] == 50   # 40 + 20//2
         assert mock.clicks == [(160, 50)]
@@ -62,7 +62,7 @@ class TestClickService:
     def test_click_unknown_ref(self):
         ctx = _make_ctx()
         with pytest.raises(ActionError, match="Unknown reference"):
-            do_click(ctx, target="t999")
+            do_click(ctx, target="e999")
 
     def test_click_fails(self):
         mock = MockController(click_ok=False)
@@ -200,7 +200,7 @@ class TestServiceContext:
 
         ctx = ServiceContext(
             get_controller=factory,
-            textrefs_path=Path("/nonexistent"),
+            elements_path=Path("/nonexistent"),
             session_type="win32",
         )
         _ = ctx.controller
@@ -217,7 +217,7 @@ class TestServiceContext:
 
         ctx = ServiceContext(
             get_controller=factory,
-            textrefs_path=Path("/nonexistent"),
+            elements_path=Path("/nonexistent"),
             session_type="win32",
         )
         _ = ctx.controller

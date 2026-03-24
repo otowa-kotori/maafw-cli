@@ -13,13 +13,13 @@ from maafw_cli.core.output import OutputFormatter
 class TestFormatOcrTable:
     def test_basic(self):
         refs = [
-            {"ref": "t1", "text": "Hello", "box": [10, 20, 100, 30], "score": 0.95},
-            {"ref": "t2", "text": "World", "box": [10, 60, 100, 30], "score": 0.88},
+            {"ref": "e1", "text": "Hello", "box": [10, 20, 100, 30], "score": 0.95},
+            {"ref": "e2", "text": "World", "box": [10, 60, 100, 30], "score": 0.88},
         ]
         result = OutputFormatter.format_ocr_table(refs, 123)
-        assert "t1" in result
+        assert "e1" in result
         assert "Hello" in result
-        assert "t2" in result
+        assert "e2" in result
         assert "World" in result
         assert "95%" in result
         assert "88%" in result
@@ -28,7 +28,7 @@ class TestFormatOcrTable:
         assert "default" in result  # default session label
 
     def test_custom_session_label(self):
-        refs = [{"ref": "t1", "text": "x", "box": [0, 0, 1, 1], "score": 1.0}]
+        refs = [{"ref": "e1", "text": "x", "box": [0, 0, 1, 1], "score": 1.0}]
         result = OutputFormatter.format_ocr_table(refs, 50, session_label="phone")
         assert "phone" in result
 
@@ -38,7 +38,7 @@ class TestFormatOcrTable:
         assert "0ms" in result
 
     def test_unicode_text(self):
-        refs = [{"ref": "t1", "text": "设置", "box": [10, 20, 80, 24], "score": 0.97}]
+        refs = [{"ref": "e1", "text": "设置", "box": [10, 20, 80, 24], "score": 0.97}]
         result = OutputFormatter.format_ocr_table(refs, 200)
         assert "设置" in result
         assert "97%" in result

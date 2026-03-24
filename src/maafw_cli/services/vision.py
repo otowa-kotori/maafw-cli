@@ -39,13 +39,13 @@ def do_ocr(ctx: ServiceContext, roi: str | None = None) -> dict:
             raise RecognitionError("OCR model not found. Run: maafw-cli resource download-ocr")
         raise RecognitionError("OCR failed.")
 
-    store = ctx.get_textref_store()
-    refs = store.build_from_ocr(results)
+    store = ctx.get_element_store()
+    elements = store.build_from_ocr(results)
     store.save()
 
     return {
         "session": "default",
-        "results": [r.to_dict() for r in refs],
+        "results": [e.to_dict() for e in elements],
         "elapsed_ms": elapsed_ms,
     }
 

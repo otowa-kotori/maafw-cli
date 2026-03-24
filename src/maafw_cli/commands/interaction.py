@@ -17,7 +17,7 @@ from maafw_cli.services.interaction import do_click, do_swipe, do_scroll, do_typ
 def click_cmd(ctx: CliContext, target: str) -> None:
     """Click on a target.
 
-    TARGET can be a TextRef (e.g. t3) or coordinates (e.g. 452,387).
+    TARGET can be an Element ref (e.g. e3) or coordinates (e.g. 452,387).
     """
     ctx.run(do_click, target=target)
 
@@ -31,13 +31,13 @@ def click_cmd(ctx: CliContext, target: str) -> None:
 def swipe_cmd(ctx: CliContext, from_target: str, to_target: str, duration: int) -> None:
     """Swipe from FROM to TO.
 
-    FROM and TO can be a TextRef (e.g. t3) or coordinates (e.g. 452,387).
+    FROM and TO can be an Element ref (e.g. e3) or coordinates (e.g. 452,387).
 
     \b
     Examples:
       maafw-cli swipe 100,800 100,200
       maafw-cli swipe 100,800 100,200 --duration 500
-      maafw-cli swipe t1 t3
+      maafw-cli swipe e1 e3
     """
     ctx.run(do_swipe, from_target=from_target, to_target=to_target, duration=duration)
 

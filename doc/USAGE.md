@@ -15,8 +15,8 @@ maafw-cli connect adb 127.0.0.1:16384           # Android 模拟器
 maafw-cli connect win32 "记事本" --as notepad    # Win32 窗口，命名为 notepad
 
 # 2. 操作（通过 daemon，零重连）
-maafw-cli ocr                                    # OCR，输出带 TextRef
-maafw-cli click t3                               # 按引用点击
+maafw-cli ocr                                    # OCR，输出带 Element
+maafw-cli click e3                               # 按引用点击
 maafw-cli click 452,387                          # 按坐标点击
 maafw-cli screenshot                             # 截图保存到当前目录
 
@@ -100,7 +100,7 @@ maafw-cli connect adb 127.0.0.1:16384 --as phone     # 会话名 = phone
 
 ### `ocr`
 
-对连接的设备/窗口执行全屏 OCR。结果赋予 TextRef（t1, t2, ...），可供 `click` 使用。
+对连接的设备/窗口执行全屏 OCR。结果赋予 Element（e1, e2, ...），可供 `click` 使用。
 
 | 选项 | 说明 |
 |------|------|
@@ -123,12 +123,12 @@ maafw-cli ocr --roi 0,0,400,300       # 只识别左上角区域
 ### `click <TARGET>`
 
 点击目标。TARGET 支持：
-- TextRef：`t3`（需先运行 ocr）
+- Element：`e3`（需先运行 ocr）
 - 坐标：`452,387`
 
 ### `swipe <FROM> <TO>`
 
-从 FROM 滑动到 TO。FROM/TO 支持 TextRef 或坐标。
+从 FROM 滑动到 TO。FROM/TO 支持 Element 或坐标。
 
 | 选项 | 默认 | 说明 |
 |------|------|------|
@@ -137,7 +137,7 @@ maafw-cli ocr --roi 0,0,400,300       # 只识别左上角区域
 ```bash
 maafw-cli swipe 100,800 100,200              # 从下往上滑
 maafw-cli swipe 100,800 100,200 --duration 500
-maafw-cli swipe t1 t3                         # 从 TextRef t1 滑到 t3
+maafw-cli swipe e1 e3                         # 从 Element e1 滑到 e3
 ```
 
 ### `scroll <DX> <DY>`
@@ -214,9 +214,9 @@ maafw-cli resource status
 maafw-cli repl
 maafw> connect adb 127.0.0.1:16384
 maafw> ocr
-maafw> click t1
+maafw> click e1
 maafw> observe on        # 开启 --observe 模式
-maafw> click t2          # 点击后自动 OCR
+maafw> click e2          # 点击后自动 OCR
 maafw> quit
 ```
 
@@ -260,8 +260,8 @@ maafw-cli session close tablet
 在动作命令（click/swipe/scroll/type/key）执行后自动追加 OCR，一条命令完成"操作+感知"。
 
 ```bash
-maafw-cli --observe click t3          # 点击后立即输出 OCR 结果
-maafw-cli --observe --json click t3   # JSON 中含 OCR 结果
+maafw-cli --observe click e3          # 点击后立即输出 OCR 结果
+maafw-cli --observe --json click e3   # JSON 中含 OCR 结果
 ```
 
 REPL 中用 `observe on` / `observe off` 切换。

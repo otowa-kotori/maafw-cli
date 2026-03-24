@@ -154,7 +154,7 @@ class TestCliContextObserve:
         ctx = CliContext(no_daemon=True, observe=True)
         mock_svc_ctx = MagicMock()
         mock_ocr = MagicMock(return_value={
-            "results": [{"ref": "t1", "text": "hi", "box": [0, 0, 10, 10], "score": 0.9}],
+            "results": [{"ref": "e1", "text": "hi", "box": [0, 0, 10, 10], "score": 0.9}],
             "elapsed_ms": 100,
         })
 

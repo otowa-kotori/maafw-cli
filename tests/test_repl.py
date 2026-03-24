@@ -22,7 +22,7 @@ def _make_repl(mock: MockController | None = None, json_mode: bool = False) -> R
     repl = Repl(fmt)
     repl._svc_ctx = ServiceContext(
         get_controller=lambda: mock,
-        textrefs_path=Path("/nonexistent"),
+        elements_path=Path("/nonexistent"),
         session_type="win32",
     )
     return repl

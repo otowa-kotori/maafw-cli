@@ -1,7 +1,7 @@
 """
-SessionManager — named sessions with controllers and textrefs in memory.
+SessionManager — named sessions with controllers and elements in memory.
 
-Each ``ManagedSession`` holds a Controller, TextRefStore, SessionInfo,
+Each ``ManagedSession`` holds a Controller, ElementStore, SessionInfo,
 and a per-session asyncio Lock for concurrency safety.
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import Any
 
 from maafw_cli.core.errors import DeviceConnectionError
 from maafw_cli.core.session import SessionInfo
-from maafw_cli.core.textref import TextRefStore
+from maafw_cli.core.element import ElementStore
 from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.registry import DISPATCH
 
@@ -27,16 +27,16 @@ class ManagedSession:
     name: str
     controller: Any  # Controller (typed as Any to allow mocking)
     session_info: SessionInfo
-    textref_store: TextRefStore = field(default_factory=lambda: TextRefStore(path=None))
+    element_store: ElementStore = field(default_factory=lambda: ElementStore(path=None))
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     def make_service_context(self) -> ServiceContext:
         """Build a ServiceContext for executing service functions."""
         return ServiceContext(
             get_controller=lambda: self.controller,
-            textrefs_path=None,
+            elements_path=None,
             session_type=self.session_info.type,
-            textref_store=self.textref_store,
+            element_store=self.element_store,
             session_name=self.name,
         )
 

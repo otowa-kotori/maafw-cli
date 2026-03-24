@@ -9,7 +9,7 @@ MaaFramework 命令行界面。让 Human / AI / Script / Cron 都能直接操作
 ```
 commands/    CLI 薄壳：Click 参数 + 输出格式化，调用 services/
 services/    纯业务逻辑：@service 注册，返回 dict，抛异常，不碰 Click/sys.exit
-core/        共享基础设施：IPC、会话、TextRef、日志、keymap、错误类型
+core/        共享基础设施：IPC、会话、Element、日志、keymap、错误类型
 daemon/      后台守护进程：asyncio TCP server，持久连接，命名会话
 maafw/       MaaFramework API 薄封装 + init_toolkit()
 ```

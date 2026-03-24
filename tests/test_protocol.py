@@ -16,7 +16,7 @@ class TestEncodeDecode:
     """Round-trip and edge-case tests for encode/decode."""
 
     def test_round_trip_simple(self):
-        msg = {"id": "abc", "action": "click", "session": None, "params": {"target": "t2"}}
+        msg = {"id": "abc", "action": "click", "session": None, "params": {"target": "e2"}}
         raw = encode(msg)
         assert raw.endswith(b"\n")
         assert decode(raw) == msg
@@ -68,9 +68,9 @@ class TestDecodeErrors:
 
 class TestRequestHelpers:
     def test_make_request_defaults(self):
-        req = make_request("click", {"target": "t1"})
+        req = make_request("click", {"target": "e1"})
         assert req["action"] == "click"
-        assert req["params"] == {"target": "t1"}
+        assert req["params"] == {"target": "e1"}
         assert req["session"] is None
         assert isinstance(req["id"], str)
         assert len(req["id"]) == 12

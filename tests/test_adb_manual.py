@@ -127,7 +127,7 @@ def test_screenshot_auto_name():
 
 
 def test_ocr():
-    """Verify OCR returns TextRef results."""
+    """Verify OCR returns Element results."""
     device = _get_device()
     runner.invoke(cli, ["connect", "adb", device])
 
@@ -180,12 +180,12 @@ def test_click_by_coords():
     assert "Clicked" in result.output
 
 
-def test_click_by_textref():
-    """Verify clicking by TextRef (requires OCR first)."""
+def test_click_by_element():
+    """Verify clicking by Element (requires OCR first)."""
     device = _get_device()
     runner.invoke(cli, ["connect", "adb", device])
 
-    # First run OCR to populate TextRefs
+    # First run OCR to populate Elements
     ocr_result = runner.invoke(cli, ["--json", "ocr"])
     if ocr_result.exit_code != 0:
         pytest.skip("OCR failed")
@@ -193,14 +193,14 @@ def test_click_by_textref():
     if not data.get("results"):
         pytest.skip("No OCR results to click on")
 
-    # Click the first TextRef
-    result = runner.invoke(cli, ["click", "t1"])
+    # Click the first Element
+    result = runner.invoke(cli, ["click", "e1"])
     print(result.output)
     assert result.exit_code == 0
     assert "Clicked" in result.output
 
 
-def test_click_by_textref_json():
+def test_click_by_element_json():
     """Verify click --json returns structured data."""
     device = _get_device()
     runner.invoke(cli, ["connect", "adb", device])

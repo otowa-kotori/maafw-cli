@@ -49,7 +49,7 @@ class CliContext:
     def _make_service_context(self):
         """Build a :class:`ServiceContext` for the current session (direct mode)."""
         from maafw_cli.core.reconnect import reconnect
-        from maafw_cli.core.session import load_session, textrefs_file
+        from maafw_cli.core.session import load_session, elements_file
         from maafw_cli.services.context import ServiceContext
 
         session = load_session()
@@ -57,7 +57,7 @@ class CliContext:
 
         return ServiceContext(
             get_controller=lambda: reconnect(),
-            textrefs_path=textrefs_file(),
+            elements_path=elements_file(),
             session_type=session_type,
         )
 
