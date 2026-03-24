@@ -87,6 +87,14 @@ def mock_window():
     proc.kill()
     proc.wait()
 
+    # Clean up auto-generated screenshot files
+    import glob
+    for f in glob.glob("screenshot_*.png"):
+        try:
+            Path(f).unlink()
+        except OSError:
+            pass
+
 
 # ── helpers ─────────────────────────────────────────────────────
 
