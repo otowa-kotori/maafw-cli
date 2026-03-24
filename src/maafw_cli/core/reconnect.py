@@ -41,6 +41,8 @@ def reconnect(fmt: OutputFormatter) -> Controller:
 
         if session.type == "adb":
             return _reconnect_adb(fmt, session)
+        elif session.type == "win32":
+            return _reconnect_win32(fmt, session)
 
         fmt.error(f"Unsupported session type: {session.type}", exit_code=_EXIT_CONNECTION_ERROR)
 
@@ -80,6 +82,41 @@ def _reconnect_adb(fmt: OutputFormatter, session) -> Controller:
     if controller is None:
         fmt.error(
             f"Failed to reconnect to '{session.device}'.",
+            exit_code=_EXIT_CONNECTION_ERROR,
+        )
+    return controller
+
+
+def _reconnect_win32(fmt: OutputFormatter, session) -> Controller:
+    from maafw_cli.maafw.win32 import find_win32_windows, connect_win32
+
+    with Timer("window discovery", log=_log):
+        windows = find_win32_windows()
+
+    # Match by window title (more stable than hwnd across restarts)
+    needle = session.window_name.lower() if session.window_name else ""
+    match = None
+    for w in windows:
+        if needle and needle in w.window_name.lower():
+            match = w
+            break
+
+    if match is None:
+        fmt.error(
+            f"Session window '{session.window_name}' no longer available.",
+            exit_code=_EXIT_CONNECTION_ERROR,
+        )
+
+    with Timer("Win32 connection", log=_log):
+        controller = connect_win32(
+            match,
+            screencap_method=session.screencap_methods,
+            input_method=session.input_methods,
+        )
+
+    if controller is None:
+        fmt.error(
+            f"Failed to reconnect to '{session.window_name}'.",
             exit_code=_EXIT_CONNECTION_ERROR,
         )
     return controller

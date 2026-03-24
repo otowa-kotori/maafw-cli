@@ -398,8 +398,78 @@ $ maafw-cli screenshot --output test.png
 - `text:` 目标寻址（自动 OCR + 查找 + 点击）
 - `--observe` 标志（动作后自动 OCR）
 - `reco` 命令（MaaFW 原生感知接口）
-- Win32 支持：`device list --win32`, `connect win32`
+- ~~Win32 支持：`device list --win32`, `connect win32`~~ ✅ 已实现
 - 完善错误信息和帮助文档
+
+#### Win32 窗口支持（✅ 已实现）
+
+**新增文件**：`maafw/win32.py`
+**修改文件**：`commands/device.py`, `commands/connect.py`, `core/session.py`, `core/reconnect.py`, `core/log.py`, `maafw/control.py`
+
+**命令**：
+```bash
+# 列出有标题的 Win32 窗口
+$ maafw-cli device list --win32
+Win32 windows (5):
+  0x000A0B2C  原神                     UnityWndClass
+  0x001204FA  Visual Studio Code       Chrome_WidgetWin_1
+
+# 按标题子串连接（大小写不敏感）
+$ maafw-cli connect win32 "记事本"
+
+# 按窗口句柄精确连接
+$ maafw-cli connect win32 0x000A0B2C
+
+# 指定截图和输入方式
+$ maafw-cli connect win32 "游戏" --screencap-method FramePool --input-method Seize
+```
+
+**截图方式**（`--screencap-method`，默认 `FramePool`）：
+
+| 方式 | 速度 | 后台支持 | 备注 |
+|------|------|---------|------|
+| GDI | 快 | ❌ | |
+| **FramePool** ✅ | 非常快 | ✅ | 需 Win10 1903+，推荐 |
+| DXGI_DesktopDup | 非常快 | ❌ | 全屏桌面复制 |
+| DXGI_DesktopDup_Window | 非常快 | ❌ | 桌面复制后裁剪到窗口 |
+| PrintWindow | 中 | ✅ | 兼容性较好 |
+| ScreenDC | 快 | ❌ | 兼容性最高 |
+
+**输入方式**（`--input-method`，默认 `PostMessage`）：
+
+| 方式 | 抢鼠标 | 后台 | 兼容性 | 备注 |
+|------|--------|------|--------|------|
+| Seize | ✅ 持续 | ❌ | 最高 | UWP/所有窗口均有效 |
+| SendMessage | ❌ | ✅ | 中 | 部分窗口（UWP、tkinter 等）无效 |
+| **PostMessage** ✅ | ❌ | ✅ | 中 | 同 SendMessage，异步投递 |
+| SendMessageWithCursorPos | 短暂 | ✅ | 中 | 短暂移光标后恢复 |
+| PostMessageWithCursorPos | 短暂 | ✅ | 中 | 同上，异步 |
+| SendMessageWithWindowPos | ❌ | ✅ | 中 | 移窗口到光标位置后恢复 |
+| PostMessageWithWindowPos | ❌ | ✅ | 中 | 同上，异步 |
+
+> **选择建议**：
+> - 纯截图/OCR（不需要点击）：默认即可
+> - 需要点击传统 Win32 应用（模拟器、游戏客户端）：`PostMessage` 或 `SendMessage` 通常有效
+> - 需要点击 UWP 应用（计算器、设置等）：必须用 `Seize`
+> - 自动化时不想被干扰：优先 `PostMessage`；若无效，退而求其次用 `SendMessageWithCursorPos`（短暂移光标）；最后选 `Seize`
+
+**重连策略**：按 `window_name`（窗口标题）子串重新搜索。hwnd 每次重启会变，标题更稳定。
+
+**session.json 示例**：
+```json
+{
+  "type": "win32",
+  "device": "记事本",
+  "address": "0x000A0B2C",
+  "screencap_methods": 2,
+  "input_methods": 4,
+  "window_name": "记事本"
+}
+```
+
+**其它改动**：
+- `click` 命令改用 `Controller.post_click()`（原 `post_touch_down/up` 对 Win32 SendMessage 系列无效）
+- `setup_logging()` 每次清理旧 handler，修复 CliRunner 多次调用后日志写入已关闭流的问题
 
 ### Phase 3：守护进程 + 多会话
 
@@ -454,10 +524,14 @@ maafw-cli/
 │       └── maafw/
 │           ├── __init__.py
 │           ├── adb.py           # ADB 设备操作
+│           ├── win32.py         # Win32 窗口操作
 │           ├── vision.py        # 截图 + OCR
 │           └── control.py       # 点击等控制操作
 └── tests/
     ├── test_cli.py              # CliRunner 集成测试
     ├── test_textref.py          # TextRef 单元测试
-    └── test_target.py           # 目标解析单元测试
+    ├── test_target.py           # 目标解析单元测试
+    ├── test_adb_manual.py       # ADB 手动集成测试
+    ├── test_win32_manual.py     # Win32 手动集成测试
+    └── mock_win32_window.py     # Win32 测试用 tkinter mock 窗口
 ```

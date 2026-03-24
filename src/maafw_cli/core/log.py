@@ -32,6 +32,11 @@ def setup_logging(*, verbose: bool = False, quiet: bool = False) -> None:
     """
     level = logging.WARNING if quiet else (logging.DEBUG if verbose else logging.INFO)
 
+    # Remove any previously attached handlers so we don't accumulate stale
+    # references (e.g. when CliRunner.invoke() is called multiple times in
+    # tests, each invocation gets a different sys.stderr).
+    logger.handlers.clear()
+
     handler = logging.StreamHandler(sys.stderr)
 
     if verbose:

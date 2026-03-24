@@ -10,16 +10,13 @@ from maafw_cli.cli import pass_ctx, CliContext, EXIT_ACTION_FAILED
 
 @click.command("click")
 @click.argument("target")
-@click.option("--long", "long_press", type=int, default=None,
-              help="Long-press duration in ms.")
 @pass_ctx
-def click_cmd(ctx: CliContext, target: str, long_press: int | None) -> None:
+def click_cmd(ctx: CliContext, target: str) -> None:
     """Click on a target.
 
     TARGET can be a TextRef (e.g. t3) or coordinates (e.g. 452,387).
     """
     fmt = ctx.fmt
-    duration = long_press if long_press is not None else 50
 
     # Resolve target
     from maafw_cli.core.textref import TextRefStore
@@ -42,7 +39,7 @@ def click_cmd(ctx: CliContext, target: str, long_press: int | None) -> None:
 
     from maafw_cli.maafw.control import click as do_click
 
-    ok = do_click(controller, resolved.x, resolved.y, duration=duration)
+    ok = do_click(controller, resolved.x, resolved.y)
     if not ok:
         fmt.error("Click failed.", exit_code=EXIT_ACTION_FAILED)
 

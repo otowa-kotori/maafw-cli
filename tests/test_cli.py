@@ -35,17 +35,24 @@ class TestCliStructure:
         result = runner.invoke(cli, ["device", "list", "--help"])
         assert result.exit_code == 0
         assert "--adb" in result.output
+        assert "--win32" in result.output
 
     def test_connect_help(self):
         result = runner.invoke(cli, ["connect", "--help"])
         assert result.exit_code == 0
         assert "adb" in result.output
+        assert "win32" in result.output
 
     def test_connect_adb_help(self):
         result = runner.invoke(cli, ["connect", "adb", "--help"])
         assert result.exit_code == 0
         assert "DEVICE" in result.output
         assert "--screenshot-size" in result.output
+
+    def test_connect_win32_help(self):
+        result = runner.invoke(cli, ["connect", "win32", "--help"])
+        assert result.exit_code == 0
+        assert "WINDOW" in result.output
 
     def test_ocr_help(self):
         result = runner.invoke(cli, ["ocr", "--help"])
@@ -63,7 +70,6 @@ class TestCliStructure:
         result = runner.invoke(cli, ["click", "--help"])
         assert result.exit_code == 0
         assert "TARGET" in result.output
-        assert "--long" in result.output
 
     def test_global_json_flag(self):
         """Ensure --json is accepted as a global option."""
