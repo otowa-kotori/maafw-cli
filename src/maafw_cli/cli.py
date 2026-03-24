@@ -214,15 +214,8 @@ class CliContext:
         if self.fmt.json_mode:
             self.fmt.success(ocr_result)
         elif refs:
-            lines: list[str] = ["\u2500" * 60]
-            for r in refs:
-                box = r["box"]
-                box_str = f"[{box[0]:>4},{box[1]:>4},{box[2]:>4},{box[3]:>4}]"
-                score_str = f"{r['score'] * 100:.0f}%"
-                lines.append(f" {r['ref']:<4s} {r['text']:<20s} {box_str}  {score_str}")
-            lines.append("\u2500" * 60)
-            lines.append(f"{len(refs)} results | {elapsed_ms}ms")
-            self.fmt.success(ocr_result, human="\n".join(lines))
+            human = OutputFormatter.format_ocr_table(refs, elapsed_ms)
+            self.fmt.success(ocr_result, human=human)
 
 
 pass_ctx = click.make_pass_decorator(CliContext, ensure=True)

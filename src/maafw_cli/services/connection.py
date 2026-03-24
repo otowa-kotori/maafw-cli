@@ -11,24 +11,14 @@ from typing import Any
 from maafw_cli.core.errors import ConnectionError
 from maafw_cli.core.log import logger
 from maafw_cli.core.session import SessionInfo, save_session
+from maafw_cli.maafw import init_toolkit
 from maafw_cli.services.registry import service
-
-
-def _init_toolkit() -> None:
-    """Initialise MaaFramework toolkit (safe to call multiple times)."""
-    try:
-        from maa.toolkit import Toolkit
-        from maafw_cli.paths import get_data_dir, ensure_dirs
-        ensure_dirs()
-        Toolkit.init_option(get_data_dir(), {"stdout_level": 0})
-    except Exception:
-        pass
 
 
 @service(name="device_list", needs_session=False)
 def do_device_list(*, adb: bool = True, win32: bool = False) -> dict:
     """List available devices / windows."""
-    _init_toolkit()
+    init_toolkit()
     result: dict = {}
 
     if adb:
@@ -61,7 +51,7 @@ def _connect_adb_inner(
 
     Returns (result_dict, Controller, SessionInfo) — no side effects.
     """
-    _init_toolkit()
+    init_toolkit()
     logger.info("Connecting to ADB device '%s'...", device)
 
     from maafw_cli.maafw.adb import find_adb_devices, connect_adb as _connect
@@ -111,7 +101,7 @@ def _connect_win32_inner(
 
     Returns (result_dict, Controller, SessionInfo) — no side effects.
     """
-    _init_toolkit()
+    init_toolkit()
     logger.info("Connecting to Win32 window '%s'...", window)
 
     from maafw_cli.maafw.win32 import find_win32_windows, connect_win32 as _connect

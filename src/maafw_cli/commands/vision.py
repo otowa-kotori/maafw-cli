@@ -9,6 +9,7 @@ import click
 
 from maafw_cli.cli import pass_ctx, CliContext
 from maafw_cli.core.errors import MaafwError
+from maafw_cli.core.output import OutputFormatter
 from maafw_cli.services.vision import do_ocr, do_screenshot
 
 
@@ -43,18 +44,9 @@ def ocr(ctx: CliContext, roi: str | None, text_only: bool) -> None:
         for r in refs:
             print(r["text"])
     else:
-        lines: list[str] = []
         session_label = result.get("session", "default")
-        lines.append(f"Screen OCR \u2014 {session_label}")
-        lines.append("\u2500" * 60)
-        for r in refs:
-            box = r["box"]
-            box_str = f"[{box[0]:>4},{box[1]:>4},{box[2]:>4},{box[3]:>4}]"
-            score_str = f"{r['score'] * 100:.0f}%"
-            lines.append(f" {r['ref']:<4s} {r['text']:<20s} {box_str}  {score_str}")
-        lines.append("\u2500" * 60)
-        lines.append(f"{len(refs)} results | {elapsed_ms}ms")
-        fmt.success(result, human="\n".join(lines))
+        human = OutputFormatter.format_ocr_table(refs, elapsed_ms, session_label)
+        fmt.success(result, human=human)
 
 
 @click.command("screenshot")

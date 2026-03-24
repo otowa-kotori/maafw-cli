@@ -20,9 +20,21 @@ from maafw_cli.paths import get_resource_dir
 
 _log = logging.getLogger("maafw_cli.vision")
 
+# ── cached resource ──────────────────────────────────────────────
+
+_cached_resource: Resource | None = None
+
 
 def _get_resource() -> Optional[Resource]:
-    """Create a Resource instance, loading the OCR model bundle."""
+    """Return a cached Resource instance, creating one on first call.
+
+    The Resource (OCR model bundle) is expensive to load (~200-500ms) but
+    stateless — it can safely be reused across controllers and OCR calls.
+    """
+    global _cached_resource
+    if _cached_resource is not None:
+        return _cached_resource
+
     resource_path = get_resource_dir()
     resource = Resource()
 
@@ -32,11 +44,13 @@ def _get_resource() -> Optional[Resource]:
     with Timer("resource bundle load", log=_log):
         if not resource.post_bundle(str(resource_path)).wait().succeeded:
             return None
+
+    _cached_resource = resource
     return resource
 
 
 def _get_tasker(controller: Controller) -> Optional[Tasker]:
-    """Create a Tasker bound to *controller* with a fresh Resource."""
+    """Create a Tasker bound to *controller* with a (cached) Resource."""
     resource = _get_resource()
     if resource is None:
         return None

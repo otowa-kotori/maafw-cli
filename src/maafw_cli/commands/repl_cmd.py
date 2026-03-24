@@ -298,6 +298,7 @@ class Repl:
     def _run_observe(self) -> None:
         """Run OCR after an action (best-effort)."""
         from maafw_cli.services.vision import do_ocr
+        from maafw_cli.core.output import OutputFormatter
 
         try:
             ocr_result = do_ocr(self._svc_ctx)
@@ -312,15 +313,8 @@ class Repl:
         if self.fmt.json_mode:
             self.fmt.success(ocr_result)
         else:
-            lines: list[str] = ["\u2500" * 60]
-            for r in refs:
-                box = r["box"]
-                box_str = f"[{box[0]:>4},{box[1]:>4},{box[2]:>4},{box[3]:>4}]"
-                score_str = f"{r['score'] * 100:.0f}%"
-                lines.append(f" {r['ref']:<4s} {r['text']:<20s} {box_str}  {score_str}")
-            lines.append("\u2500" * 60)
-            lines.append(f"{len(refs)} results | {elapsed_ms}ms")
-            self.fmt.success(ocr_result, human="\n".join(lines))
+            human = OutputFormatter.format_ocr_table(refs, elapsed_ms)
+            self.fmt.success(ocr_result, human=human)
 
 
 @click.command("repl")

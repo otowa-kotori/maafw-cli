@@ -73,3 +73,23 @@ class OutputFormatter:
         sys.stdout.buffer.write(text.encode("utf-8"))
         sys.stdout.buffer.write(b"\n")
         sys.stdout.buffer.flush()
+
+    # ── OCR formatting ───────────────────────────────────────────
+
+    @staticmethod
+    def format_ocr_table(refs: list[dict], elapsed_ms: int, session_label: str = "default") -> str:
+        """Format OCR results as a human-readable table.
+
+        Used by ``ocr`` command and ``--observe`` mode.
+        """
+        lines: list[str] = []
+        lines.append(f"Screen OCR \u2014 {session_label}")
+        lines.append("\u2500" * 60)
+        for r in refs:
+            box = r["box"]
+            box_str = f"[{box[0]:>4},{box[1]:>4},{box[2]:>4},{box[3]:>4}]"
+            score_str = f"{r['score'] * 100:.0f}%"
+            lines.append(f" {r['ref']:<4s} {r['text']:<20s} {box_str}  {score_str}")
+        lines.append("\u2500" * 60)
+        lines.append(f"{len(refs)} results | {elapsed_ms}ms")
+        return "\n".join(lines)

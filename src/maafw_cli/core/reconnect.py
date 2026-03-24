@@ -33,7 +33,8 @@ def reconnect() -> Controller:
 
         # Initialise MaaFW toolkit (idempotent)
         with Timer("toolkit init", log=_log):
-            _init_toolkit()
+            from maafw_cli.maafw import init_toolkit
+            init_toolkit()
 
         if session.type == "adb":
             return _reconnect_adb(session)
@@ -41,17 +42,6 @@ def reconnect() -> Controller:
             return _reconnect_win32(session)
 
         raise MaafwConnectionError(f"Unsupported session type: {session.type}")
-
-
-def _init_toolkit() -> None:
-    """Initialise MaaFramework toolkit (safe to call multiple times)."""
-    try:
-        from maa.toolkit import Toolkit
-        from maafw_cli.paths import get_data_dir, ensure_dirs
-        ensure_dirs()
-        Toolkit.init_option(get_data_dir(), {"stdout_level": 0})
-    except Exception:
-        pass
 
 
 def _reconnect_adb(session) -> Controller:
