@@ -27,11 +27,13 @@ _DAEMON_START_TIMEOUT = 10.0  # seconds to wait for daemon to start
 _DAEMON_POLL_INTERVAL = 0.1   # polling interval when waiting
 
 
-def _pid_file() -> Path:
+def pid_file() -> Path:
+    """Path to the daemon PID file."""
     return _data_dir() / "daemon.pid"
 
 
-def _port_file() -> Path:
+def port_file() -> Path:
+    """Path to the daemon port file."""
     return _data_dir() / "daemon.port"
 
 
@@ -93,8 +95,8 @@ def _is_daemon_reachable(port: int, host: str = "127.0.0.1") -> bool:
 
 def _read_daemon_info() -> tuple[int | None, int | None]:
     """Read PID and port from daemon files. Returns (pid, port) or (None, None)."""
-    pid_path = _pid_file()
-    port_path = _port_file()
+    pid_path = pid_file()
+    port_path = port_file()
 
     if not pid_path.exists() or not port_path.exists():
         return None, None
@@ -109,7 +111,7 @@ def _read_daemon_info() -> tuple[int | None, int | None]:
 
 def _cleanup_stale_files() -> None:
     """Remove PID/port files if the daemon process is dead."""
-    for f in (_pid_file(), _port_file()):
+    for f in (pid_file(), port_file()):
         try:
             f.unlink(missing_ok=True)
         except OSError:
@@ -244,3 +246,19 @@ class DaemonClient:
             return decode(line)
         finally:
             sock.close()
+
+
+# ── public helpers for daemon management ─────────────────────────
+
+
+def get_daemon_info() -> tuple[int | None, int | None]:
+    """Return (pid, port) of a running daemon, or (None, None).
+
+    Also verifies the process is alive; stale files return (None, None).
+    """
+    pid, port = _read_daemon_info()
+    if pid is None or port is None:
+        return None, None
+    if not _is_process_alive(pid):
+        return None, None
+    return pid, port

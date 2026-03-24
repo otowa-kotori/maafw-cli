@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import cv2
 from maa.controller import Controller
@@ -25,7 +25,7 @@ _log = logging.getLogger("maafw_cli.vision")
 _cached_resource: Resource | None = None
 
 
-def _get_resource() -> Optional[Resource]:
+def _get_resource() -> Resource | None:
     """Return a cached Resource instance, creating one on first call.
 
     The Resource (OCR model bundle) is expensive to load (~200-500ms) but
@@ -49,7 +49,7 @@ def _get_resource() -> Optional[Resource]:
     return resource
 
 
-def _get_tasker(controller: Controller) -> Optional[Tasker]:
+def _get_tasker(controller: Controller) -> Tasker | None:
     """Create a Tasker bound to *controller* with a (cached) Resource."""
     resource = _get_resource()
     if resource is None:
@@ -70,7 +70,7 @@ def screencap(controller: Controller) -> Any:
         return controller.post_screencap().wait().get()
 
 
-def screencap_to_file(controller: Controller, output: str | Path | None = None) -> Optional[Path]:
+def screencap_to_file(controller: Controller, output: str | Path | None = None) -> Path | None:
     """Take a screenshot and save to *output* (or an auto-named file).
 
     Returns the path on success, ``None`` on failure.
@@ -92,7 +92,7 @@ def screencap_to_file(controller: Controller, output: str | Path | None = None) 
     return output
 
 
-def ocr(controller: Controller, roi: tuple[int, int, int, int] | None = None) -> Optional[list[OCRResult]]:
+def ocr(controller: Controller, roi: tuple[int, int, int, int] | None = None) -> list[OCRResult] | None:
     """Run OCR, optionally restricted to *roi* ``(x, y, w, h)``.
 
     Returns a list of ``OCRResult`` (with ``.text``, ``.box``, ``.score``),

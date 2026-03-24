@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from maa.toolkit import Toolkit
 from maa.controller import AdbController
@@ -45,7 +45,7 @@ def find_adb_devices() -> list[AdbDeviceInfo]:
     ]
 
 
-def connect_adb(device: AdbDeviceInfo, screenshot_short_side: int = 720) -> Optional[AdbController]:
+def connect_adb(device: AdbDeviceInfo, screenshot_short_side: int = 720) -> AdbController | None:
     """Create and connect an AdbController for *device*.
 
     Returns the connected controller, or ``None`` on failure.

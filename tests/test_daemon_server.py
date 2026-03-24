@@ -9,7 +9,8 @@ import time
 import pytest
 
 from maafw_cli.daemon.protocol import encode, decode, make_request
-from maafw_cli.daemon.server import DaemonServer, _pid_file, _port_file
+from maafw_cli.daemon.server import DaemonServer
+from maafw_cli.core.ipc import pid_file, port_file
 
 # Import services to populate DISPATCH
 import maafw_cli.services.interaction  # noqa: F401
@@ -240,8 +241,9 @@ class TestDaemonServerSessionActions:
 
 class TestDaemonServerPidPortFiles:
     async def test_pid_port_files_written(self, tmp_path, monkeypatch):
-        # Redirect data dir to tmp
+        # Redirect data dir to tmp (both server and ipc use _data_dir)
         monkeypatch.setattr("maafw_cli.daemon.server._data_dir", lambda: tmp_path)
+        monkeypatch.setattr("maafw_cli.core.ipc._data_dir", lambda: tmp_path)
 
         server = DaemonServer(port=0)
         server.port = await server._bind()
@@ -249,19 +251,20 @@ class TestDaemonServerPidPortFiles:
         server.port = actual_port
         server._write_pid_port_files()
 
-        pid_file = tmp_path / "daemon.pid"
-        port_file = tmp_path / "daemon.port"
+        pid_path = tmp_path / "daemon.pid"
+        port_path = tmp_path / "daemon.port"
 
-        assert pid_file.exists()
-        assert port_file.exists()
-        assert int(pid_file.read_text()) == os.getpid()
-        assert int(port_file.read_text()) == actual_port
+        assert pid_path.exists()
+        assert port_path.exists()
+        assert int(pid_path.read_text()) == os.getpid()
+        assert int(port_path.read_text()) == actual_port
 
         server._server.close()
         await server._server.wait_closed()
 
     async def test_cleanup_removes_files(self, tmp_path, monkeypatch):
         monkeypatch.setattr("maafw_cli.daemon.server._data_dir", lambda: tmp_path)
+        monkeypatch.setattr("maafw_cli.core.ipc._data_dir", lambda: tmp_path)
 
         server = DaemonServer(port=0)
         server.port = await server._bind()

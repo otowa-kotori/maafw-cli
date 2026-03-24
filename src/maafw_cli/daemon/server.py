@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from maafw_cli.core.errors import MaafwError
+from maafw_cli.core.ipc import pid_file, port_file
 from maafw_cli.paths import get_data_dir as _data_dir
 from maafw_cli.daemon.protocol import decode, encode, error_response, ok_response
 from maafw_cli.daemon.session_mgr import SessionManager
@@ -34,14 +35,6 @@ DEFAULT_PORT = 19799
 PORT_RANGE_END = 19810  # exclusive; try 19799-19809
 IDLE_CHECK_INTERVAL = 30  # seconds
 IDLE_TIMEOUT = 300  # 5 minutes
-
-
-def _pid_file() -> Path:
-    return _data_dir() / "daemon.pid"
-
-
-def _port_file() -> Path:
-    return _data_dir() / "daemon.port"
 
 
 # ── DaemonServer ────────────────────────────────────────────────
@@ -119,8 +112,8 @@ class DaemonServer:
         data_dir = _data_dir()
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        _pid_file().write_text(str(os.getpid()), encoding="utf-8")
-        _port_file().write_text(str(self.port), encoding="utf-8")
+        pid_file().write_text(str(os.getpid()), encoding="utf-8")
+        port_file().write_text(str(self.port), encoding="utf-8")
         _log.debug("PID/port files written: pid=%d port=%d", os.getpid(), self.port)
 
     def _install_signal_handlers(self) -> None:
@@ -151,7 +144,7 @@ class DaemonServer:
         self.session_mgr.close_all()
 
         # Remove PID/port files
-        for f in (_pid_file(), _port_file()):
+        for f in (pid_file(), port_file()):
             try:
                 f.unlink(missing_ok=True)
             except Exception:

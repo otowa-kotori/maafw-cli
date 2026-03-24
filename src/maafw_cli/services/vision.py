@@ -3,8 +3,6 @@ Vision services — OCR, screenshot.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from maafw_cli.core.errors import ActionError, RecognitionError
 from maafw_cli.core.log import Timer
 from maafw_cli.services.context import ServiceContext
@@ -53,7 +51,7 @@ def do_ocr(ctx: ServiceContext, roi: str | None = None) -> dict:
 
 
 @service(human=lambda r: f"Saved: {r['path']}")
-def do_screenshot(ctx: ServiceContext, output: Optional[str] = None) -> dict:
+def do_screenshot(ctx: ServiceContext, output: str | None = None) -> dict:
     from maafw_cli.maafw.vision import screencap_to_file
 
     path = screencap_to_file(ctx.controller, output)

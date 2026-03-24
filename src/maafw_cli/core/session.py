@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from maafw_cli.paths import get_data_dir
 
@@ -56,7 +56,7 @@ def save_session(info: SessionInfo) -> None:
     path.write_text(json.dumps(info.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def load_session() -> Optional[SessionInfo]:
+def load_session() -> SessionInfo | None:
     """Load session info from disk.  Returns None if missing."""
     path = session_file()
     if not path.exists():

@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.request import urlopen, Request
 from urllib.error import URLError
 
+from maafw_cli import __version__
 from maafw_cli.paths import get_ocr_dir, get_model_dir
 
 OCR_DOWNLOAD_URL = "https://download.maafw.xyz/MaaCommonAssets/OCR/ppocr_v5/ppocr_v5-zh_cn.zip"
@@ -44,7 +45,7 @@ def download_and_extract_ocr(ocr_dir: Path | None = None) -> bool:
         _log(log_file, "开始下载 OCR 资源文件")
         _log(log_file, f"下载地址: {OCR_DOWNLOAD_URL}")
 
-        request = Request(OCR_DOWNLOAD_URL, headers={"User-Agent": "maafw-cli/0.1"})
+        request = Request(OCR_DOWNLOAD_URL, headers={"User-Agent": f"maafw-cli/{__version__}"})
 
         with urlopen(request, timeout=300) as response:
             total_size = response.headers.get("Content-Length")
@@ -90,6 +91,12 @@ def download_and_extract_ocr(ocr_dir: Path | None = None) -> bool:
                     _log(log_file, f"警告: 未在压缩包中找到 {req_file}")
 
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+        # Clean up the downloaded zip file
+        try:
+            zip_file.unlink(missing_ok=True)
+        except OSError:
+            pass
 
         _log(log_file, f"解压完成，OCR 资源已保存到: {ocr_dir}")
         return True

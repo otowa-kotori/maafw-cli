@@ -243,13 +243,6 @@ def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool,
     )
 
 
-# ── exit codes (kept for backward compat imports) ────────────────
-EXIT_SUCCESS = 0
-EXIT_ACTION_FAILED = 1
-EXIT_RECOGNITION_FAILED = 2
-EXIT_CONNECTION_ERROR = 3
-
-
 # ── import sub-commands to register them ────────────────────────
 
 from maafw_cli.commands.connection import device, connect  # noqa: E402

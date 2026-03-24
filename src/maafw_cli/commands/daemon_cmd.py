@@ -33,11 +33,11 @@ def daemon_start(ctx: CliContext, verbose: bool) -> None:
 @pass_ctx
 def daemon_stop(ctx: CliContext) -> None:
     """Stop the background daemon."""
-    from maafw_cli.core.ipc import DaemonClient, _read_daemon_info, _is_process_alive
+    from maafw_cli.core.ipc import DaemonClient, get_daemon_info
 
     fmt = ctx.fmt
-    pid, port = _read_daemon_info()
-    if pid is None or port is None or not _is_process_alive(pid):
+    pid, port = get_daemon_info()
+    if pid is None or port is None:
         fmt.success({"status": "not_running"}, human="Daemon is not running.")
         return
 
@@ -53,12 +53,12 @@ def daemon_stop(ctx: CliContext) -> None:
 @pass_ctx
 def daemon_status(ctx: CliContext) -> None:
     """Check daemon status."""
-    from maafw_cli.core.ipc import DaemonClient, _read_daemon_info, _is_process_alive
+    from maafw_cli.core.ipc import DaemonClient, get_daemon_info
 
     fmt = ctx.fmt
-    pid, port = _read_daemon_info()
+    pid, port = get_daemon_info()
 
-    if pid is None or port is None or not _is_process_alive(pid):
+    if pid is None or port is None:
         fmt.success({"status": "not_running"}, human="Daemon is not running.")
         return
 

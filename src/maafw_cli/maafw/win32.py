@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from maa.toolkit import Toolkit
 from maa.controller import Win32Controller
@@ -46,7 +45,7 @@ def connect_win32(
     window: Win32WindowInfo,
     screencap_method: int = MaaWin32ScreencapMethodEnum.FramePool,
     input_method: int = MaaWin32InputMethodEnum.PostMessage,
-) -> Optional[Win32Controller]:
+) -> Win32Controller | None:
     """Create and connect a Win32Controller for *window*.
 
     Returns the connected controller, or ``None`` on failure.
@@ -54,8 +53,8 @@ def connect_win32(
     ctrl = Win32Controller(
         window.hwnd,
         screencap_method,
-        input_method,
-        input_method,
+        input_method,      # key input
+        input_method,      # touch input (same as key for simplicity)
     )
     with Timer("Win32 connection", log=_log):
         if not ctrl.post_connection().wait().succeeded:

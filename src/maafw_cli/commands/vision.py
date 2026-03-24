@@ -41,8 +41,8 @@ def ocr(ctx: CliContext, roi: str | None, text_only: bool) -> None:
     if fmt.json_mode:
         fmt.success(result)
     elif text_only:
-        for r in refs:
-            print(r["text"])
+        text = "\n".join(r["text"] for r in refs)
+        fmt.success(result, human=text)
     else:
         session_label = result.get("session", "default")
         human = OutputFormatter.format_ocr_table(refs, elapsed_ms, session_label)
