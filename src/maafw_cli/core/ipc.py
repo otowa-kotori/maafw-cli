@@ -157,12 +157,15 @@ def ensure_daemon() -> int:
     Starts a new daemon if needed. Raises :class:`MaafwConnectionError`
     if the daemon cannot be started within the timeout.
     """
+    t0 = time.perf_counter()
+
     pid, port = _read_daemon_info()
 
     # Case 1: PID/port files exist — verify daemon is actually reachable
     if pid is not None and port is not None:
         if _is_process_alive(pid) and _is_daemon_reachable(port):
-            _log.debug("Daemon already running: pid=%d port=%d", pid, port)
+            elapsed = int((time.perf_counter() - t0) * 1000)
+            _log.debug("ensure_daemon: %dms (already running, pid=%d port=%d)", elapsed, pid, port)
             return port
         # Stale files
         _log.debug("Stale daemon files (pid=%s, port=%s), cleaning up", pid, port)
@@ -214,10 +217,13 @@ class DaemonClient:
         if session_name is not None:
             request["session_name"] = session_name
 
+        t0 = time.perf_counter()
         try:
             response = asyncio.run(self._async_send(request))
         except (OSError, asyncio.TimeoutError) as e:
             raise MaafwConnectionError(f"Failed to communicate with daemon: {e}")
+        elapsed = int((time.perf_counter() - t0) * 1000)
+        _log.debug("IPC %s: %dms (round-trip)", action, elapsed)
 
         if not response.get("ok"):
             error_msg = response.get("error", "Unknown daemon error")
