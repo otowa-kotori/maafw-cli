@@ -8,6 +8,7 @@
 - [x] `swipe`, `scroll`, `type`, `key` 等交互命令
 - [ ] `reco` 命令——暴露 MaaFW 原生感知接口（TemplateMatch / ColorMatch 等）
 - [x] `resource download-ocr` 命令
+- [ ] `ocr` 顺便保存截图（已截图，可附带输出）
 
 ## 中期
 

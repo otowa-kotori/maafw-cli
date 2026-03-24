@@ -16,7 +16,7 @@ from maa.pipeline import JRecognitionType, JOCR
 
 from maafw_cli.core.log import Timer
 from maafw_cli.download import check_ocr_files_exist
-from maafw_cli.paths import get_resource_dir, get_screenshots_dir
+from maafw_cli.paths import get_resource_dir
 
 _log = logging.getLogger("maafw_cli.vision")
 
@@ -67,10 +67,8 @@ def screencap_to_file(controller: Controller, output: str | Path | None = None) 
 
     if output is None:
         from datetime import datetime
-        screenshots_dir = get_screenshots_dir()
-        screenshots_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        output = screenshots_dir / f"screenshot_{ts}.png"
+        output = Path(f"screenshot_{ts}.png")
     else:
         output = Path(output)
 

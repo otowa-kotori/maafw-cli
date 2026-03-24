@@ -12,7 +12,7 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from maafw_cli.core.session import _data_dir
+from maafw_cli.paths import get_data_dir as _data_dir
 
 
 def daemon_log_path() -> Path:

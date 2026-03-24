@@ -2,8 +2,7 @@
 Cross-platform path management for maafw-cli.
 
 Uses platformdirs for OS-appropriate data directories.
-Data dir is shared with MaaMCP (same MaaXYZ/MaaMCP namespace)
-so OCR models downloaded by either tool are reused.
+All data lives under ``MaaXYZ/maafw-cli`` (e.g. ``%LOCALAPPDATA%/MaaXYZ/maafw-cli``).
 """
 from __future__ import annotations
 
@@ -12,8 +11,7 @@ from pathlib import Path
 from platformdirs import user_data_dir
 
 
-# Share the same data dir as MaaMCP so OCR models are reused
-APP_NAME = "MaaMCP"
+APP_NAME = "maafw-cli"
 APP_AUTHOR = "MaaXYZ"
 
 
@@ -39,5 +37,5 @@ def get_screenshots_dir() -> Path:
 
 def ensure_dirs() -> None:
     """Ensure all necessary directories exist."""
-    for d in [get_resource_dir(), get_model_dir(), get_ocr_dir(), get_screenshots_dir()]:
+    for d in [get_resource_dir(), get_model_dir(), get_ocr_dir()]:
         d.mkdir(parents=True, exist_ok=True)

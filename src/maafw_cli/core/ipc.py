@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from maafw_cli.core.errors import ConnectionError as MaafwConnectionError
-from maafw_cli.core.session import _data_dir
+from maafw_cli.paths import get_data_dir as _data_dir
 from maafw_cli.daemon.protocol import decode, encode, make_request
 
 _log = logging.getLogger("maafw_cli.ipc")

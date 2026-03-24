@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from maafw_cli.core.errors import MaafwError
-from maafw_cli.core.session import _data_dir
+from maafw_cli.paths import get_data_dir as _data_dir
 from maafw_cli.daemon.protocol import decode, encode, error_response, ok_response
 from maafw_cli.daemon.session_mgr import SessionManager
 

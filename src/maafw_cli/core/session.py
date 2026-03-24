@@ -1,11 +1,8 @@
 """
-Session management — Phase 1: file-based single session.
+Session management — file-based single session (--no-daemon mode).
 
-Stores connection parameters in ``~/.maafw/session.json`` so each CLI
-invocation can reconnect to the same device.  TextRefs live in
-``~/.maafw/textrefs.json``.
-
-Phase 3 will replace this with a daemon + named sessions.
+Stores connection parameters in the data dir so each CLI
+invocation can reconnect to the same device.
 """
 from __future__ import annotations
 
@@ -14,17 +11,14 @@ from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Any, Optional
 
-from platformdirs import user_data_dir
+from maafw_cli.paths import get_data_dir
 
 
 # ── paths ──────────────────────────────────────────────────────
 
-APP_NAME = "maafw-cli"
-APP_AUTHOR = "MaaXYZ"
-
 
 def _data_dir() -> Path:
-    return Path(user_data_dir(APP_NAME, APP_AUTHOR))
+    return get_data_dir()
 
 
 def session_file() -> Path:
