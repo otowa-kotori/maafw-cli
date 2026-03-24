@@ -36,6 +36,8 @@ from click.testing import CliRunner
 
 from maafw_cli.cli import cli
 
+pytestmark = pytest.mark.manual
+
 runner = CliRunner()
 
 # Allow overriding the test device via env var

@@ -54,3 +54,7 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not manual'"
+markers = [
+    "manual: manual integration tests requiring a real device (not run by default)",
+]
