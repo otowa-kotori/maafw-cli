@@ -105,7 +105,7 @@ $ maafw-cli pipeline run workflow.json --on phone --json | process_results.py
 | **会话架构** | 按需守护进程 | 首次 CLI 调用自动启动 daemon，空闲超时退出。跨平台 IPC 方案需专项调研 |
 | **serve 功能** | 不做 | 不保留 MCP 兼容，专注 CLI |
 | **自动连接** | 不做 | 用户必须显式 connect |
-| **Python 版本** | 3.10+ | 与 MaaMCP 一致 |
+| **Python 版本** | 3.10+ | 与 MaaFramework Python 绑定一致 |
 | **核心依赖** | `maafw>=5.2.6`, `click`, `opencv-python`, `platformdirs` | 最小依赖集 |
 
 ---

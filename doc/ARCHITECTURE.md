@@ -12,7 +12,7 @@ maafw-cli/
 │   ├── __init__.py          # 版本号 (0.1.0)
 │   ├── __main__.py          # python -m 入口
 │   ├── cli.py               # Click 根命令、全局选项、子命令注册
-│   ├── paths.py             # 跨平台路径（与 MaaMCP 共享 OCR 资源目录）
+│   ├── paths.py             # 跨平台路径（MaaXYZ/maafw-cli）
 │   ├── download.py          # OCR 模型下载
 │   ├── commands/            # CLI 命令层（依赖 core/ 和 maafw/）
 │   │   ├── device.py        # device list [--adb|--win32]

@@ -230,5 +230,5 @@ REPL 中用 `observe on` / `observe off` 切换。
 
 | 内容 | 路径 |
 |------|------|
-| OCR 模型、截图 | `platformdirs("MaaMCP", "MaaXYZ")`（与 MaaMCP 共享） |
-| Session、TextRef | `platformdirs("maafw-cli", "MaaXYZ")` |
+| 所有数据（session、OCR 模型、daemon 等） | `platformdirs("maafw-cli", "MaaXYZ")` |
+| 截图默认输出 | 当前工作目录 |

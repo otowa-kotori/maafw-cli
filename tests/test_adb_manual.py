@@ -7,7 +7,7 @@ NOT part of automated CI. Run manually to verify end-to-end functionality:
 
 Prerequisites:
     - An ADB device or emulator connected (e.g. emulator-5554)
-    - OCR model downloaded (maafw-cli resource download-ocr, or existing MaaMCP data)
+    - OCR model downloaded (maafw-cli resource download-ocr)
 
 Usage:
     # Run all manual tests:
