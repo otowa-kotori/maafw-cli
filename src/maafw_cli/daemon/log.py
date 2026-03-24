@@ -36,6 +36,10 @@ def setup_daemon_logging(*, verbose: bool = False) -> logging.Logger:
     log_file = daemon_log_path()
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
+    # Truncate old log on each daemon start
+    if log_file.exists():
+        log_file.write_text("", encoding="utf-8")
+
     fh = RotatingFileHandler(
         log_file,
         maxBytes=5 * 1024 * 1024,  # 5 MB
