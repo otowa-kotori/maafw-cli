@@ -33,30 +33,30 @@ def device_list(ctx: CliContext, adb_flag: bool, win32_flag: bool) -> None:
         adb_flag = True
 
     try:
-        result = do_device_list(adb=adb_flag, win32=win32_flag)
+        result = ctx.run_raw(do_device_list, adb=adb_flag, win32=win32_flag)
     except MaafwError as e:
         fmt.error(str(e), exit_code=e.exit_code)
+        return
+
+    if fmt.json_mode:
+        fmt.success(result)
         return
 
     if adb_flag and "adb" in result:
         devices = result["adb"]
         if not devices:
             fmt.error("No ADB devices found.", exit_code=3)
-        if fmt.json_mode:
-            fmt.success(devices)
-        else:
-            lines = [f"  {d['name']:<30s} {d['address']}" for d in devices]
-            fmt.success(devices, human=f"ADB devices ({len(devices)}):\n" + "\n".join(lines))
+            return
+        lines = [f"  {d['name']:<30s} {d['address']}" for d in devices]
+        fmt.success(devices, human=f"ADB devices ({len(devices)}):\n" + "\n".join(lines))
 
     if win32_flag and "win32" in result:
         windows = result["win32"]
         if not windows:
             fmt.error("No Win32 windows found.", exit_code=3)
-        if fmt.json_mode:
-            fmt.success(windows)
-        else:
-            lines = [f"  {w['hwnd']:<14s} {w['window_name']:<25s} {w['class_name']}" for w in windows]
-            fmt.success(windows, human=f"Win32 windows ({len(windows)}):\n" + "\n".join(lines))
+            return
+        lines = [f"  {w['hwnd']:<14s} {w['window_name']:<25s} {w['class_name']}" for w in windows]
+        fmt.success(windows, human=f"Win32 windows ({len(windows)}):\n" + "\n".join(lines))
 
 
 # ── connect ──────────────────────────────────────────────────────
@@ -80,33 +80,13 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
 
     DEVICE is the device name as shown by ``device list --adb``.
     """
-    fmt = ctx.fmt
-
-    if ctx.no_daemon:
-        # --no-daemon: Phase 1 direct mode (save to session.json)
-        try:
-            result = do_connect_adb(device, screenshot_size=screenshot_size)
-        except MaafwError as e:
-            fmt.error(str(e), exit_code=e.exit_code)
-            return
-        fmt.success(result, human=f"Connected to {result['device']} ({result['address']})")
-        return
-
-    # Default: daemon mode
-    from maafw_cli.core.ipc import DaemonClient, ensure_daemon
     name = session_name or device
-    try:
-        port = ensure_daemon()
-        client = DaemonClient(port)
-        result = client.send(
-            "connect_adb",
-            {"device": device, "screenshot_size": screenshot_size},
-            session_name=name,
-        )
-    except MaafwError as e:
-        fmt.error(str(e), exit_code=e.exit_code)
-        return
-    fmt.success(result, human=f"Connected to {result.get('device', device)} as '{name}'")
+    ctx.run(
+        do_connect_adb,
+        device=device,
+        screenshot_size=screenshot_size,
+        session_name=name,
+    )
 
 
 @connect.command("win32")
@@ -126,32 +106,11 @@ def connect_win32_cmd(ctx: CliContext, window: str,
     WINDOW is a window title substring (case-insensitive) or a hex hwnd
     like ``0x000A0B2C``.
     """
-    fmt = ctx.fmt
-
-    if ctx.no_daemon:
-        # --no-daemon: Phase 1 direct mode
-        try:
-            result = do_connect_win32(window, screencap_method=screencap_method,
-                                      input_method=input_method)
-        except MaafwError as e:
-            fmt.error(str(e), exit_code=e.exit_code)
-            return
-        fmt.success(result, human=f"Connected to {result['window_name']} ({result['hwnd']})")
-        return
-
-    # Default: daemon mode
-    from maafw_cli.core.ipc import DaemonClient, ensure_daemon
     name = session_name or window
-    try:
-        port = ensure_daemon()
-        client = DaemonClient(port)
-        result = client.send(
-            "connect_win32",
-            {"window": window, "screencap_method": screencap_method,
-             "input_method": input_method},
-            session_name=name,
-        )
-    except MaafwError as e:
-        fmt.error(str(e), exit_code=e.exit_code)
-        return
-    fmt.success(result, human=f"Connected to {result.get('window_name', window)} as '{name}'")
+    ctx.run(
+        do_connect_win32,
+        window=window,
+        screencap_method=screencap_method,
+        input_method=input_method,
+        session_name=name,
+    )

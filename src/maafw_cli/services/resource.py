@@ -8,7 +8,7 @@ from maafw_cli.core.log import logger
 from maafw_cli.services.registry import service
 
 
-@service(name="resource_download_ocr", human=lambda r: f"OCR model ready at {r['path']}")
+@service(name="resource_download_ocr", needs_session=False, human=lambda r: f"OCR model ready at {r['path']}")
 def do_download_ocr() -> dict:
     """Download OCR model if not already present."""
     from maafw_cli.download import check_ocr_files_exist, download_and_extract_ocr
@@ -27,7 +27,7 @@ def do_download_ocr() -> dict:
     return {"downloaded": True, "already_exists": False, "path": str(ocr_dir)}
 
 
-@service(name="resource_status")
+@service(name="resource_status", needs_session=False)
 def do_resource_status() -> dict:
     """Check status of all downloadable resources."""
     from maafw_cli.download import check_ocr_files_exist

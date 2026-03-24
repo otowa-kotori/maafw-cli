@@ -25,7 +25,7 @@ def _init_toolkit() -> None:
         pass
 
 
-@service(name="device_list")
+@service(name="device_list", needs_session=False)
 def do_device_list(*, adb: bool = True, win32: bool = False) -> dict:
     """List available devices / windows."""
     _init_toolkit()
@@ -174,27 +174,38 @@ def _connect_win32_inner(
 # ── public service wrappers (thin: call inner + persist) ──────
 
 
-@service(name="connect_adb")
-def do_connect_adb(device: str, screenshot_size: int = 720) -> dict:
+@service(
+    name="connect_adb",
+    needs_session=False,
+    human=lambda r: f"Connected to {r.get('device', '?')} ({r.get('address', '?')}) as '{r.get('session', 'default')}'",
+)
+def do_connect_adb(device: str, screenshot_size: int = 720, session_name: str = "default") -> dict:
     """Connect to an ADB device and persist session."""
     result, _controller, info = _connect_adb_inner(device, screenshot_size)
 
+    info.name = session_name
     save_session(info)
 
-    result["session"] = "default"
+    result["session"] = session_name
     return result
 
 
-@service(name="connect_win32")
+@service(
+    name="connect_win32",
+    needs_session=False,
+    human=lambda r: f"Connected to {r.get('window_name', '?')} ({r.get('hwnd', '?')}) as '{r.get('session', 'default')}'",
+)
 def do_connect_win32(
     window: str,
     screencap_method: str = "FramePool",
     input_method: str = "PostMessage",
+    session_name: str = "default",
 ) -> dict:
     """Connect to a Win32 window and persist session."""
     result, _controller, info = _connect_win32_inner(window, screencap_method, input_method)
 
+    info.name = session_name
     save_session(info)
 
-    result["session"] = "default"
+    result["session"] = session_name
     return result

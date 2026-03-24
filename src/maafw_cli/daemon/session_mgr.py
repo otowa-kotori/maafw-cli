@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from maafw_cli.core.errors import ConnectionError as MaafwConnectionError
 from maafw_cli.core.session import SessionInfo
 from maafw_cli.core.textref import TextRefStore
 from maafw_cli.services.context import ServiceContext
@@ -86,7 +87,7 @@ class SessionManager:
             name = self._default
         if name is None or name not in self._sessions:
             target = name or "(no default)"
-            raise ConnectionError(f"No active session '{target}'. Connect to a device first.")
+            raise MaafwConnectionError(f"No active session '{target}'. Connect to a device first.")
         return self._sessions[name]
 
     def close(self, name: str) -> None:
@@ -167,10 +168,20 @@ class SessionManager:
 
         Looks up the action in DISPATCH, builds a ServiceContext,
         and runs the service function with per-session locking.
+
+        Services marked with ``needs_session=False`` are executed directly
+        without a session context (e.g. ``device_list``, ``resource_status``).
         """
         service_fn = DISPATCH.get(action)
         if service_fn is None:
             raise ValueError(f"Unknown action: '{action}'")
+
+        needs_session = getattr(service_fn, "needs_session", True)
+
+        if not needs_session:
+            # Global service — no session required, run in thread directly
+            result = await asyncio.to_thread(service_fn, **params)
+            return result
 
         session = self.get(session_name)
 

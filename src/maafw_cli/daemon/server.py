@@ -298,7 +298,7 @@ class DaemonServer:
 
         device = params.get("device", "")
         screenshot_size = params.get("screenshot_size", 720)
-        session_name = request.get("session_name") or params.get("session_name") or device
+        session_name = params.get("session_name") or request.get("session_name") or device
 
         result, controller, info = await asyncio.to_thread(
             _connect_adb_inner, device, screenshot_size,
@@ -318,7 +318,7 @@ class DaemonServer:
         window = params.get("window", "")
         screencap_method = params.get("screencap_method", "FramePool")
         input_method = params.get("input_method", "PostMessage")
-        session_name = request.get("session_name") or params.get("session_name") or window
+        session_name = params.get("session_name") or request.get("session_name") or window
 
         result, controller, info = await asyncio.to_thread(
             _connect_win32_inner, window, screencap_method, input_method,

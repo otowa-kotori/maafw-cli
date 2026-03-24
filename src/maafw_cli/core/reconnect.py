@@ -10,27 +10,23 @@ import logging
 
 from maa.controller import Controller
 
+from maafw_cli.core.errors import ConnectionError as MaafwConnectionError
 from maafw_cli.core.log import Timer
-from maafw_cli.core.output import OutputFormatter
 from maafw_cli.core.session import load_session
 
 _log = logging.getLogger("maafw_cli.reconnect")
 
-_EXIT_CONNECTION_ERROR = 3
 
-
-def reconnect(fmt: OutputFormatter) -> Controller:
+def reconnect() -> Controller:
     """Re-establish a MaaFW connection from the saved session file.
 
-    Calls ``fmt.error(…)`` (which exits) if anything goes wrong,
-    so callers can assume the return value is always a live Controller.
+    Raises :class:`MaafwConnectionError` if anything goes wrong.
     """
     with Timer("total reconnect", log=_log):
         session = load_session()
         if session is None:
-            fmt.error(
-                "No active session. Run 'maafw-cli connect adb <device>' first.",
-                exit_code=_EXIT_CONNECTION_ERROR,
+            raise MaafwConnectionError(
+                "No active session. Run 'maafw-cli connect adb <device>' first."
             )
 
         _log.debug("session loaded from file")
@@ -40,11 +36,11 @@ def reconnect(fmt: OutputFormatter) -> Controller:
             _init_toolkit()
 
         if session.type == "adb":
-            return _reconnect_adb(fmt, session)
+            return _reconnect_adb(session)
         elif session.type == "win32":
-            return _reconnect_win32(fmt, session)
+            return _reconnect_win32(session)
 
-        fmt.error(f"Unsupported session type: {session.type}", exit_code=_EXIT_CONNECTION_ERROR)
+        raise MaafwConnectionError(f"Unsupported session type: {session.type}")
 
 
 def _init_toolkit() -> None:
@@ -58,7 +54,7 @@ def _init_toolkit() -> None:
         pass
 
 
-def _reconnect_adb(fmt: OutputFormatter, session) -> Controller:
+def _reconnect_adb(session) -> Controller:
     from maafw_cli.maafw.adb import find_adb_devices, connect_adb
 
     with Timer("device discovery", log=_log):
@@ -71,23 +67,21 @@ def _reconnect_adb(fmt: OutputFormatter, session) -> Controller:
             break
 
     if match is None:
-        fmt.error(
-            f"Session device '{session.device}' no longer available.",
-            exit_code=_EXIT_CONNECTION_ERROR,
+        raise MaafwConnectionError(
+            f"Session device '{session.device}' no longer available."
         )
 
     with Timer("ADB connection", log=_log):
         controller = connect_adb(match, screenshot_short_side=session.screenshot_short_side)
 
     if controller is None:
-        fmt.error(
-            f"Failed to reconnect to '{session.device}'.",
-            exit_code=_EXIT_CONNECTION_ERROR,
+        raise MaafwConnectionError(
+            f"Failed to reconnect to '{session.device}'."
         )
     return controller
 
 
-def _reconnect_win32(fmt: OutputFormatter, session) -> Controller:
+def _reconnect_win32(session) -> Controller:
     from maafw_cli.maafw.win32 import find_win32_windows, connect_win32
 
     with Timer("window discovery", log=_log):
@@ -102,9 +96,8 @@ def _reconnect_win32(fmt: OutputFormatter, session) -> Controller:
             break
 
     if match is None:
-        fmt.error(
-            f"Session window '{session.window_name}' no longer available.",
-            exit_code=_EXIT_CONNECTION_ERROR,
+        raise MaafwConnectionError(
+            f"Session window '{session.window_name}' no longer available."
         )
 
     with Timer("Win32 connection", log=_log):
@@ -115,8 +108,7 @@ def _reconnect_win32(fmt: OutputFormatter, session) -> Controller:
         )
 
     if controller is None:
-        fmt.error(
-            f"Failed to reconnect to '{session.window_name}'.",
-            exit_code=_EXIT_CONNECTION_ERROR,
+        raise MaafwConnectionError(
+            f"Failed to reconnect to '{session.window_name}'."
         )
     return controller

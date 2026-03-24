@@ -11,7 +11,12 @@ from typing import Callable
 DISPATCH: dict[str, Callable] = {}
 
 
-def service(*, human: Callable[[dict], str] | None = None, name: str | None = None):
+def service(
+    *,
+    human: Callable[[dict], str] | None = None,
+    name: str | None = None,
+    needs_session: bool = True,
+):
     """Mark a function as a service and register it.
 
     Parameters
@@ -21,11 +26,17 @@ def service(*, human: Callable[[dict], str] | None = None, name: str | None = No
     name:
         Override the dispatch key.  Defaults to the function name with
         a leading ``do_`` stripped (``do_click`` → ``"click"``).
+    needs_session:
+        Whether this service requires a ``ServiceContext`` as first arg.
+        Set to ``False`` for global services like ``device_list`` or
+        ``resource_status`` that don't operate on a connected session.
     """
 
     def decorator(fn: Callable) -> Callable:
         fn.human_fmt = human  # type: ignore[attr-defined]
+        fn.needs_session = needs_session  # type: ignore[attr-defined]
         key = name or fn.__name__.removeprefix("do_")
+        fn.dispatch_key = key  # type: ignore[attr-defined]
         DISPATCH[key] = fn
         return fn
 

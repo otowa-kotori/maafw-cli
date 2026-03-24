@@ -274,3 +274,45 @@ class TestResourceService:
         assert "ocr_model" in result
         assert "ocr_path" in result
         assert isinstance(result["ocr_model"], bool)
+
+
+# ── registry decorator ─────────────────────────────────────────────
+
+
+class TestServiceDecorator:
+    """Test @service decorator metadata attachment."""
+
+    def test_dispatch_key_attached(self):
+        from maafw_cli.services.interaction import do_click
+        assert do_click.dispatch_key == "click"
+
+    def test_needs_session_default_true(self):
+        from maafw_cli.services.interaction import do_click
+        assert do_click.needs_session is True
+
+    def test_needs_session_false(self):
+        from maafw_cli.services.connection import do_device_list
+        assert do_device_list.needs_session is False
+
+    def test_connect_services_no_session(self):
+        from maafw_cli.services.connection import do_connect_adb, do_connect_win32
+        assert do_connect_adb.needs_session is False
+        assert do_connect_win32.needs_session is False
+
+    def test_resource_services_no_session(self):
+        from maafw_cli.services.resource import do_download_ocr, do_resource_status
+        assert do_download_ocr.needs_session is False
+        assert do_resource_status.needs_session is False
+
+    def test_human_fmt_attached(self):
+        from maafw_cli.services.interaction import do_click
+        assert callable(do_click.human_fmt)
+
+    def test_dispatch_table_populated(self):
+        from maafw_cli.services.registry import DISPATCH
+        # Ensure key services are registered
+        assert "click" in DISPATCH
+        assert "ocr" in DISPATCH
+        assert "device_list" in DISPATCH
+        assert "connect_adb" in DISPATCH
+        assert "resource_status" in DISPATCH

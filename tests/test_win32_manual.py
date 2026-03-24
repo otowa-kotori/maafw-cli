@@ -62,7 +62,8 @@ def mock_window():
         if result.exit_code != 0:
             time.sleep(0.5)
             continue
-        windows = _parse_json_output(result.output)
+        data = _parse_json_output(result.output)
+        windows = data.get("win32", data) if isinstance(data, dict) else data
         for w in windows:
             if expected_title in w["window_name"]:
                 window = w
@@ -112,8 +113,8 @@ def _safe_print(text: str) -> None:
 
 
 def _ensure_connected(win: dict) -> None:
-    """Connect to the mock window by hwnd."""
-    result = runner.invoke(cli, ["connect", "win32", win["hwnd"]])
+    """Connect to the mock window by hwnd (direct mode for file persistence)."""
+    result = runner.invoke(cli, ["--no-daemon", "connect", "win32", win["hwnd"]])
     if result.exit_code != 0:
         pytest.skip(f"Failed to connect (exit {result.exit_code})")
 
@@ -134,7 +135,9 @@ def test_win32_device_list_json():
     result = runner.invoke(cli, ["--json", "device", "list", "--win32"])
     _safe_print(result.output)
     assert result.exit_code == 0
-    windows = _parse_json_output(result.output)
+    data = _parse_json_output(result.output)
+    assert isinstance(data, dict)
+    windows = data.get("win32", [])
     assert isinstance(windows, list)
     assert len(windows) > 0
     w = windows[0]
@@ -172,7 +175,7 @@ def test_win32_connect_not_found():
 def test_win32_connect_with_options(mock_window):
     """Verify --screencap-method and --input-method options."""
     result = runner.invoke(cli, [
-        "connect", "win32", mock_window["hwnd"],
+        "--no-daemon", "connect", "win32", mock_window["hwnd"],
         "--screencap-method", "GDI",
         "--input-method", "Seize",
     ])

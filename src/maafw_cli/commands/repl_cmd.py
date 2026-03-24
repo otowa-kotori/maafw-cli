@@ -160,9 +160,8 @@ class Repl:
         from maafw_cli.core.reconnect import reconnect
 
         # Build a ServiceContext that connects lazily
-        fmt_for_reconnect = OutputFormatter(json_mode=False, quiet=True)
         self._svc_ctx = ServiceContext(
-            get_controller=lambda: reconnect(fmt_for_reconnect),
+            get_controller=lambda: reconnect(),
             textrefs_path=textrefs_file(),
             session_type=session.type,
         )

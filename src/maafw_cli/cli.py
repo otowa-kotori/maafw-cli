@@ -21,12 +21,8 @@ _log = logging.getLogger("maafw_cli.cli")
 # ── action name reverse-lookup ─────────────────────────────────
 
 def _get_action_name(fn: Callable) -> str | None:
-    """Reverse-lookup the DISPATCH key for a service function."""
-    from maafw_cli.services.registry import DISPATCH
-    for key, registered_fn in DISPATCH.items():
-        if registered_fn is fn:
-            return key
-    return None
+    """Return the DISPATCH key for a service function."""
+    return getattr(fn, "dispatch_key", None)
 
 
 # ── shared context ──────────────────────────────────────────────
@@ -60,7 +56,7 @@ class CliContext:
         session_type = session.type if session else "win32"
 
         return ServiceContext(
-            get_controller=lambda: reconnect(self.fmt),
+            get_controller=lambda: reconnect(),
             textrefs_path=textrefs_file(),
             session_type=session_type,
         )
@@ -71,10 +67,49 @@ class CliContext:
         Routing logic:
         - ``--no-daemon`` → direct (Phase 1 path, reconnect from session.json)
         - Default → daemon (IPC to background process)
+
+        Automatically handles ``needs_session`` — services that don't need
+        a session (e.g. ``device_list``) are called directly without a
+        ServiceContext.
         """
+        needs_session = getattr(service_fn, "needs_session", True)
+
+        if not needs_session:
+            return self._run_no_session(service_fn, **kwargs)
         if self.no_daemon:
             return self._run_direct(service_fn, **kwargs)
         return self._run_via_daemon(service_fn, **kwargs)
+
+    def _run_no_session(self, service_fn: Callable, **kwargs) -> dict:
+        """Execute a service that doesn't require a session.
+
+        In daemon mode, still routes via IPC so the daemon can handle it.
+        In direct mode, calls the function directly.
+        """
+        if self.no_daemon:
+            try:
+                result = service_fn(**kwargs)
+            except MaafwError as e:
+                self.fmt.error(str(e), exit_code=e.exit_code)
+                return {}
+        else:
+            from maafw_cli.core.ipc import DaemonClient, ensure_daemon
+
+            action = _get_action_name(service_fn)
+            if action is None:
+                raise RuntimeError(f"Service function {service_fn} not in DISPATCH table")
+            port = ensure_daemon()
+            client = DaemonClient(port)
+            try:
+                result = client.send(action, kwargs, session=self.on)
+            except MaafwError as e:
+                self.fmt.error(str(e), exit_code=e.exit_code)
+                return {}
+
+        human_fn = getattr(service_fn, "human_fmt", None)
+        human = human_fn(result) if human_fn else None
+        self.fmt.success(result, human=human)
+        return result
 
     def _run_direct(self, service_fn: Callable, **kwargs) -> dict:
         """Phase 1 path: reconnect from session.json every time."""
@@ -101,6 +136,12 @@ class CliContext:
         Used by commands that need custom display logic (e.g. OCR text-only).
         Raises :class:`MaafwError` on failure.
         """
+        needs_session = getattr(service_fn, "needs_session", True)
+
+        if not needs_session:
+            if self.no_daemon:
+                return service_fn(**kwargs)
+            return self._run_raw_daemon(service_fn, **kwargs)
         if self.no_daemon:
             return self._run_raw_direct(service_fn, **kwargs)
         return self._run_raw_daemon(service_fn, **kwargs)
@@ -139,10 +180,14 @@ class CliContext:
         human = human_fn(result) if human_fn else None
         self.fmt.success(result, human=human)
 
+        # --observe: auto-OCR after action commands (via daemon)
+        if self.observe and result.get("action"):
+            self._run_observe_daemon(client)
+
         return result
 
     def _run_observe(self, svc_ctx, action_result: dict) -> None:
-        """Run OCR after an action and output the results."""
+        """Run OCR after an action and output the results (direct mode)."""
         from maafw_cli.services.vision import do_ocr
 
         try:
@@ -150,6 +195,19 @@ class CliContext:
         except MaafwError:
             return  # observe is best-effort
 
+        self._display_observe(ocr_result)
+
+    def _run_observe_daemon(self, client) -> None:
+        """Run OCR after an action via daemon IPC (daemon mode)."""
+        try:
+            ocr_result = client.send("ocr", {}, session=self.on)
+        except MaafwError:
+            return  # observe is best-effort
+
+        self._display_observe(ocr_result)
+
+    def _display_observe(self, ocr_result: dict) -> None:
+        """Display observe OCR results."""
         refs = ocr_result["results"]
         elapsed_ms = ocr_result["elapsed_ms"]
 
