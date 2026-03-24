@@ -1,15 +1,14 @@
 """
-Manual integration tests for Win32 window support.
+Automated integration tests for Win32 window support.
 
 The test session automatically launches a lightweight tkinter mock window
 (``tests/mock_win32_window.py``) and tears it down afterwards.
-The mock responds to SendMessage input, so we can verify click operations
-actually take effect by checking that the label text changes from
-"READY" to "CLICKED".
+The mock responds to SendMessage input, so we can verify interactions
+actually take effect by checking label text changes via OCR.
 
-NOT part of automated CI.  Run manually:
+These tests run automatically on Windows (skipped on other platforms):
 
-    uv run python -m pytest tests/test_win32_manual.py -v -s -m manual
+    uv run pytest tests/test_win32_manual.py -v -s
 """
 from __future__ import annotations
 
@@ -27,7 +26,6 @@ from click.testing import CliRunner
 from maafw_cli.cli import cli
 
 pytestmark = [
-    pytest.mark.manual,
     pytest.mark.skipif(sys.platform != "win32", reason="Win32 tests require Windows"),
 ]
 
@@ -87,10 +85,21 @@ def mock_window():
 
 
 def _parse_json_output(output: str):
-    """Extract JSON from CliRunner output that may have logger lines mixed in."""
-    for i, ch in enumerate(output):
+    """Extract JSON from CliRunner output that may have logger lines mixed in.
+
+    Scans for the first ``[`` or ``{`` that starts valid JSON.  Retries from
+    the next candidate if the first one fails (e.g. when info messages
+    contain bracket characters).
+    """
+    i = 0
+    while i < len(output):
+        ch = output[i]
         if ch in ("[", "{"):
-            return json.loads(output[i:])
+            try:
+                return json.loads(output[i:])
+            except json.JSONDecodeError:
+                pass  # not valid JSON, keep scanning
+        i += 1
     raise ValueError(f"No JSON found in output: {output[:200]}")
 
 
@@ -344,3 +353,207 @@ def test_win32_full_workflow(mock_window):
     print(f"OCR found {len(ocr2['results'])} results in {ocr2['elapsed_ms']}ms")
 
     print("Full Win32 workflow passed.")
+
+
+# ── New interaction command tests ─────────────────────────────────
+
+
+def test_win32_swipe(mock_window):
+    """Verify swipe command executes and the mock detects the drag."""
+    result = runner.invoke(cli, [
+        "connect", "win32", mock_window["hwnd"],
+        "--input-method", "Seize",
+    ])
+    assert result.exit_code == 0
+
+    # Swipe across the label area (top half of 400x300 window)
+    result = runner.invoke(cli, ["swipe", "50,100", "350,100", "--duration", "300"])
+    _safe_print(result.output)
+    assert result.exit_code == 0
+    assert "Swiped" in result.output
+
+    # Verify via OCR that the mock detected the swipe
+    time.sleep(0.3)
+    result = runner.invoke(cli, ["--json", "ocr"])
+    if result.exit_code == 0:
+        data = _parse_json_output(result.output)
+        all_text = " ".join(r["text"] for r in data["results"])
+        _safe_print(f"  OCR after swipe: {all_text}")
+        # The mock window label should show SWIPED
+        assert "SWIPED" in all_text, f"Expected 'SWIPED' in OCR, got: {all_text}"
+
+
+def test_win32_swipe_json(mock_window):
+    """Verify swipe --json returns structured data."""
+    _ensure_connected(mock_window)
+
+    result = runner.invoke(cli, ["--json", "swipe", "100,200", "100,50"])
+    _safe_print(result.output)
+    assert result.exit_code == 0
+    data = _parse_json_output(result.output)
+    assert data["action"] == "swipe"
+    assert data["x1"] == 100
+    assert data["y1"] == 200
+    assert data["x2"] == 100
+    assert data["y2"] == 50
+    assert "duration" in data
+
+
+def test_win32_swipe_with_textrefs(mock_window):
+    """Verify swipe accepts TextRef arguments."""
+    _ensure_connected(mock_window)
+
+    # Run OCR first to populate TextRefs
+    ocr_result = runner.invoke(cli, ["--json", "ocr"])
+    if ocr_result.exit_code != 0:
+        pytest.skip("OCR failed")
+    data = _parse_json_output(ocr_result.output)
+    if len(data.get("results", [])) < 2:
+        pytest.skip("Need at least 2 OCR results for swipe test")
+
+    # Swipe from t1 to t2
+    result = runner.invoke(cli, ["swipe", "t1", "t2"])
+    _safe_print(result.output)
+    assert result.exit_code == 0
+    assert "Swiped" in result.output
+
+
+def test_win32_scroll(mock_window):
+    """Verify scroll command executes successfully."""
+    _ensure_connected(mock_window)
+
+    result = runner.invoke(cli, ["scroll", "0", "-360"])
+    _safe_print(result.output)
+    assert result.exit_code == 0
+    assert "Scrolled" in result.output
+
+
+def test_win32_scroll_json(mock_window):
+    """Verify scroll --json returns structured data."""
+    _ensure_connected(mock_window)
+
+    result = runner.invoke(cli, ["--json", "scroll", "0", "120"])
+    _safe_print(result.output)
+    assert result.exit_code == 0
+    data = _parse_json_output(result.output)
+    assert data["action"] == "scroll"
+    assert data["dx"] == 0
+    assert data["dy"] == 120
+
+
+def test_win32_type(mock_window):
+    """Verify type command executes successfully."""
+    _ensure_connected(mock_window)
+
+    result = runner.invoke(cli, ["type", "Hello"])
+    _safe_print(result.output)
+    assert result.exit_code == 0
+    assert "Typed" in result.output
+
+
+def test_win32_type_json(mock_window):
+    """Verify type --json returns structured data."""
+    _ensure_connected(mock_window)
+
+    result = runner.invoke(cli, ["--json", "type", "Test123"])
+    _safe_print(result.output)
+    assert result.exit_code == 0
+    data = _parse_json_output(result.output)
+    assert data["action"] == "type"
+    assert data["text"] == "Test123"
+
+
+def test_win32_key_enter(mock_window):
+    """Verify key command with a named key."""
+    result = runner.invoke(cli, [
+        "connect", "win32", mock_window["hwnd"],
+        "--input-method", "Seize",
+    ])
+    assert result.exit_code == 0
+
+    result = runner.invoke(cli, ["key", "enter"])
+    _safe_print(result.output)
+    assert result.exit_code == 0
+    assert "Pressed" in result.output
+
+
+def test_win32_key_hex(mock_window):
+    """Verify key command with hex code."""
+    _ensure_connected(mock_window)
+
+    result = runner.invoke(cli, ["key", "0x0D"])
+    _safe_print(result.output)
+    assert result.exit_code == 0
+    assert "Pressed" in result.output
+
+
+def test_win32_key_json(mock_window):
+    """Verify key --json returns structured data."""
+    _ensure_connected(mock_window)
+
+    result = runner.invoke(cli, ["--json", "key", "tab"])
+    _safe_print(result.output)
+    assert result.exit_code == 0
+    data = _parse_json_output(result.output)
+    assert data["action"] == "key"
+    assert data["keycode"] == 0x09
+    assert data["keycode_hex"] == "0x09"
+
+
+def test_win32_key_changes_label(mock_window):
+    """Verify pressing a key updates the mock window label via OCR.
+
+    The mock window binds <Key> events and changes the label to KEY:<vk>.
+    """
+    result = runner.invoke(cli, [
+        "connect", "win32", mock_window["hwnd"],
+        "--input-method", "Seize",
+    ])
+    assert result.exit_code == 0
+
+    # Press F5 key
+    result = runner.invoke(cli, ["key", "f5"])
+    assert result.exit_code == 0
+
+    # Wait for UI update and verify
+    time.sleep(0.3)
+    result = runner.invoke(cli, ["--json", "ocr"])
+    if result.exit_code == 0:
+        data = _parse_json_output(result.output)
+        all_text = " ".join(r["text"] for r in data["results"])
+        _safe_print(f"  OCR after key press: {all_text}")
+        # The mock window should show KEY:<vk_code> (F5 = 0x74 = 116)
+        assert "KEY" in all_text, f"Expected 'KEY:...' in OCR, got: {all_text}"
+
+
+def test_win32_interaction_workflow(mock_window):
+    """End-to-end: connect -> type -> key -> swipe -> scroll -> ocr."""
+    result = runner.invoke(cli, [
+        "connect", "win32", mock_window["hwnd"],
+        "--input-method", "Seize",
+    ])
+    assert result.exit_code == 0
+
+    # 1. Type text
+    r = runner.invoke(cli, ["type", "hello"])
+    assert r.exit_code == 0, f"type failed: {r.output}"
+
+    # 2. Press Enter
+    r = runner.invoke(cli, ["key", "enter"])
+    assert r.exit_code == 0, f"key failed: {r.output}"
+
+    # 3. Swipe
+    r = runner.invoke(cli, ["swipe", "50,150", "350,150"])
+    assert r.exit_code == 0, f"swipe failed: {r.output}"
+
+    # 4. Scroll
+    r = runner.invoke(cli, ["scroll", "0", "-120"])
+    assert r.exit_code == 0, f"scroll failed: {r.output}"
+
+    # 5. Final OCR to verify window is still responsive
+    r = runner.invoke(cli, ["--json", "ocr"])
+    assert r.exit_code == 0, f"ocr failed: {r.output}"
+    data = _parse_json_output(r.output)
+    _safe_print(f"  Final OCR: {len(data['results'])} results")
+
+    print("Full interaction workflow passed.")

@@ -106,6 +106,70 @@ maafw-cli device list --win32      # Win32 窗口
 - TextRef：`t3`（需先运行 ocr）
 - 坐标：`452,387`
 
+### `swipe <FROM> <TO>`
+
+从 FROM 滑动到 TO。FROM/TO 支持 TextRef 或坐标。
+
+| 选项 | 默认 | 说明 |
+|------|------|------|
+| `--duration` | 300 | 滑动持续时间（毫秒） |
+
+```bash
+maafw-cli swipe 100,800 100,200              # 从下往上滑
+maafw-cli swipe 100,800 100,200 --duration 500
+maafw-cli swipe t1 t3                         # 从 TextRef t1 滑到 t3
+```
+
+### `scroll <DX> <DY>`
+
+滚动操作。建议使用 120 的整数倍（WHEEL_DELTA）。正 DY 向上滚，负 DY 向下滚。
+
+```bash
+maafw-cli scroll 0 -360    # 向下滚 3 格
+maafw-cli scroll 0 360     # 向上滚 3 格
+maafw-cli scroll 120 0     # 向右滚 1 格
+```
+
+> **注意**：scroll 主要支持 Win32 控制器。
+
+### `type <TEXT>`
+
+向当前焦点控件输入文本。
+
+```bash
+maafw-cli type "Hello World"
+maafw-cli type 你好
+```
+
+### `key <KEYCODE>`
+
+按下一个虚拟按键。
+
+**自动码表切换**：命令根据当前 session 类型（`adb` 或 `win32`）自动选择正确的键码表。同一名称在不同平台映射到不同的底层码：
+
+| 名称 | ADB (Android AKEYCODE) | Win32 (VK) |
+|------|----------------------|------------|
+| `enter` | 66 | 0x0D |
+| `back` | 4 | —（仅 Android） |
+| `home` | 3（Android Home） | 0x24（文本 Home） |
+| `tab` | 61 | 0x09 |
+| `space` | 62 | 0x20 |
+| `esc` | 111 | 0x1B |
+
+KEYCODE 支持：
+- **名称**（自动适配平台）：`enter`, `tab`, `esc`, `space`, `backspace`, `delete`, `up`, `down`, `left`, `right`, `f1`-`f12`, `ctrl`, `alt`, `shift` 等
+- **Android 专属名称**（仅 ADB）：`back`, `home`, `recent`, `volume_up`, `volume_down`, `power`, `camera`, `wakeup`, `sleep`
+- **Win32 专属名称**（仅 Win32）：`win`, `lwin`, `rwin`, `insert`, `numlock`, `scrolllock`, `printscreen`, `pause`, `apps`
+- **整数直传**（不经过码表）：`66`（十进制）、`0x42`（十六进制）
+
+```bash
+maafw-cli key enter          # ADB → 66, Win32 → 0x0D（自动）
+maafw-cli key back           # ADB → 4（Android 返回键）
+maafw-cli key f5
+maafw-cli key 66             # 直传整数，不查表
+maafw-cli key 0x0D           # 直传十六进制
+```
+
 ## 退出码
 
 | 码 | 含义 |

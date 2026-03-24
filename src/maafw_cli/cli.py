@@ -60,9 +60,17 @@ from maafw_cli.commands.connect import connect  # noqa: E402
 from maafw_cli.commands.ocr import ocr  # noqa: E402
 from maafw_cli.commands.screenshot import screenshot  # noqa: E402
 from maafw_cli.commands.click_cmd import click_cmd  # noqa: E402
+from maafw_cli.commands.swipe_cmd import swipe_cmd  # noqa: E402
+from maafw_cli.commands.scroll_cmd import scroll_cmd  # noqa: E402
+from maafw_cli.commands.type_cmd import type_cmd  # noqa: E402
+from maafw_cli.commands.key_cmd import key_cmd  # noqa: E402
 
 cli.add_command(device)
 cli.add_command(connect)
 cli.add_command(ocr, name="ocr")
 cli.add_command(screenshot, name="screenshot")
 cli.add_command(click_cmd, name="click")
+cli.add_command(swipe_cmd, name="swipe")
+cli.add_command(scroll_cmd, name="scroll")
+cli.add_command(type_cmd, name="type")
+cli.add_command(key_cmd, name="key")
