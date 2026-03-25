@@ -330,6 +330,7 @@ class TestServiceDecorator:
         # Ensure key services are registered
         assert "click" in DISPATCH
         assert "ocr" in DISPATCH
+        assert "reco" in DISPATCH
         assert "device_list" in DISPATCH
         assert "connect_adb" in DISPATCH
         assert "resource_status" in DISPATCH
@@ -374,3 +375,43 @@ class TestControllerDestroyOnFailure:
 
         assert result is None
         mock_ctrl.destroy.assert_called_once()
+
+
+# ── reco service ────────────────────────────────────────────────
+
+
+class TestRecoService:
+    def test_reco_registered_in_dispatch(self):
+        from maafw_cli.services.registry import DISPATCH
+        assert "reco" in DISPATCH
+
+    def test_reco_needs_session(self):
+        from maafw_cli.services.recognition import do_reco
+        assert do_reco.needs_session is True
+
+    def test_reco_dispatch_key(self):
+        from maafw_cli.services.recognition import do_reco
+        assert do_reco.dispatch_key == "reco"
+
+
+class TestRecoParamsParsing:
+    """Test services/recognition.py parameter parsing."""
+
+    def test_parse_kv_pairs(self):
+        from maafw_cli.services.recognition import _parse_kv_params
+        result = _parse_kv_params("template=button.png roi=0,0,400,200 threshold=0.8")
+        assert result == {
+            "template": "button.png",
+            "roi": "0,0,400,200",
+            "threshold": "0.8",
+        }
+
+    def test_parse_empty_params(self):
+        from maafw_cli.services.recognition import _parse_kv_params
+        assert _parse_kv_params(None) == {}
+        assert _parse_kv_params("") == {}
+
+    def test_parse_ignores_non_kv(self):
+        from maafw_cli.services.recognition import _parse_kv_params
+        result = _parse_kv_params("template=a.png garbage roi=0,0,1,1")
+        assert result == {"template": "a.png", "roi": "0,0,1,1"}

@@ -24,7 +24,7 @@ TOKEN = sys.argv[1] if len(sys.argv) > 1 else "maafw_test"
 
 root = tk.Tk()
 root.title(f"MaafwTest_{TOKEN}")
-root.geometry("400x300")
+root.geometry("960x720")
 root.resizable(False, False)
 
 label = tk.Label(root, text="READY", font=("Arial", 48))

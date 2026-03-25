@@ -1,8 +1,9 @@
 """Tests for the Element system."""
+import json
 import tempfile
 from pathlib import Path
 
-from maa.define import OCRResult
+from maa.define import BoxAndCountResult, BoxAndScoreResult, OCRResult
 
 from maafw_cli.core.element import Element, ElementStore
 
@@ -150,3 +151,104 @@ class TestElementStoreLoadTolerance:
         refs = store.load()
         # Should not crash; returns empty list on parse error
         assert isinstance(refs, list)
+
+
+# ── Element count field ──────────────────────────────────────────
+
+
+class TestElementCount:
+    def test_to_dict_with_count(self):
+        e = Element(ref="e1", text=None, box=[0, 0, 10, 10], score=0.0, count=42)
+        d = e.to_dict()
+        assert d["count"] == 42
+
+    def test_to_dict_without_count(self):
+        e = Element(ref="e1", text="hi", box=[0, 0, 10, 10], score=0.9)
+        d = e.to_dict()
+        assert "count" not in d  # count=None is excluded
+
+    def test_to_dict_existing_element_unchanged(self):
+        """Existing OCR-style elements still produce the same dict shape."""
+        e = Element(ref="e1", text="A", box=[0, 0, 10, 10], score=0.5)
+        d = e.to_dict()
+        assert d == {"ref": "e1", "text": "A", "box": [0, 0, 10, 10], "score": 0.5}
+
+    def test_center_with_count(self):
+        e = Element(ref="e1", text=None, box=[100, 200, 40, 20], score=0.5, count=10)
+        assert e.center == (120, 210)
+
+
+# ── build_from_results ───────────────────────────────────────────
+
+
+class TestBuildFromResults:
+    def test_template_match_results(self):
+        results = [BoxAndScoreResult(box=[10, 20, 30, 40], score=0.95)]
+        store = ElementStore(None)
+        elems = store.build_from_results(results, "TemplateMatch")
+        assert len(elems) == 1
+        assert elems[0].ref == "e1"
+        assert elems[0].text is None
+        assert elems[0].score == 0.95
+        assert elems[0].count is None
+
+    def test_color_match_results(self):
+        results = [BoxAndCountResult(box=[10, 20, 30, 40], count=1542)]
+        store = ElementStore(None)
+        elems = store.build_from_results(results, "ColorMatch")
+        assert elems[0].score == 0.0
+        assert elems[0].count == 1542
+        assert elems[0].text is None
+
+    def test_feature_match_results(self):
+        results = [BoxAndCountResult(box=[5, 10, 15, 20], count=8)]
+        store = ElementStore(None)
+        elems = store.build_from_results(results, "FeatureMatch")
+        assert elems[0].count == 8
+
+    def test_ocr_results(self):
+        results = [OCRResult(box=[10, 20, 30, 40], score=0.97, text="设置")]
+        store = ElementStore(None)
+        elems = store.build_from_results(results, "OCR")
+        assert elems[0].text == "设置"
+        assert elems[0].score == 0.97
+        assert elems[0].count is None
+
+    def test_sequential_refs(self):
+        results = [BoxAndScoreResult(box=[i, 0, 10, 10], score=0.5) for i in range(5)]
+        store = ElementStore(None)
+        elems = store.build_from_results(results, "TemplateMatch")
+        assert [e.ref for e in elems] == ["e1", "e2", "e3", "e4", "e5"]
+
+    def test_empty_results(self):
+        store = ElementStore(None)
+        elems = store.build_from_results([], "TemplateMatch")
+        assert elems == []
+
+
+class TestBuildFromResultsPersistence:
+    def test_save_load_with_count(self, tmp_path):
+        store = ElementStore(tmp_path / "elements.json")
+        store._elements = [
+            Element(ref="e1", text=None, box=[10, 20, 30, 40], score=0.0, count=100),
+        ]
+        store.save()
+
+        store2 = ElementStore(tmp_path / "elements.json")
+        refs = store2.load()
+        assert len(refs) == 1
+        assert refs[0].count == 100
+
+    def test_load_old_format_no_count(self, tmp_path):
+        """Old format elements.json (without count field) should load fine."""
+        path = tmp_path / "elements.json"
+        path.write_text(json.dumps({
+            "timestamp": "2026-01-01T00:00:00",
+            "elements": [{"ref": "e1", "text": "A", "box": [0, 0, 10, 10], "score": 0.9}]
+        }))
+        store = ElementStore(path)
+        refs = store.load()
+        assert len(refs) == 1
+        assert refs[0].count is None
+        assert refs[0].text == "A"
+        assert refs[0].score == 0.9
