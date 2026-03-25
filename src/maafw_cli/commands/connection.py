@@ -9,7 +9,6 @@ import click
 
 from maafw_cli.cli import pass_ctx, CliContext
 from maafw_cli.core.errors import MaafwError
-from maafw_cli.core.keymap import SCREENCAP_METHODS, INPUT_METHODS
 from maafw_cli.services.connection import do_connect_adb, do_connect_win32, do_device_list
 
 
@@ -108,10 +107,12 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
 
 @connect.command("win32")
 @click.argument("window")
-@click.option("--screencap-method", type=click.Choice(SCREENCAP_METHODS),
-              default="FramePool", show_default=True, help="Win32 screenshot method.")
-@click.option("--input-method", type=click.Choice(INPUT_METHODS),
-              default="PostMessage", show_default=True, help="Win32 input method.")
+@click.option("--screencap-method", type=str,
+              default="FramePool,PrintWindow", show_default=True,
+              help="Win32 screenshot method (comma-separated for fallback, e.g. FramePool,PrintWindow).")
+@click.option("--input-method", type=str,
+              default="PostMessage", show_default=True,
+              help="Win32 input method (comma-separated for fallback, e.g. PostMessage,Seize).")
 @click.option("--as", "session_name", default=None,
               help="Name this session (default: window title).")
 @pass_ctx

@@ -103,9 +103,36 @@ def _connect_adb_inner(
     return result, controller, info
 
 
+def _parse_method_flags(value: str, enum_cls: type, param_name: str) -> int:
+    """Parse a method string like ``"FramePool,PrintWindow"`` into OR'd enum flags.
+
+    Accepts:
+    - Single name: ``"FramePool"``
+    - Combined names: ``"FramePool,PrintWindow"``
+    - Integer: ``"18"``
+    """
+    # Try as integer first
+    try:
+        return int(value, 0)
+    except ValueError:
+        pass
+
+    valid = [a for a in dir(enum_cls) if not a.startswith("_")]
+    parts = [p.strip() for p in value.split(",")]
+    result = 0
+    for part in parts:
+        try:
+            result |= int(getattr(enum_cls, part))
+        except AttributeError:
+            raise DeviceConnectionError(
+                f"Invalid {param_name} '{part}'. Valid: {', '.join(valid)}"
+            )
+    return result
+
+
 def _connect_win32_inner(
     window: str,
-    screencap_method: str = "FramePool",
+    screencap_method: str = "FramePool,PrintWindow",
     input_method: str = "PostMessage",
 ) -> tuple[dict[str, Any], Any, SessionInfo]:
     """Connect to a Win32 window.
@@ -144,20 +171,8 @@ def _connect_win32_inner(
 
     from maa.define import MaaWin32ScreencapMethodEnum, MaaWin32InputMethodEnum
 
-    try:
-        sc_val = int(getattr(MaaWin32ScreencapMethodEnum, screencap_method))
-    except AttributeError:
-        valid = [a for a in dir(MaaWin32ScreencapMethodEnum) if not a.startswith("_")]
-        raise DeviceConnectionError(
-            f"Invalid screencap_method '{screencap_method}'. Valid: {', '.join(valid)}"
-        )
-    try:
-        in_val = int(getattr(MaaWin32InputMethodEnum, input_method))
-    except AttributeError:
-        valid = [a for a in dir(MaaWin32InputMethodEnum) if not a.startswith("_")]
-        raise DeviceConnectionError(
-            f"Invalid input_method '{input_method}'. Valid: {', '.join(valid)}"
-        )
+    sc_val = _parse_method_flags(screencap_method, MaaWin32ScreencapMethodEnum, "screencap_method")
+    in_val = _parse_method_flags(input_method, MaaWin32InputMethodEnum, "input_method")
 
     controller = _connect(matched, screencap_method=sc_val, input_method=in_val)
     if controller is None:
@@ -210,7 +225,7 @@ def do_connect_adb(device: str, screenshot_size: int = 720, session_name: str = 
 )
 def do_connect_win32(
     window: str,
-    screencap_method: str = "FramePool",
+    screencap_method: str = "FramePool,PrintWindow",
     input_method: str = "PostMessage",
     session_name: str = "default",
 ) -> dict:

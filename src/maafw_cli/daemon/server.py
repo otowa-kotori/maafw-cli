@@ -355,7 +355,7 @@ class DaemonServer:
         from maafw_cli.services.connection import _connect_win32_inner
 
         window = params.get("window", "")
-        screencap_method = params.get("screencap_method", "FramePool")
+        screencap_method = params.get("screencap_method", "FramePool,PrintWindow")
         input_method = params.get("input_method", "PostMessage")
         session_name = params.get("session_name") or request.get("session_name") or window
 

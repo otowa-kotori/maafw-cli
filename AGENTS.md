@@ -69,8 +69,15 @@ uv run maafw-cli --help          # 运行 CLI
 
 - 单元测试：`uv run pytest tests/ --ignore=tests/integration -v`
 - 集成测试：`uv run pytest tests/integration/ -v -s`（自动启动 mock 窗口，仅 Windows）
+- 全部一起跑：`uv run pytest tests/ -v`（单元测试先跑，集成测试排最后）
 - 集成测试结束后 fixture teardown 会 `daemon stop`，保证不留残留进程。
 - 若手动中断测试导致 daemon 残留，先 `uv run maafw-cli daemon stop` 再重跑。
+
+## CI 制品
+
+- CI 产出 `test-report.xml` 和 `daemon.log` 作为 artifact 上传。
+- 拉取到本地：`gh run download <RUN_ID> --dir .local/artifacts`
+- `.local/` 已在 `.gitignore` 中，不会提交。
 
 ## 新增功能 checklist
 
