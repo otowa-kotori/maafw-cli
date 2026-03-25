@@ -32,4 +32,12 @@ jobs:
           done
 
       - name: Run unit tests
-        run: uv run pytest -v -rs
+        run: uv run pytest
+
+      - name: Upload daemon log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daemon-log
+          path: ~/AppData/Local/MaaXYZ/maafw-cli/daemon.log
+          if-no-files-found: ignore

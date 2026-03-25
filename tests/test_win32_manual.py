@@ -129,30 +129,56 @@ def _safe_print(text: str) -> None:
         print(text.encode("ascii", errors="replace").decode("ascii"))
 
 
+def _diagnose_connection_failure(win: dict, label: str, result) -> str:
+    """Build a diagnostic message when connection fails."""
+    lines = [f"{label} (exit {result.exit_code}): {result.output.strip()}"]
+    # Check if the window is still visible
+    dev = runner.invoke(cli, ["--json", "device", "win32"])
+    if dev.exit_code == 0:
+        lines.append(f"device win32 output: {dev.output.strip()}")
+    else:
+        lines.append(f"device win32 failed (exit {dev.exit_code}): {dev.output.strip()}")
+    return "\n".join(lines)
+
+
+# Track connection state to avoid redundant connect calls
+_connected_mode: str | None = None
+
+
 def _ensure_connected(win: dict) -> None:
     """Connect to the mock window via daemon (default mode)."""
+    global _connected_mode
+    if _connected_mode == "daemon":
+        return
     result = runner.invoke(cli, ["connect", "win32", win["hwnd"]])
     if result.exit_code != 0:
-        pytest.fail(f"Failed to connect (exit {result.exit_code}): {result.output.strip()}")
+        pytest.fail(_diagnose_connection_failure(win, "Failed to connect", result))
+    _connected_mode = "daemon"
 
 
 def _ensure_connected_seize(win: dict) -> None:
     """Connect with Seize input — the only method that triggers tkinter buttons."""
+    global _connected_mode
+    if _connected_mode == "seize":
+        return
     result = runner.invoke(cli, [
         "connect", "win32", win["hwnd"],
         "--input-method", "Seize",
     ])
     if result.exit_code != 0:
-        pytest.fail(f"Failed to connect with Seize (exit {result.exit_code}): {result.output.strip()}")
+        pytest.fail(_diagnose_connection_failure(win, "Failed to connect with Seize", result))
+    _connected_mode = "seize"
 
 
 def _ensure_connected_direct(win: dict) -> None:
     """Connect in --no-daemon mode for file persistence tests."""
+    global _connected_mode
     result = runner.invoke(cli, [
         "--no-daemon", "connect", "win32", win["hwnd"],
     ])
     if result.exit_code != 0:
-        pytest.fail(f"Failed to connect in direct mode (exit {result.exit_code}): {result.output.strip()}")
+        pytest.fail(_diagnose_connection_failure(win, "Failed to connect in direct mode", result))
+    _connected_mode = "direct"
 
 
 # ═══════════════════════════════════════════════════════════════════
