@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Download OCR model
+        shell: bash
+        run: |
+          OCR_DIR="$LOCALAPPDATA/MaaXYZ/maafw-cli/resource/model/ocr"
+          mkdir -p "$OCR_DIR"
+          BASE_URL="https://raw.githubusercontent.com/MaaXYZ/MaaCommonAssets/main/OCR/ppocr_v5/zh_cn"
+          for f in det.onnx rec.onnx keys.txt; do
+            curl -sL "$BASE_URL/$f" -o "$OCR_DIR/$f"
+          done
+
+      - name: Run unit tests
+        run: uv run pytest -v -rs

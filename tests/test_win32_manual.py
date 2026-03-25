@@ -133,7 +133,7 @@ def _ensure_connected(win: dict) -> None:
     """Connect to the mock window via daemon (default mode)."""
     result = runner.invoke(cli, ["connect", "win32", win["hwnd"]])
     if result.exit_code != 0:
-        pytest.skip(f"Failed to connect (exit {result.exit_code})")
+        pytest.fail(f"Failed to connect (exit {result.exit_code}): {result.output.strip()}")
 
 
 def _ensure_connected_seize(win: dict) -> None:
@@ -143,7 +143,7 @@ def _ensure_connected_seize(win: dict) -> None:
         "--input-method", "Seize",
     ])
     if result.exit_code != 0:
-        pytest.skip(f"Failed to connect with Seize (exit {result.exit_code})")
+        pytest.fail(f"Failed to connect with Seize (exit {result.exit_code}): {result.output.strip()}")
 
 
 def _ensure_connected_direct(win: dict) -> None:
@@ -152,7 +152,7 @@ def _ensure_connected_direct(win: dict) -> None:
         "--no-daemon", "connect", "win32", win["hwnd"],
     ])
     if result.exit_code != 0:
-        pytest.skip(f"Failed to connect in direct mode (exit {result.exit_code})")
+        pytest.fail(f"Failed to connect in direct mode (exit {result.exit_code}): {result.output.strip()}")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -237,6 +237,13 @@ def test_win32_screenshot_auto_name(mock_window):
     assert result.exit_code == 0
     data = _parse_json_output(result.output)
     assert Path(data["path"]).exists()
+
+
+def test_win32_download_ocr():
+    """Verify OCR model can be downloaded (or already exists)."""
+    result = runner.invoke(cli, ["resource", "download-ocr"])
+    _safe_print(result.output)
+    assert result.exit_code == 0
 
 
 def test_win32_ocr(mock_window):
