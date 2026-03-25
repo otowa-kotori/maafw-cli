@@ -44,7 +44,7 @@ def daemon_stop(ctx: CliContext) -> None:
     try:
         client = DaemonClient(port)
         client.send("shutdown")
-        fmt.success({"status": "stopped"}, human="Daemon stopped.")
+        fmt.success({"status": "shutdown_requested"}, human="Shutdown requested.")
     except Exception as e:
         fmt.error(f"Failed to stop daemon: {e}", exit_code=1)
 
@@ -75,7 +75,6 @@ def daemon_status(ctx: CliContext) -> None:
             ),
         )
     except Exception:
-        fmt.success(
-            {"status": "unreachable", "pid": pid, "port": port},
-            human=f"Daemon PID {pid} on port {port} is unreachable.",
+        fmt.print_error(
+            f"Daemon PID {pid} on port {port} is unreachable."
         )

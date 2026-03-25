@@ -28,6 +28,20 @@ def _summarize(d: dict[str, Any], max_len: int = 200) -> str:
     s = json.dumps(d, ensure_ascii=False, separators=(",", ":"))
     return s if len(s) <= max_len else s[:max_len] + "…"
 
+
+_SENSITIVE_KEYS = frozenset({"token", "password", "secret", "key", "credential"})
+
+
+def _sanitize_params(params: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of *params* with sensitive values redacted for logging."""
+    sanitized = {}
+    for k, v in params.items():
+        if any(sk in k.lower() for sk in _SENSITIVE_KEYS):
+            sanitized[k] = "***"
+        else:
+            sanitized[k] = v
+    return sanitized
+
 # ── port / file constants ───────────────────────────────────────
 
 DEFAULT_PORT = 19799
@@ -41,6 +55,9 @@ IDLE_TIMEOUT = 300  # 5 minutes
 
 class DaemonServer:
     """asyncio TCP daemon server."""
+
+    # Maximum size for a single JSON-line request (1 MB).
+    MAX_LINE_LENGTH = 1 * 1024 * 1024
 
     def __init__(
         self,
@@ -57,6 +74,7 @@ class DaemonServer:
         self.session_mgr = SessionManager()
 
         self._server: asyncio.Server | None = None
+        self._watchdog_task: asyncio.Task[None] | None = None
         self._start_time = time.monotonic()
         self._last_activity = time.monotonic()
         self._shutdown_event = asyncio.Event()
@@ -68,13 +86,16 @@ class DaemonServer:
     async def start(self) -> None:
         """Bind, write PID/port files, and serve forever."""
         self.port = await self._bind()
-        self._write_pid_port_files()
         self._install_signal_handlers()
 
-        _log.info("Daemon listening on %s:%d", self.host, self.port)
+        # Start idle watchdog (save reference to prevent silent GC)
+        self._watchdog_task = asyncio.create_task(self._idle_watchdog())
 
-        # Start idle watchdog
-        asyncio.create_task(self._idle_watchdog())
+        # Write PID/port files AFTER all initialization is complete,
+        # so clients don't connect before the server is fully ready.
+        self._write_pid_port_files()
+
+        _log.info("Daemon listening on %s:%d", self.host, self.port)
 
         # Serve until shutdown
         await self._shutdown_event.wait()
@@ -84,9 +105,10 @@ class DaemonServer:
 
     async def _bind(self) -> int:
         """Find an available port and start the TCP server."""
+        limit = self.MAX_LINE_LENGTH
         if self.requested_port is not None:
             self._server = await asyncio.start_server(
-                self._handle_client, self.host, self.requested_port,
+                self._handle_client, self.host, self.requested_port, limit=limit,
             )
             return self.requested_port
 
@@ -95,7 +117,7 @@ class DaemonServer:
         for port in range(DEFAULT_PORT, PORT_RANGE_END):
             try:
                 self._server = await asyncio.start_server(
-                    self._handle_client, self.host, port,
+                    self._handle_client, self.host, port, limit=limit,
                 )
                 return port
             except OSError as e:
@@ -124,8 +146,8 @@ class DaemonServer:
                 try:
                     loop.add_signal_handler(sig, lambda s=sig_name: self._signal_shutdown(s))
                 except NotImplementedError:
-                    # Windows doesn't support add_signal_handler for all signals
-                    pass
+                    # Windows doesn't support add_signal_handler — use signal.signal fallback
+                    signal.signal(sig, lambda signum, frame, s=sig_name: self._signal_shutdown(s))
 
     def _signal_shutdown(self, sig_name: str) -> None:
         _log.info("Received %s, initiating shutdown", sig_name)
@@ -133,14 +155,25 @@ class DaemonServer:
         self._shutdown_event.set()
 
     async def _cleanup(self) -> None:
-        """Graceful shutdown: stop server, close sessions, remove files."""
-        # Stop accepting connections
+        """Graceful shutdown: stop server, drain connections, close sessions, remove files."""
+        # Stop accepting new connections
         if self._server is not None:
             self._server.close()
             await self._server.wait_closed()
 
+        # Cancel watchdog
+        if self._watchdog_task is not None and not self._watchdog_task.done():
+            self._watchdog_task.cancel()
+
+        # Wait for active connections to drain (up to 5 seconds)
+        drain_deadline = time.monotonic() + 5.0
+        while self._active_connections > 0 and time.monotonic() < drain_deadline:
+            await asyncio.sleep(0.1)
+        if self._active_connections > 0:
+            _log.warning("Forcing shutdown with %d active connection(s)", self._active_connections)
+
         # Close all sessions
-        self.session_mgr.close_all()
+        await self.session_mgr.close_all()
 
         # Remove PID/port files
         for f in (pid_file(), port_file()):
@@ -189,7 +222,11 @@ class DaemonServer:
         try:
             while True:
                 try:
-                    line = await reader.readline()
+                    line = await reader.readuntil(b"\n")
+                except asyncio.LimitOverrunError:
+                    _log.warning("Client %s sent oversized message (>%d bytes), dropping",
+                                 peer, reader._limit)
+                    break
                 except (ConnectionError, asyncio.IncompleteReadError):
                     break
 
@@ -225,7 +262,7 @@ class DaemonServer:
         session_name = request.get("session")
         params = request.get("params", {})
 
-        _log.info(">>> %s session=%s params=%s", action, session_name, params)
+        _log.info(">>> %s session=%s params=%s", action, session_name, _sanitize_params(params))
         t0 = time.monotonic()
 
         try:
@@ -256,12 +293,16 @@ class DaemonServer:
         if action == "session_list":
             return {"sessions": self.session_mgr.list_sessions()}
         if action == "session_default":
-            name = params.get("name", "")
+            name = params.get("name") or None
+            if not name:
+                raise ValueError("session_default requires a non-empty 'name' parameter")
             self.session_mgr.set_default(name)
             return {"default": name}
         if action == "session_close":
-            name = params.get("name", "")
-            self.session_mgr.close(name)
+            name = params.get("name") or None
+            if not name:
+                raise ValueError("session_close requires a non-empty 'name' parameter")
+            await self.session_mgr.close(name)
             return {"closed": name}
 
         # ── connect actions (create sessions) ───────────────────
@@ -296,7 +337,7 @@ class DaemonServer:
             _connect_adb_inner, device, screenshot_size,
         )
         info.name = session_name
-        self.session_mgr.add(session_name, controller, info)
+        await self.session_mgr.add(session_name, controller, info)
 
         result["session"] = session_name
         return result
@@ -316,7 +357,7 @@ class DaemonServer:
             _connect_win32_inner, window, screencap_method, input_method,
         )
         info.name = session_name
-        self.session_mgr.add(session_name, controller, info)
+        await self.session_mgr.add(session_name, controller, info)
 
         result["session"] = session_name
         return result

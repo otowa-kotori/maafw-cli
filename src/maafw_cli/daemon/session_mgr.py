@@ -45,38 +45,41 @@ class SessionManager:
     """Manages named sessions for the daemon.
 
     Tracks active sessions, default session, and provides execution routing.
+    All mutations are protected by an asyncio.Lock for concurrency safety.
     """
 
     def __init__(self) -> None:
         self._sessions: dict[str, ManagedSession] = {}
         self._default: str | None = None
+        self._lock = asyncio.Lock()
 
     # ── add / get / close ───────────────────────────────────────
 
-    def add(
+    async def add(
         self,
         name: str,
         controller: Any,
         session_info: SessionInfo,
     ) -> ManagedSession:
         """Add a named session.  If *name* already exists, close the old one first."""
-        if name in self._sessions:
-            _log.info("Replacing existing session '%s'", name)
-            self._close_session(name)
+        async with self._lock:
+            if name in self._sessions:
+                _log.info("Replacing existing session '%s'", name)
+                await self._close_session_unlocked(name)
 
-        session = ManagedSession(
-            name=name,
-            controller=controller,
-            session_info=session_info,
-        )
-        self._sessions[name] = session
+            session = ManagedSession(
+                name=name,
+                controller=controller,
+                session_info=session_info,
+            )
+            self._sessions[name] = session
 
-        # First session becomes default automatically
-        if self._default is None:
-            self._default = name
+            # First session becomes default automatically
+            if self._default is None:
+                self._default = name
 
-        _log.info("Added session '%s' (type=%s, device=%s)", name, session_info.type, session_info.device)
-        return session
+            _log.info("Added session '%s' (type=%s, device=%s)", name, session_info.type, session_info.device)
+            return session
 
     def get(self, name: str | None = None) -> ManagedSession:
         """Get a session by name, or the default if *name* is None.
@@ -90,27 +93,29 @@ class SessionManager:
             raise DeviceConnectionError(f"No active session '{target}'. Connect to a device first.")
         return self._sessions[name]
 
-    def close(self, name: str) -> None:
+    async def close(self, name: str) -> None:
         """Close and remove a session.  Raises KeyError if not found."""
-        if name not in self._sessions:
-            raise KeyError(f"Session '{name}' not found.")
-        self._close_session(name)
+        async with self._lock:
+            if name not in self._sessions:
+                raise KeyError(f"Session '{name}' not found.")
+            await self._close_session_unlocked(name)
 
-    def close_all(self) -> None:
+    async def close_all(self) -> None:
         """Close all sessions (for daemon shutdown)."""
-        for name in list(self._sessions):
-            self._close_session(name)
+        async with self._lock:
+            for name in list(self._sessions):
+                await self._close_session_unlocked(name)
 
-    def _close_session(self, name: str) -> None:
-        """Internal: destroy a session and update default."""
+    async def _close_session_unlocked(self, name: str) -> None:
+        """Internal: destroy a session and update default. Must be called with lock held."""
         session = self._sessions.pop(name, None)
         if session is None:
             return
 
-        # Try to destroy the controller
+        # Try to destroy the controller (may block — run in thread)
         try:
             if hasattr(session.controller, "destroy"):
-                session.controller.destroy()
+                await asyncio.to_thread(session.controller.destroy)
         except Exception:
             _log.warning("Error destroying controller for session '%s'", name, exc_info=True)
 

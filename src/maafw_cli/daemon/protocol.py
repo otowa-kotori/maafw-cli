@@ -46,7 +46,7 @@ def make_request(
 ) -> dict[str, Any]:
     """Build a request dict ready for :func:`encode`."""
     return {
-        "id": request_id or uuid.uuid4().hex[:12],
+        "id": request_id or uuid.uuid4().hex[:16],
         "action": action,
         "session": session,
         "params": params or {},

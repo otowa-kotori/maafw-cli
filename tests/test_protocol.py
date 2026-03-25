@@ -73,7 +73,7 @@ class TestRequestHelpers:
         assert req["params"] == {"target": "e1"}
         assert req["session"] is None
         assert isinstance(req["id"], str)
-        assert len(req["id"]) == 12
+        assert len(req["id"]) == 16
 
     def test_make_request_with_session(self):
         req = make_request("ocr", session="phone", request_id="custom-id")

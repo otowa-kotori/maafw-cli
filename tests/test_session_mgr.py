@@ -18,23 +18,28 @@ def _make_info(type_: str = "adb", device: str = "emu-5554") -> SessionInfo:
     return SessionInfo(type=type_, device=device)
 
 
+def _run(coro):
+    """Helper to run a coroutine synchronously."""
+    return asyncio.get_event_loop().run_until_complete(coro)
+
+
 class TestSessionManagerBasics:
     def test_add_and_get(self):
         mgr = SessionManager()
         ctrl = MockController()
-        mgr.add("phone", ctrl, _make_info())
+        _run(mgr.add("phone", ctrl, _make_info()))
         session = mgr.get("phone")
         assert session.name == "phone"
         assert session.controller is ctrl
 
     def test_first_session_becomes_default(self):
         mgr = SessionManager()
-        mgr.add("phone", MockController(), _make_info())
+        _run(mgr.add("phone", MockController(), _make_info()))
         assert mgr.default_name == "phone"
 
     def test_get_none_returns_default(self):
         mgr = SessionManager()
-        mgr.add("phone", MockController(), _make_info())
+        _run(mgr.add("phone", MockController(), _make_info()))
         session = mgr.get(None)
         assert session.name == "phone"
 
@@ -50,8 +55,8 @@ class TestSessionManagerBasics:
 
     def test_list_sessions(self):
         mgr = SessionManager()
-        mgr.add("phone", MockController(), _make_info(device="emu-5554"))
-        mgr.add("tablet", MockController(), _make_info(device="emu-5556"))
+        _run(mgr.add("phone", MockController(), _make_info(device="emu-5554")))
+        _run(mgr.add("tablet", MockController(), _make_info(device="emu-5556")))
         result = mgr.list_sessions()
         assert len(result) == 2
         names = {s["name"] for s in result}
@@ -64,48 +69,48 @@ class TestSessionManagerBasics:
     def test_count(self):
         mgr = SessionManager()
         assert mgr.count == 0
-        mgr.add("phone", MockController(), _make_info())
+        _run(mgr.add("phone", MockController(), _make_info()))
         assert mgr.count == 1
 
     def test_session_names(self):
         mgr = SessionManager()
-        mgr.add("a", MockController(), _make_info())
-        mgr.add("b", MockController(), _make_info())
+        _run(mgr.add("a", MockController(), _make_info()))
+        _run(mgr.add("b", MockController(), _make_info()))
         assert set(mgr.session_names) == {"a", "b"}
 
 
 class TestSessionManagerClose:
     def test_close_session(self):
         mgr = SessionManager()
-        mgr.add("phone", MockController(), _make_info())
-        mgr.close("phone")
+        _run(mgr.add("phone", MockController(), _make_info()))
+        _run(mgr.close("phone"))
         assert mgr.count == 0
 
     def test_close_nonexistent_raises(self):
         mgr = SessionManager()
         with pytest.raises(KeyError, match="not found"):
-            mgr.close("nope")
+            _run(mgr.close("nope"))
 
     def test_close_default_switches(self):
         mgr = SessionManager()
-        mgr.add("phone", MockController(), _make_info())
-        mgr.add("tablet", MockController(), _make_info())
+        _run(mgr.add("phone", MockController(), _make_info()))
+        _run(mgr.add("tablet", MockController(), _make_info()))
         assert mgr.default_name == "phone"
-        mgr.close("phone")
+        _run(mgr.close("phone"))
         # Default switches to remaining session
         assert mgr.default_name == "tablet"
 
     def test_close_last_session_clears_default(self):
         mgr = SessionManager()
-        mgr.add("phone", MockController(), _make_info())
-        mgr.close("phone")
+        _run(mgr.add("phone", MockController(), _make_info()))
+        _run(mgr.close("phone"))
         assert mgr.default_name is None
 
     def test_close_all(self):
         mgr = SessionManager()
-        mgr.add("a", MockController(), _make_info())
-        mgr.add("b", MockController(), _make_info())
-        mgr.close_all()
+        _run(mgr.add("a", MockController(), _make_info()))
+        _run(mgr.add("b", MockController(), _make_info()))
+        _run(mgr.close_all())
         assert mgr.count == 0
         assert mgr.default_name is None
 
@@ -113,8 +118,8 @@ class TestSessionManagerClose:
 class TestSessionManagerDefault:
     def test_set_default(self):
         mgr = SessionManager()
-        mgr.add("phone", MockController(), _make_info())
-        mgr.add("tablet", MockController(), _make_info())
+        _run(mgr.add("phone", MockController(), _make_info()))
+        _run(mgr.add("tablet", MockController(), _make_info()))
         mgr.set_default("tablet")
         assert mgr.default_name == "tablet"
 
@@ -129,8 +134,8 @@ class TestSessionManagerReplace:
         mgr = SessionManager()
         ctrl1 = MockController()
         ctrl2 = MockController()
-        mgr.add("phone", ctrl1, _make_info(device="old"))
-        mgr.add("phone", ctrl2, _make_info(device="new"))
+        _run(mgr.add("phone", ctrl1, _make_info(device="old")))
+        _run(mgr.add("phone", ctrl2, _make_info(device="new")))
         session = mgr.get("phone")
         assert session.controller is ctrl2
         assert session.session_info.device == "new"
@@ -156,9 +161,9 @@ class TestSessionManagerExecute:
     def test_execute_click(self):
         mgr = SessionManager()
         ctrl = MockController()
-        mgr.add("phone", ctrl, _make_info())
+        _run(mgr.add("phone", ctrl, _make_info()))
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = _run(
             mgr.execute("click", {"target": "100,200"}, session_name="phone")
         )
         assert result["action"] == "click"
@@ -168,19 +173,19 @@ class TestSessionManagerExecute:
 
     def test_execute_unknown_action_raises(self):
         mgr = SessionManager()
-        mgr.add("phone", MockController(), _make_info())
+        _run(mgr.add("phone", MockController(), _make_info()))
 
         with pytest.raises(ValueError, match="Unknown action"):
-            asyncio.get_event_loop().run_until_complete(
+            _run(
                 mgr.execute("nonexistent", {}, session_name="phone")
             )
 
     def test_execute_uses_default_session(self):
         mgr = SessionManager()
         ctrl = MockController()
-        mgr.add("phone", ctrl, _make_info())
+        _run(mgr.add("phone", ctrl, _make_info()))
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = _run(
             mgr.execute("click", {"target": "50,60"})
         )
         assert result["action"] == "click"
@@ -214,7 +219,7 @@ class TestSessionManagerConnectionError:
         # Populate DISPATCH with at least one action
         import maafw_cli.services.interaction  # noqa: F401
         with pytest.raises(DeviceConnectionError):
-            asyncio.get_event_loop().run_until_complete(
+            _run(
                 mgr.execute("click", {"target": "1,2"})
             )
 
@@ -232,7 +237,7 @@ class TestSessionManagerNeedsSession:
             return {"x": x}
 
         mgr = SessionManager()
-        result = asyncio.get_event_loop().run_until_complete(
+        result = _run(
             mgr.execute("_test_global", {"x": 42})
         )
         assert result == {"x": 42}

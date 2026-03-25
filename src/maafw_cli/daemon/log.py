@@ -7,6 +7,7 @@ Optionally mirrors to stderr for debugging (``--daemon-verbose``).
 from __future__ import annotations
 
 import logging
+import os
 import platform
 import sys
 from logging.handlers import RotatingFileHandler
@@ -36,9 +37,8 @@ def setup_daemon_logging(*, verbose: bool = False) -> logging.Logger:
     log_file = daemon_log_path()
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # Truncate old log on each daemon start
-    if log_file.exists():
-        log_file.write_text("", encoding="utf-8")
+    # Let RotatingFileHandler manage log rotation naturally — do NOT truncate
+    # on startup, as that defeats the purpose of keeping rotated backups.
 
     fh = RotatingFileHandler(
         log_file,
@@ -66,7 +66,7 @@ def setup_daemon_logging(*, verbose: bool = False) -> logging.Logger:
     # ── startup banner ───────────────────────────────────────
     log.info(
         "Daemon starting — PID=%d, Python=%s, platform=%s",
-        __import__("os").getpid(),
+        os.getpid(),
         platform.python_version(),
         platform.platform(),
     )
