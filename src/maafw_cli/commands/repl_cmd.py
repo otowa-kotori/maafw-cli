@@ -209,7 +209,11 @@ class Repl:
         i = 2
         while i < len(args):
             if args[i] == "--duration" and i + 1 < len(args):
-                kw["duration"] = int(args[i + 1])
+                try:
+                    kw["duration"] = int(args[i + 1])
+                except ValueError:
+                    print(f"Error: duration must be an integer, got '{args[i + 1]}'", file=sys.stderr)
+                    return None
                 i += 2
             else:
                 i += 1
@@ -220,7 +224,11 @@ class Repl:
         if len(args) != 2:
             print("Usage: scroll <dx> <dy>", file=sys.stderr)
             return None
-        return {"dx": int(args[0]), "dy": int(args[1])}
+        try:
+            return {"dx": int(args[0]), "dy": int(args[1])}
+        except ValueError:
+            print(f"Error: scroll dx/dy must be integers, got '{args[0]}', '{args[1]}'", file=sys.stderr)
+            return None
 
     @staticmethod
     def _parse_type(args: list[str]) -> dict | None:

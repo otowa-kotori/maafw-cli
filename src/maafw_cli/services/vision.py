@@ -3,7 +3,7 @@ Vision services — OCR, screenshot.
 """
 from __future__ import annotations
 
-from maafw_cli.core.errors import ActionError, RecognitionError
+from maafw_cli.core.errors import ActionError
 from maafw_cli.core.log import Timer
 from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.registry import service
@@ -31,13 +31,6 @@ def do_ocr(ctx: ServiceContext, roi: str | None = None) -> dict:
         results = _ocr(ctx.controller, roi=roi_tuple)
 
     elapsed_ms = t.elapsed_ms
-
-    if results is None:
-        from maafw_cli.download import check_ocr_files_exist
-
-        if not check_ocr_files_exist():
-            raise RecognitionError("OCR model not found. Run: maafw-cli resource download-ocr")
-        raise RecognitionError("OCR failed.")
 
     store = ctx.get_element_store()
     elements = store.build_from_ocr(results)

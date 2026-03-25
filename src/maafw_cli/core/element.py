@@ -8,12 +8,15 @@ can resolve them without re-running recognition.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from maa.define import OCRResult
+
+_log = logging.getLogger("maafw_cli.element")
 
 
 @dataclass
@@ -78,7 +81,7 @@ class ElementStore:
             return
         self._path.parent.mkdir(parents=True, exist_ok=True)
         data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "elements": [e.to_dict() for e in self._elements],
         }
         self._path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -95,7 +98,8 @@ class ElementStore:
             raw = data.get("elements") or data.get("refs", [])
             self._elements = [Element(**r) for r in raw]
             return self._elements
-        except (json.JSONDecodeError, TypeError, KeyError):
+        except (json.JSONDecodeError, TypeError, KeyError) as exc:
+            _log.warning("Failed to load elements from %s: %s", self._path, exc)
             return []
 
     @property

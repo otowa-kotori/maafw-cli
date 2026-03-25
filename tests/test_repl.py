@@ -108,3 +108,21 @@ class TestReplDispatch:
         repl = _make_repl()
         repl.execute_line("observe maybe")
         assert repl.observe is False  # unchanged
+
+
+class TestReplParseErrors:
+    """REPL should handle invalid arguments gracefully, not crash."""
+
+    def test_swipe_bad_duration(self, capsys):
+        repl = _make_repl()
+        result = repl.execute_line("swipe 0,0 100,100 --duration abc")
+        assert result is None
+        captured = capsys.readouterr()
+        assert "integer" in captured.err.lower()
+
+    def test_scroll_bad_args(self, capsys):
+        repl = _make_repl()
+        result = repl.execute_line("scroll abc def")
+        assert result is None
+        captured = capsys.readouterr()
+        assert "integer" in captured.err.lower()

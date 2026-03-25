@@ -29,6 +29,8 @@ def do_click(ctx: ServiceContext, target: str) -> dict:
 def do_swipe(
     ctx: ServiceContext, from_target: str, to_target: str, duration: int = 300
 ) -> dict:
+    if duration <= 0:
+        raise ActionError(f"Duration must be positive, got {duration}.")
     src = ctx.resolve_target(from_target)
     dst = ctx.resolve_target(to_target)
     ok = swipe(ctx.controller, src.x, src.y, dst.x, dst.y, duration)
@@ -48,6 +50,8 @@ def do_swipe(
 def do_scroll(ctx: ServiceContext, dx: int, dy: int) -> dict:
     if ctx.session_type != "win32":
         raise ActionError("Scroll is only supported on PC/Win32 sessions.")
+    if not isinstance(dx, int) or not isinstance(dy, int):
+        raise ActionError(f"Scroll dx/dy must be integers, got dx={dx!r}, dy={dy!r}.")
     ok = scroll(ctx.controller, dx, dy)
     if not ok:
         raise ActionError("Scroll failed.")

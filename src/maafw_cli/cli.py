@@ -6,6 +6,7 @@ All sub-commands are registered here.
 from __future__ import annotations
 
 import logging
+import sys
 from typing import Callable
 
 import click
@@ -53,7 +54,7 @@ class CliContext:
         from maafw_cli.services.context import ServiceContext
 
         session = load_session()
-        session_type = session.type if session else "win32"
+        session_type = session.type if session else ("win32" if sys.platform == "win32" else "adb")
 
         return ServiceContext(
             get_controller=lambda: reconnect(),
@@ -208,8 +209,11 @@ class CliContext:
 
     def _display_observe(self, ocr_result: dict) -> None:
         """Display observe OCR results."""
-        refs = ocr_result["results"]
-        elapsed_ms = ocr_result["elapsed_ms"]
+        refs = ocr_result.get("results")
+        elapsed_ms = ocr_result.get("elapsed_ms", 0)
+
+        if refs is None:
+            return
 
         if self.fmt.json_mode:
             self.fmt.success(ocr_result)

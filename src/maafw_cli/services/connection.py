@@ -133,8 +133,20 @@ def _connect_win32_inner(
 
     from maa.define import MaaWin32ScreencapMethodEnum, MaaWin32InputMethodEnum
 
-    sc_val = int(getattr(MaaWin32ScreencapMethodEnum, screencap_method))
-    in_val = int(getattr(MaaWin32InputMethodEnum, input_method))
+    try:
+        sc_val = int(getattr(MaaWin32ScreencapMethodEnum, screencap_method))
+    except AttributeError:
+        valid = [a for a in dir(MaaWin32ScreencapMethodEnum) if not a.startswith("_")]
+        raise DeviceConnectionError(
+            f"Invalid screencap_method '{screencap_method}'. Valid: {', '.join(valid)}"
+        )
+    try:
+        in_val = int(getattr(MaaWin32InputMethodEnum, input_method))
+    except AttributeError:
+        valid = [a for a in dir(MaaWin32InputMethodEnum) if not a.startswith("_")]
+        raise DeviceConnectionError(
+            f"Invalid input_method '{input_method}'. Valid: {', '.join(valid)}"
+        )
 
     controller = _connect(matched, screencap_method=sc_val, input_method=in_val)
     if controller is None:

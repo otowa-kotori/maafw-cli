@@ -37,5 +37,5 @@ def get_screenshots_dir() -> Path:
 
 def ensure_dirs() -> None:
     """Ensure all necessary directories exist."""
-    for d in [get_resource_dir(), get_model_dir(), get_ocr_dir()]:
+    for d in [get_resource_dir(), get_model_dir(), get_ocr_dir(), get_screenshots_dir()]:
         d.mkdir(parents=True, exist_ok=True)

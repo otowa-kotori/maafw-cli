@@ -79,16 +79,21 @@ def _reconnect_win32(session) -> Controller:
 
     # Match by window title (more stable than hwnd across restarts)
     needle = session.window_name.lower() if session.window_name else ""
-    match = None
+    matches = []
     for w in windows:
         if needle and needle in w.window_name.lower():
-            match = w
-            break
+            matches.append(w)
 
-    if match is None:
+    if not matches:
         raise DeviceConnectionError(
             f"Session window '{session.window_name}' no longer available."
         )
+
+    if len(matches) > 1:
+        listing = ", ".join(f"{w.window_name} ({hex(w.hwnd)})" for w in matches)
+        _log.warning("Multiple windows match '%s': %s. Using first match.", session.window_name, listing)
+
+    match = matches[0]
 
     with Timer("Win32 connection", log=_log):
         controller = connect_win32(

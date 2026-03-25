@@ -15,6 +15,7 @@ from maa.resource import Resource
 from maa.tasker import Tasker, TaskDetail
 from maa.pipeline import JRecognitionType, JOCR
 
+from maafw_cli.core.errors import RecognitionError
 from maafw_cli.core.log import Timer
 from maafw_cli.download import check_ocr_files_exist
 from maafw_cli.paths import get_resource_dir
@@ -100,23 +101,23 @@ def screencap_to_file(controller: Controller, output: str | Path | None = None) 
     return output
 
 
-def ocr(controller: Controller, roi: tuple[int, int, int, int] | None = None) -> list[OCRResult] | None:
+def ocr(controller: Controller, roi: tuple[int, int, int, int] | None = None) -> list[OCRResult]:
     """Run OCR, optionally restricted to *roi* ``(x, y, w, h)``.
 
-    Returns a list of ``OCRResult`` (with ``.text``, ``.box``, ``.score``),
-    or ``None`` on failure.
+    Returns a list of ``OCRResult`` (with ``.text``, ``.box``, ``.score``).
+    Raises :class:`RecognitionError` on failure with a message indicating the cause.
     """
     with Timer("total OCR pipeline", log=_log):
         if not check_ocr_files_exist():
-            return None
+            raise RecognitionError("OCR model not found. Run: maafw-cli resource download-ocr")
 
         tasker = _get_tasker(controller)
         if tasker is None:
-            return None
+            raise RecognitionError("Failed to initialize OCR tasker (resource load failed).")
 
         image = screencap(controller)
         if image is None:
-            return None
+            raise RecognitionError("Screenshot failed — cannot run OCR without an image.")
 
         ocr_params = JOCR()
         if roi is not None:
@@ -127,10 +128,10 @@ def ocr(controller: Controller, roi: tuple[int, int, int, int] | None = None) ->
                 tasker.post_recognition(JRecognitionType.OCR, ocr_params, image).wait().get()
             )
         if not info:
-            return None
+            raise RecognitionError("OCR recognition returned no result.")
 
         if not info.nodes:
             _log.warning("OCR returned empty nodes list")
-            return None
+            raise RecognitionError("OCR recognition returned empty nodes.")
 
         return info.nodes[0].recognition.all_results  # type: ignore[return-value]

@@ -27,7 +27,7 @@ class ResolvedTarget:
 
 # Regex patterns
 _REF_PATTERN = re.compile(r"^e(\d+)$", re.IGNORECASE)
-_COORD_PATTERN = re.compile(r"^(\d+)\s*,\s*(\d+)$")
+_COORD_PATTERN = re.compile(r"^(-?\d+)\s*,\s*(-?\d+)$")
 
 
 def parse_target(target: str, store: ElementStore) -> Union[ResolvedTarget, str]:

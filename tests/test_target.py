@@ -71,3 +71,18 @@ class TestParseTarget:
         store = ElementStore(Path("/tmp/dummy.json"))
         result = parse_target("  ", store)
         assert isinstance(result, str)
+
+    def test_negative_coords(self):
+        """Negative coordinates should be supported (Win32 multi-monitor)."""
+        store = ElementStore(Path("/tmp/dummy.json"))
+        result = parse_target("-100,200", store)
+        assert isinstance(result, ResolvedTarget)
+        assert result.x == -100
+        assert result.y == 200
+
+    def test_both_negative_coords(self):
+        store = ElementStore(Path("/tmp/dummy.json"))
+        result = parse_target("-50,-30", store)
+        assert isinstance(result, ResolvedTarget)
+        assert result.x == -50
+        assert result.y == -30

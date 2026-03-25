@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import shutil
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.request import urlopen, Request
 from urllib.error import URLError
@@ -20,7 +20,7 @@ OCR_REQUIRED_FILES = ["det.onnx", "keys.txt", "rec.onnx"]
 
 
 def _log(log_file: Path, message: str) -> None:
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {message}\n")
 
@@ -42,8 +42,8 @@ def download_and_extract_ocr(ocr_dir: Path | None = None) -> bool:
     log_file = model_dir / "download.log"
 
     try:
-        _log(log_file, "开始下载 OCR 资源文件")
-        _log(log_file, f"下载地址: {OCR_DOWNLOAD_URL}")
+        _log(log_file, "Starting OCR resource download")
+        _log(log_file, f"URL: {OCR_DOWNLOAD_URL}")
 
         request = Request(OCR_DOWNLOAD_URL, headers={"User-Agent": f"maafw-cli/{__version__}"})
 
@@ -69,14 +69,25 @@ def download_and_extract_ocr(ocr_dir: Path | None = None) -> bool:
                             last_percent = percent
                             mb_down = downloaded / (1024 * 1024)
                             mb_total = total_size / (1024 * 1024)
-                            _log(log_file, f"下载进度: {mb_down:.1f}/{mb_total:.1f} MB ({percent}%)")
+                            _log(log_file, f"Download progress: {mb_down:.1f}/{mb_total:.1f} MB ({percent}%)")
 
-        _log(log_file, "下载完成，正在解压...")
+        _log(log_file, "Download complete, extracting...")
 
         with zipfile.ZipFile(zip_file, "r") as zip_ref:
             temp_dir = ocr_dir / "_temp_extract"
             temp_dir.mkdir(exist_ok=True)
-            zip_ref.extractall(temp_dir)
+
+            # Validate all member paths to prevent zip path traversal
+            resolved_temp = temp_dir.resolve()
+            safe_members = []
+            for member in zip_ref.infolist():
+                member_path = (temp_dir / member.filename).resolve()
+                if not str(member_path).startswith(str(resolved_temp)):
+                    _log(log_file, f"Skipping suspicious zip entry: {member.filename}")
+                    continue
+                safe_members.append(member)
+
+            zip_ref.extractall(temp_dir, members=safe_members)
 
             for req_file in OCR_REQUIRED_FILES:
                 found = False
@@ -88,7 +99,7 @@ def download_and_extract_ocr(ocr_dir: Path | None = None) -> bool:
                     found = True
                     break
                 if not found:
-                    _log(log_file, f"警告: 未在压缩包中找到 {req_file}")
+                    _log(log_file, f"Warning: {req_file} not found in archive")
 
             shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -98,15 +109,15 @@ def download_and_extract_ocr(ocr_dir: Path | None = None) -> bool:
         except OSError:
             pass
 
-        _log(log_file, f"解压完成，OCR 资源已保存到: {ocr_dir}")
+        _log(log_file, f"Extraction complete, OCR resources saved to: {ocr_dir}")
         return True
 
     except URLError as e:
-        _log(log_file, f"下载失败: {e}")
+        _log(log_file, f"Download failed: {e}")
         return False
     except zipfile.BadZipFile:
-        _log(log_file, "解压失败: 下载的文件不是有效的 ZIP 文件")
+        _log(log_file, "Extraction failed: downloaded file is not a valid ZIP")
         return False
     except Exception as e:
-        _log(log_file, f"发生错误: {e}")
+        _log(log_file, f"Error: {e}")
         return False

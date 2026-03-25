@@ -100,6 +100,16 @@ class TestSwipeService:
         with pytest.raises(ActionError, match="Swipe failed"):
             do_swipe(ctx, from_target="0,0", to_target="100,100")
 
+    def test_swipe_negative_duration(self):
+        ctx = _make_ctx()
+        with pytest.raises(ActionError, match="Duration must be positive"):
+            do_swipe(ctx, from_target="0,0", to_target="100,100", duration=-1)
+
+    def test_swipe_zero_duration(self):
+        ctx = _make_ctx()
+        with pytest.raises(ActionError, match="Duration must be positive"):
+            do_swipe(ctx, from_target="0,0", to_target="100,100", duration=0)
+
 
 # ── scroll ───────────────────────────────────────────────────────
 

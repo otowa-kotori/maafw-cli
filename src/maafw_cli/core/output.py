@@ -110,7 +110,10 @@ class OutputFormatter:
             box = r["box"]
             box_str = f"[{box[0]:>4},{box[1]:>4},{box[2]:>4},{box[3]:>4}]"
             score_str = f"{r['score'] * 100:.0f}%"
-            lines.append(f" {r['ref']:<4s} {r['text']:<20s} {box_str}  {score_str}")
+            text = r['text']
+            if len(text) > 20:
+                text = text[:18] + "…"
+            lines.append(f" {r['ref']:<4s} {text:<20s} {box_str}  {score_str}")
         lines.append("\u2500" * 60)
         lines.append(f"{len(refs)} results | {elapsed_ms}ms")
         return "\n".join(lines)
