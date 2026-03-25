@@ -19,6 +19,18 @@ connect → ocr (see screen) → act → ocr (verify)
 
 Always OCR before acting — never guess coordinates.
 
+## First-time setup
+
+```bash
+# Install (pick one)
+uvx maafw-cli --help              # run directly without install
+uv tool install maafw-cli         # install globally via uv
+pip install maafw-cli             # or via pip
+
+# Download OCR model (one-time)
+maafw-cli resource download-ocr
+```
+
 ## Discover devices
 
 ```bash
@@ -114,9 +126,3 @@ maafw-cli resource status          # check OCR model is downloaded
 - Exit code 2 (recognition failed) → run `resource download-ocr`
 - Exit code 3 (connection error) → check device is on, run `device adb` or `device win32`
 - Daemon not responding → `maafw-cli daemon stop` then retry (auto-restarts)
-
-## First-time setup
-
-```bash
-maafw-cli resource download-ocr    # download OCR model (one-time)
-```
