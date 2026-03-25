@@ -58,5 +58,7 @@ def connect_win32(
     )
     with Timer("Win32 connection", log=_log):
         if not ctrl.post_connection().wait().succeeded:
+            if hasattr(ctrl, "destroy"):
+                ctrl.destroy()
             return None
     return ctrl

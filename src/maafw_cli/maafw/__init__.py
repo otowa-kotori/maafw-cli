@@ -3,6 +3,10 @@ MaaFramework API thin wrappers.
 """
 from __future__ import annotations
 
+import logging
+
+_log = logging.getLogger("maafw_cli.maafw")
+
 
 def init_toolkit() -> None:
     """Initialise MaaFramework toolkit (safe to call multiple times)."""
@@ -12,4 +16,4 @@ def init_toolkit() -> None:
         ensure_dirs()
         Toolkit.init_option(get_data_dir(), {"stdout_level": 0})
     except Exception:
-        pass
+        _log.warning("Failed to initialize MaaFramework toolkit", exc_info=True)

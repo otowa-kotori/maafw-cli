@@ -60,5 +60,7 @@ def connect_adb(device: AdbDeviceInfo, screenshot_short_side: int = 720) -> AdbC
     ctrl.set_screenshot_target_short_side(screenshot_short_side)
     with Timer("ADB connection", log=_log):
         if not ctrl.post_connection().wait().succeeded:
+            if hasattr(ctrl, "destroy"):
+                ctrl.destroy()
             return None
     return ctrl

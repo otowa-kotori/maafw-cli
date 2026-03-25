@@ -72,17 +72,28 @@ class OutputFormatter:
 
     @staticmethod
     def _print_text(text: str, file: Any = None) -> None:
-        """Print text safely on Windows (UTF-8 via buffer)."""
+        """Print text safely on Windows (UTF-8 via buffer when available)."""
         target = file or sys.stdout
-        target.buffer.write(text.encode("utf-8"))
-        target.buffer.write(b"\n")
-        target.buffer.flush()
+        if hasattr(target, "buffer"):
+            target.buffer.write(text.encode("utf-8"))
+            target.buffer.write(b"\n")
+            target.buffer.flush()
+        else:
+            target.write(text)
+            target.write("\n")
+            target.flush()
 
     def _print_json(self, obj: Any) -> None:
         text = json.dumps(obj, ensure_ascii=False, indent=2)
-        sys.stdout.buffer.write(text.encode("utf-8"))
-        sys.stdout.buffer.write(b"\n")
-        sys.stdout.buffer.flush()
+        target = sys.stdout
+        if hasattr(target, "buffer"):
+            target.buffer.write(text.encode("utf-8"))
+            target.buffer.write(b"\n")
+            target.buffer.flush()
+        else:
+            target.write(text)
+            target.write("\n")
+            target.flush()
 
     # ── OCR formatting ───────────────────────────────────────────
 

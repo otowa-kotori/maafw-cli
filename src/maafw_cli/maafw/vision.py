@@ -4,6 +4,7 @@ Vision operations — screenshot + OCR via MaaFramework.
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ _log = logging.getLogger("maafw_cli.vision")
 # ── cached resource ──────────────────────────────────────────────
 
 _cached_resource: Resource | None = None
+_resource_lock = threading.Lock()
 
 
 def _get_resource() -> Resource | None:
@@ -30,23 +32,29 @@ def _get_resource() -> Resource | None:
 
     The Resource (OCR model bundle) is expensive to load (~200-500ms) but
     stateless — it can safely be reused across controllers and OCR calls.
+    Thread-safe: uses a lock to prevent duplicate creation.
     """
     global _cached_resource
     if _cached_resource is not None:
         return _cached_resource
 
-    resource_path = get_resource_dir()
-    resource = Resource()
+    with _resource_lock:
+        # Double-check after acquiring lock
+        if _cached_resource is not None:
+            return _cached_resource
 
-    if not resource.use_directml():
-        _log.debug("DirectML not available, falling back to CPU inference")
+        resource_path = get_resource_dir()
+        resource = Resource()
 
-    with Timer("resource bundle load", log=_log):
-        if not resource.post_bundle(str(resource_path)).wait().succeeded:
-            return None
+        if not resource.use_directml():
+            _log.debug("DirectML not available, falling back to CPU inference")
 
-    _cached_resource = resource
-    return resource
+        with Timer("resource bundle load", log=_log):
+            if not resource.post_bundle(str(resource_path)).wait().succeeded:
+                return None
+
+        _cached_resource = resource
+        return resource
 
 
 def _get_tasker(controller: Controller) -> Tasker | None:
@@ -119,6 +127,10 @@ def ocr(controller: Controller, roi: tuple[int, int, int, int] | None = None) ->
                 tasker.post_recognition(JRecognitionType.OCR, ocr_params, image).wait().get()
             )
         if not info:
+            return None
+
+        if not info.nodes:
+            _log.warning("OCR returned empty nodes list")
             return None
 
         return info.nodes[0].recognition.all_results  # type: ignore[return-value]

@@ -128,13 +128,13 @@ def _start_daemon_process() -> None:
         # DETACHED_PROCESS takes precedence, which may allocate a
         # new visible console.
         # Use pythonw.exe when available (no console at all).
-        exe = sys.executable
-        pythonw = exe.replace("python.exe", "pythonw.exe")
-        if Path(pythonw).exists():
-            exe = pythonw
+        exe_path = Path(sys.executable)
+        pythonw = exe_path.with_name("pythonw.exe")
+        if pythonw.exists():
+            cmd[0] = str(pythonw)
 
-        subprocess.Popen(
-            [exe, "-m", "maafw_cli.daemon"],
+        _daemon_proc = subprocess.Popen(  # noqa: F841 — prevent GC of kernel handle
+            cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
@@ -142,7 +142,7 @@ def _start_daemon_process() -> None:
             close_fds=True,
         )
     else:
-        subprocess.Popen(
+        _daemon_proc = subprocess.Popen(  # noqa: F841
             cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -177,8 +177,8 @@ def ensure_daemon() -> int:
     _start_daemon_process()
 
     # Wait for daemon to become ready (files appear + port reachable)
-    deadline = time.monotonic() + _DAEMON_START_TIMEOUT
-    while time.monotonic() < deadline:
+    deadline = time.perf_counter() + _DAEMON_START_TIMEOUT
+    while time.perf_counter() < deadline:
         time.sleep(_DAEMON_POLL_INTERVAL)
         pid, port = _read_daemon_info()
         if pid is not None and port is not None and _is_daemon_reachable(port):
@@ -240,10 +240,14 @@ class DaemonClient:
         try:
             sock.settimeout(30.0)
             sock.sendall(encode(request))
-            line = sock.makefile("rb").readline()
-            if not line:
-                raise DeviceConnectionError("Daemon closed connection unexpectedly")
-            return decode(line)
+            reader = sock.makefile("rb")
+            try:
+                line = reader.readline()
+                if not line:
+                    raise DeviceConnectionError("Daemon closed connection unexpectedly")
+                return decode(line)
+            finally:
+                reader.close()
         finally:
             sock.close()
 
