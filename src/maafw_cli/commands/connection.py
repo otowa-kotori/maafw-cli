@@ -1,5 +1,5 @@
 """
-Connection CLI commands — device list, connect adb, connect win32.
+Connection CLI commands — device adb/win32/all, connect adb, connect win32.
 
 Thin shells over ``services.connection``.
 """
@@ -21,16 +21,9 @@ def device():
     pass
 
 
-@device.command("list")
-@click.option("--adb", "adb_flag", is_flag=True, default=False, help="Scan for ADB devices.")
-@click.option("--win32", "win32_flag", is_flag=True, default=False, help="List Win32 windows.")
-@pass_ctx
-def device_list(ctx: CliContext, adb_flag: bool, win32_flag: bool) -> None:
-    """List available devices."""
+def _device_list(ctx: CliContext, *, adb_flag: bool, win32_flag: bool) -> None:
+    """Shared implementation for device adb / win32 / all."""
     fmt = ctx.fmt
-
-    if not adb_flag and not win32_flag:
-        adb_flag = True
 
     try:
         result = ctx.run_raw(do_device_list, adb=adb_flag, win32=win32_flag)
@@ -59,6 +52,27 @@ def device_list(ctx: CliContext, adb_flag: bool, win32_flag: bool) -> None:
         fmt.success(windows, human=f"Win32 windows ({len(windows)}):\n" + "\n".join(lines))
 
 
+@device.command("adb")
+@pass_ctx
+def device_adb(ctx: CliContext) -> None:
+    """List ADB devices."""
+    _device_list(ctx, adb_flag=True, win32_flag=False)
+
+
+@device.command("win32")
+@pass_ctx
+def device_win32(ctx: CliContext) -> None:
+    """List Win32 windows."""
+    _device_list(ctx, adb_flag=False, win32_flag=True)
+
+
+@device.command("all")
+@pass_ctx
+def device_all(ctx: CliContext) -> None:
+    """List both ADB devices and Win32 windows."""
+    _device_list(ctx, adb_flag=True, win32_flag=True)
+
+
 # ── connect ──────────────────────────────────────────────────────
 
 @click.group()
@@ -78,7 +92,7 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
                 session_name: str | None) -> None:
     """Connect to an ADB device by name or address.
 
-    DEVICE is the device name as shown by ``device list --adb``.
+    DEVICE is the device name as shown by ``device adb``.
     """
     name = session_name or device
     ctx.run(

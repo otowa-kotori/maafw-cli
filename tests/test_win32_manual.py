@@ -64,7 +64,7 @@ def mock_window():
     # Find it via device list
     window = None
     for _attempt in range(5):
-        result = runner.invoke(cli, ["--json", "device", "list", "--win32"])
+        result = runner.invoke(cli, ["--json", "device", "win32"])
         if result.exit_code != 0:
             time.sleep(0.5)
             continue
@@ -83,6 +83,9 @@ def mock_window():
         pytest.skip(f"Could not find mock window '{expected_title}' after launch")
 
     yield window
+
+    # Stop daemon so the next test run starts clean
+    runner.invoke(cli, ["daemon", "stop"])
 
     proc.kill()
     proc.wait()
@@ -159,15 +162,15 @@ def _ensure_connected_direct(win: dict) -> None:
 
 def test_win32_device_list():
     """Verify --win32 flag returns windows."""
-    result = runner.invoke(cli, ["device", "list", "--win32"])
+    result = runner.invoke(cli, ["device", "win32"])
     _safe_print(result.output)
     assert result.exit_code == 0
     assert "Win32 windows" in result.output
 
 
 def test_win32_device_list_json():
-    """Verify --win32 --json output is parseable."""
-    result = runner.invoke(cli, ["--json", "device", "list", "--win32"])
+    """Verify win32 --json output is parseable."""
+    result = runner.invoke(cli, ["--json", "device", "win32"])
     _safe_print(result.output)
     assert result.exit_code == 0
     data = _parse_json_output(result.output)

@@ -47,7 +47,7 @@ def swipe_cmd(ctx: CliContext, from_target: str, to_target: str, duration: int) 
 @click.argument("dy", type=int)
 @pass_ctx
 def scroll_cmd(ctx: CliContext, dx: int, dy: int) -> None:
-    """Scroll by DX (horizontal) and DY (vertical).
+    """Scroll by DX (horizontal) and DY (vertical).  [PC/Win32 only]
 
     Use multiples of 120 (WHEEL_DELTA) for best compatibility.
 

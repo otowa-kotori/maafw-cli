@@ -39,19 +39,19 @@ maafw-cli daemon status                          # 查看 daemon 状态
 
 ## 命令参考
 
-### `device list`
+### `device`
 
 列出可用设备。
 
 ```bash
-maafw-cli device list              # 默认 --adb
-maafw-cli device list --adb        # ADB 设备
-maafw-cli device list --win32      # Win32 窗口
+maafw-cli device adb          # ADB 设备
+maafw-cli device win32        # Win32 窗口
+maafw-cli device all          # 两者都列
 ```
 
 ### `connect adb <DEVICE>`
 
-连接 ADB 设备。DEVICE 是 `device list` 输出的设备名或地址。
+连接 ADB 设备。DEVICE 是 `device adb` 输出的设备名或地址。
 
 | 选项 | 默认 | 说明 |
 |------|------|------|

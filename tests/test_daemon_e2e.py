@@ -80,7 +80,7 @@ def mock_window():
     # Find window hwnd
     hwnd = None
     for _ in range(5):
-        code, data = _invoke_json("device", "list", "--win32")
+        code, data = _invoke_json("device", "win32")
         if code != 0:
             time.sleep(0.5)
             continue

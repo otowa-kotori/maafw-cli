@@ -54,7 +54,7 @@ maafw-cli screenshot
 
 | 命令 | 说明 |
 |------|------|
-| `device list [--adb] [--win32]` | 列出可用设备 |
+| `device [adb\|win32\|all]` | 列出可用设备 |
 | `connect adb <DEVICE> [--as NAME]` | 连接 ADB 设备 |
 | `connect win32 <WINDOW> [--as NAME]` | 连接 Win32 窗口 |
 | `ocr [--roi x,y,w,h] [--text-only]` | 屏幕 OCR |

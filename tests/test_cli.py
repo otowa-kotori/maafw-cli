@@ -29,13 +29,9 @@ class TestCliStructure:
     def test_device_help(self):
         result = runner.invoke(cli, ["device", "--help"])
         assert result.exit_code == 0
-        assert "list" in result.output
-
-    def test_device_list_help(self):
-        result = runner.invoke(cli, ["device", "list", "--help"])
-        assert result.exit_code == 0
-        assert "--adb" in result.output
-        assert "--win32" in result.output
+        assert "adb" in result.output
+        assert "win32" in result.output
+        assert "all" in result.output
 
     def test_connect_help(self):
         result = runner.invoke(cli, ["connect", "--help"])

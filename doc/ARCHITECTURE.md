@@ -83,7 +83,7 @@ maafw-cli/
 │   ├── paths.py                   # 跨平台路径（MaaXYZ/maafw-cli）
 │   ├── download.py                # OCR 模型下载
 │   ├── commands/
-│   │   ├── connection.py          # device list, connect adb/win32
+│   │   ├── connection.py          # device adb/win32/all, connect adb/win32
 │   │   ├── vision.py              # ocr, screenshot
 │   │   ├── interaction.py         # click, swipe, scroll, type, key
 │   │   ├── resource.py            # resource download-ocr, resource status

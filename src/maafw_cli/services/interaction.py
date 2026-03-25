@@ -46,6 +46,8 @@ def do_swipe(
 
 @service(human=lambda r: f"Scrolled dx={r['dx']}, dy={r['dy']}")
 def do_scroll(ctx: ServiceContext, dx: int, dy: int) -> dict:
+    if ctx.session_type != "win32":
+        raise ActionError("Scroll is only supported on PC/Win32 sessions.")
     ok = scroll(ctx.controller, dx, dy)
     if not ok:
         raise ActionError("Scroll failed.")

@@ -120,7 +120,7 @@ def _connect_win32_inner(
 
     if not matches:
         raise DeviceConnectionError(
-            f"No window matching '{window}'. Use 'device list --win32' to see available windows."
+            f"No window matching '{window}'. Use 'device win32' to see available windows."
         )
 
     if len(matches) > 1:

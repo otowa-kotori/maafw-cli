@@ -19,6 +19,15 @@ connect → ocr (see screen) → act → ocr (verify)
 
 Always OCR before acting — never guess coordinates.
 
+## Discover devices
+
+```bash
+maafw-cli device adb               # show available ADB devices
+maafw-cli device win32             # show available Win32 windows
+```
+
+Run this first if you don't know the device address or window title.
+
 ## Connect
 
 ```bash
@@ -57,7 +66,7 @@ maafw-cli swipe 100,800 100,200   # swipe (from, to)
 maafw-cli swipe e1 e3             # swipe between refs
 maafw-cli type "hello world"      # type text
 maafw-cli key enter               # key: enter/back/home/esc/f1-f12/tab/space
-maafw-cli scroll 0 -360           # scroll (dx, dy)
+maafw-cli scroll 0 -360           # scroll (dx, dy) [Win32/PC only]
 maafw-cli screenshot              # save to current directory
 ```
 
@@ -87,6 +96,24 @@ maafw-cli session list            # see all sessions
 ## Exit codes
 
 0 = success, 1 = action failed, 2 = recognition failed (missing OCR model?), 3 = connection error
+
+## Platform notes
+
+- **swipe** works on both ADB and Win32; on Win32 it acts as a drag
+- **scroll** is for Win32/PC only (uses WHEEL_DELTA); on ADB, use **swipe** to simulate scrolling
+- **key** maps differ by platform: ADB sends Android keycodes, Win32 sends PC keys
+
+## Troubleshooting
+
+```bash
+maafw-cli daemon status            # check daemon is running
+maafw-cli resource status          # check OCR model is downloaded
+```
+
+- "No active session" → run `connect` first
+- Exit code 2 (recognition failed) → run `resource download-ocr`
+- Exit code 3 (connection error) → check device is on, run `device adb` or `device win32`
+- Daemon not responding → `maafw-cli daemon stop` then retry (auto-restarts)
 
 ## First-time setup
 

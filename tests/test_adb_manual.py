@@ -49,7 +49,7 @@ def _get_device() -> str:
     if _TEST_DEVICE:
         return _TEST_DEVICE
     # Auto-detect: run device list --json and pick the first one
-    result = runner.invoke(cli, ["--json", "device", "list", "--adb"])
+    result = runner.invoke(cli, ["--json", "device", "adb"])
     if result.exit_code != 0:
         pytest.skip(f"No ADB devices found (exit code {result.exit_code})")
     devices = json.loads(result.output)
@@ -63,7 +63,7 @@ def _get_device() -> str:
 
 def test_device_list():
     """Verify device list returns at least one device."""
-    result = runner.invoke(cli, ["device", "list", "--adb"])
+    result = runner.invoke(cli, ["device", "adb"])
     print(result.output)
     assert result.exit_code == 0
     assert "ADB devices" in result.output
@@ -71,7 +71,7 @@ def test_device_list():
 
 def test_device_list_json():
     """Verify --json output is parseable."""
-    result = runner.invoke(cli, ["--json", "device", "list", "--adb"])
+    result = runner.invoke(cli, ["--json", "device", "adb"])
     print(result.output)
     assert result.exit_code == 0
     devices = json.loads(result.output)

@@ -118,7 +118,9 @@ $ maafw-cli pipeline run workflow.json --on phone --json | process_results.py
 ```
 maafw-cli
 ├── device                           # 设备发现
-│   └── list [--adb] [--win32]       ✅
+│   ├── adb                          ✅
+│   ├── win32                        ✅
+│   └── all                          ✅
 │
 ├── connect                          # 连接
 │   ├── adb <device>                 ✅ [--screenshot-size]
@@ -350,7 +352,7 @@ def ensure_daemon():
 
 **已实现范围**：
 - 项目脚手架（pyproject.toml, click 骨架, 入口点）
-- `device list --adb` — 扫描 ADB 设备
+- `device adb` — 扫描 ADB 设备
 - `connect adb <device>` — 连接设备，写 session.json
 - `ocr` — 重连 + 截图 + OCR，输出 Element 列表，写 elements.json
 - `screenshot` — 重连 + 截图保存到文件
@@ -361,7 +363,7 @@ def ensure_daemon():
 
 **验证**：
 ```bash
-$ maafw-cli device list --adb
+$ maafw-cli device adb
 $ maafw-cli connect adb "emulator-5554"
 $ maafw-cli ocr
 $ maafw-cli ocr --json
@@ -376,7 +378,7 @@ $ maafw-cli screenshot --output test.png
 - `text:` 目标寻址（自动 OCR + 查找 + 点击）
 - `--observe` 标志（动作后自动 OCR）
 - `reco` 命令（MaaFW 原生感知接口）
-- ~~Win32 支持：`device list --win32`, `connect win32`~~ ✅ 已实现
+- ~~Win32 支持：`device win32`, `connect win32`~~ ✅ 已实现
 - 完善错误信息和帮助文档
 
 #### Win32 窗口支持（✅ 已实现）
@@ -387,7 +389,7 @@ $ maafw-cli screenshot --output test.png
 **命令**：
 ```bash
 # 列出有标题的 Win32 窗口
-$ maafw-cli device list --win32
+$ maafw-cli device win32
 Win32 windows (5):
   0x000A0B2C  原神                     UnityWndClass
   0x001204FA  Visual Studio Code       Chrome_WidgetWin_1
