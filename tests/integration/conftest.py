@@ -84,6 +84,8 @@ _child_procs: list[subprocess.Popen] = []
 # ── connection state ───────────────────────────────────────────
 
 _connected_sessions: set[str] = set()
+_fixture_errors: dict[str, str] = {}  # fixture name → error message
+_fixture_failed_once: set[str] = set()  # fixtures that already caused one FAIL
 
 
 def ensure_connected(win: dict, session_name: str | None = None) -> None:
@@ -97,7 +99,7 @@ def ensure_connected(win: dict, session_name: str | None = None) -> None:
     print(f"[{_ts()}] Connecting: {' '.join(cmd)}")
     result = runner.invoke(cli, cmd)
     if result.exit_code != 0:
-        pytest.fail(
+        raise RuntimeError(
             f"[{_ts()}] Failed to connect (exit {result.exit_code}): "
             f"{result.output.strip()}"
         )
@@ -172,19 +174,38 @@ def reco_window():
     """Launch the reco mock window with fixture icons.
 
     Also loads fixture images into daemon's Resource and connects.
+    On failure, records error for deferred fail/skip instead of crashing the fixture.
     """
     window, proc = _launch_window(_RECO_SCRIPT, "MaafwReco")
 
-    # Connect
-    ensure_connected(window, session_name="reco")
+    try:
+        ensure_connected(window, session_name="reco")
+    except RuntimeError as e:
+        _fixture_errors["reco_window"] = str(e)
+        yield window
+        return
 
     # Load fixture images into daemon's Resource
     r = runner.invoke(cli, ["resource", "load-image", str(_FIXTURES_DIR)])
     if r.exit_code != 0:
-        proc.kill()
-        pytest.fail(f"resource load-image failed: {r.output}")
+        _fixture_errors["reco_window"] = f"resource load-image failed: {r.output}"
 
     yield window
+
+
+@pytest.fixture(autouse=True)
+def _check_fixture_health(request):
+    """Before each test, check if its fixtures had setup errors.
+
+    First test using a broken fixture → FAIL. Subsequent tests → SKIP.
+    """
+    for fixture_name, error_msg in _fixture_errors.items():
+        if fixture_name in request.fixturenames:
+            if fixture_name not in _fixture_failed_once:
+                _fixture_failed_once.add(fixture_name)
+                pytest.fail(f"{fixture_name} setup failed: {error_msg}")
+            else:
+                pytest.skip(f"{fixture_name} setup failed (see earlier FAIL)")
 
 
 # ── teardown ─────────────────────────────────────────────────

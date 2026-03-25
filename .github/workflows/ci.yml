@@ -34,6 +34,11 @@ jobs:
       - name: Run unit tests
         run: uv run pytest --junitxml=test-report.xml
 
+      - name: Collect daemon log
+        if: always()
+        shell: bash
+        run: cp "$LOCALAPPDATA/MaaXYZ/maafw-cli/daemon.log" daemon.log 2>/dev/null || true
+
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -41,5 +46,5 @@ jobs:
           name: test-logs
           path: |
             test-report.xml
-            ~/AppData/Local/MaaXYZ/maafw-cli/daemon.log
+            daemon.log
           if-no-files-found: ignore
