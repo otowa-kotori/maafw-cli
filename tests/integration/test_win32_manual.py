@@ -37,7 +37,7 @@ pytestmark = [
 
 runner = CliRunner(charset="utf-8")
 
-_MOCK_SCRIPT = str(Path(__file__).parent / "mock_win32_window.py")
+_MOCK_SCRIPT = str(Path(__file__).parent.parent / "mock_win32_window.py")
 
 
 # ── fixtures ────────────────────────────────────────────────────
