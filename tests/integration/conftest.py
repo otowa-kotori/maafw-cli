@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -44,6 +45,11 @@ _TESTS_DIR = Path(__file__).parent.parent
 _MOCK_SCRIPT = str(_TESTS_DIR / "mock_win32_window.py")
 _RECO_SCRIPT = str(_TESTS_DIR / "mock_reco_window.py")
 _FIXTURES_DIR = _TESTS_DIR / "fixtures"
+
+
+def _ts() -> str:
+    """Current timestamp string for logging."""
+    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
 
 
 # ── helpers (importable by test modules) ───────────────────────
@@ -88,12 +94,14 @@ def ensure_connected(win: dict, session_name: str | None = None) -> None:
     cmd = ["connect", "win32", win["hwnd"]]
     if session_name:
         cmd += ["--as", session_name]
+    print(f"[{_ts()}] Connecting: {' '.join(cmd)}")
     result = runner.invoke(cli, cmd)
     if result.exit_code != 0:
-        lines = [f"Failed to connect (exit {result.exit_code}): {result.output.strip()}"]
-        dev = runner.invoke(cli, ["--json", "device", "win32"])
-        lines.append(f"device win32: {dev.output.strip()}")
-        pytest.fail("\n".join(lines))
+        pytest.fail(
+            f"[{_ts()}] Failed to connect (exit {result.exit_code}): "
+            f"{result.output.strip()}"
+        )
+    print(f"[{_ts()}] Connected: {key}")
     _connected_sessions.add(key)
 
 
@@ -108,16 +116,18 @@ def _launch_window(script: str, title_prefix: str):
     token = uuid.uuid4().hex[:8]
     expected_title = f"{title_prefix}_{token}"
 
+    print(f"[{_ts()}] Launching {script} (expecting '{expected_title}')")
     proc = subprocess.Popen(
         [sys.executable, script, token],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
     _child_procs.append(proc)
+    print(f"[{_ts()}] Process started: pid={proc.pid}")
     time.sleep(1.5)
 
     window = None
-    for _attempt in range(5):
+    for attempt in range(5):
         result = runner.invoke(cli, ["--json", "device", "win32"])
         if result.exit_code != 0:
             time.sleep(0.5)
@@ -140,6 +150,7 @@ def _launch_window(script: str, title_prefix: str):
         proc.kill()
         pytest.skip(f"Could not find window '{expected_title}' after launch")
 
+    print(f"[{_ts()}] Found window: hwnd={window['hwnd']} title={window['window_name']}")
     return window, proc
 
 
@@ -171,7 +182,7 @@ def reco_window():
     r = runner.invoke(cli, ["resource", "load-image", str(_FIXTURES_DIR)])
     if r.exit_code != 0:
         proc.kill()
-        pytest.skip(f"resource load-image failed: {r.output}")
+        pytest.fail(f"resource load-image failed: {r.output}")
 
     yield window
 
