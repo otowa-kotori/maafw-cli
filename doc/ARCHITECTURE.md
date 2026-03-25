@@ -83,18 +83,20 @@ maafw-cli/
 │   ├── paths.py                   # 跨平台路径（MaaXYZ/maafw-cli）
 │   ├── download.py                # OCR 模型下载
 │   ├── commands/
-│   │   ├── connection.py          # device adb/win32/all, connect adb/win32
+│   │   ├── connection.py          # device adb/win32/all (with FILTER), connect adb/win32
 │   │   ├── vision.py              # ocr, screenshot
 │   │   ├── interaction.py         # click, swipe, scroll, type, key
-│   │   ├── resource.py            # resource download-ocr, resource status
+│   │   ├── recognition.py         # reco (TemplateMatch/FeatureMatch/ColorMatch/OCR)
+│   │   ├── resource.py            # resource download-ocr, resource status, resource load-image
 │   │   ├── repl_cmd.py            # REPL 模式
 │   │   ├── daemon_cmd.py          # daemon start/stop/status
 │   │   └── session_cmd.py         # session list/default/close
 │   ├── services/
-│   │   ├── connection.py          # do_connect_adb/win32, _connect_*_inner()
+│   │   ├── connection.py          # do_connect_adb/win32, do_device_list (with filter)
 │   │   ├── vision.py              # do_ocr, do_screenshot
 │   │   ├── interaction.py         # do_click, do_swipe, do_scroll, do_type, do_key
-│   │   ├── resource.py            # do_download_ocr, do_resource_status
+│   │   ├── recognition.py         # do_reco (通用感知服务)
+│   │   ├── resource.py            # do_download_ocr, do_resource_status, do_load_image
 │   │   ├── context.py             # ServiceContext (controller 缓存 + target 解析)
 │   │   └── registry.py            # @service decorator + DISPATCH table
 │   ├── core/
@@ -105,10 +107,10 @@ maafw-cli/
 │   │   ├── reconnect.py           # reconnect() — 从 session.json 重建 Controller
 │   │   ├── element.py             # Element 系统，支持内存模式
 │   │   ├── target.py              # 目标解析 (e3 / 452,387)
-│   │   ├── output.py              # OutputFormatter (human/json/quiet) + format_ocr_table()
+│   │   ├── output.py              # OutputFormatter (human/json/quiet) + format_ocr_table/format_reco_table
 │   │   └── log.py                 # 日志 + Timer
 │   ├── daemon/
-│   │   ├── __main__.py            # python -m maafw_cli.daemon 入口
+│   │   ├── __main__.py            # python -m maafw_cli.daemon 入口（auto-import services）
 │   │   ├── protocol.py            # JSON-line IPC 协议
 │   │   ├── server.py              # asyncio TCP server + idle watchdog
 │   │   ├── session_mgr.py         # SessionManager（命名会话 + Controller 持久连接）
@@ -117,26 +119,32 @@ maafw-cli/
 │       ├── __init__.py            # init_toolkit() — MaaFW 全局初始化（幂等）
 │       ├── adb.py                 # ADB 设备发现 + 连接
 │       ├── win32.py               # Win32 窗口发现 + 连接
-│       ├── vision.py              # 截图 + OCR（Resource 缓存）
+│       ├── vision.py              # 截图 + OCR + load_image/override_image（Resource 缓存）
+│       ├── recognition.py         # 通用感知：TemplateMatch/FeatureMatch/ColorMatch/OCR
 │       └── control.py             # click/swipe/scroll/type/key
 └── tests/
     ├── conftest.py                # 共享 fixtures
     ├── mock_controller.py         # MockController
-    ├── mock_win32_window.py       # tkinter mock 窗口
+    ├── mock_win32_window.py       # tkinter mock 窗口（OCR/交互测试）
+    ├── mock_reco_window.py        # tkinter mock 窗口（感知测试，含 fixture 图标）
+    ├── fixtures/                  # 测试图片（icon_plus, icon_lenna 等）
     ├── test_cli.py                # CLI 结构 + help + keymap
     ├── test_cli_context.py        # CliContext 路由 + observe
     ├── test_services.py           # Service 层业务逻辑 + @service 装饰器
+    ├── test_recognition.py        # 感知层 build_params + recognize pipeline
     ├── test_reconnect.py          # reconnect 重连逻辑（mock）
-    ├── test_output.py             # OutputFormatter + format_ocr_table
+    ├── test_output.py             # OutputFormatter + format_ocr_table + format_reco_table
     ├── test_repl.py               # REPL dispatch
     ├── test_target.py             # 目标解析
-    ├── test_element.py            # Element
+    ├── test_element.py            # Element (含 count 字段 + build_from_results)
     ├── test_protocol.py           # IPC 协议
     ├── test_session_mgr.py        # SessionManager
     ├── test_daemon_server.py      # Daemon server (in-process)
     ├── test_ipc.py                # Client IPC + 进程生命周期
     ├── test_ipc_and_download.py   # get_daemon_info + download 逻辑
     ├── test_daemon_e2e.py         # Daemon E2E (manual)
-    ├── test_win32_manual.py       # Win32 自动化集成测试
-    └── test_adb_manual.py         # ADB 集成 (manual)
+    └── integration/               # 集成测试（需 mock window）
+        ├── conftest.py            # mock_window + reco_window fixtures
+        ├── test_win32_manual.py   # Win32 自动化集成测试
+        └── test_reco.py           # reco 集成测试（OCR/Color/Template/Feature）
 ```

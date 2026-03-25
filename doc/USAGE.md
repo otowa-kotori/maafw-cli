@@ -42,12 +42,14 @@ maafw-cli daemon status                          # 查看 daemon 状态
 
 ### `device`
 
-列出可用设备。
+列出可用设备。可选 FILTER 参数按名字子串过滤（大小写不敏感）。
 
 ```bash
-maafw-cli device adb          # ADB 设备
-maafw-cli device win32        # Win32 窗口
+maafw-cli device adb          # 全部 ADB 设备
+maafw-cli device win32        # 全部 Win32 窗口
+maafw-cli device win32 chrome # 只显示含 "chrome" 的窗口
 maafw-cli device all          # 两者都列
+maafw-cli device adb 127      # 只显示地址含 "127" 的设备
 ```
 
 ### `connect adb <DEVICE>`
@@ -112,6 +114,48 @@ maafw-cli connect adb 127.0.0.1:16384 --as phone     # 会话名 = phone
 maafw-cli ocr                         # 全屏 OCR
 maafw-cli ocr --roi 0,0,400,300       # 只识别左上角区域
 ```
+
+### `reco <TYPE> [params...]`
+
+通用感知命令，暴露 MaaFramework 原生识别接口。TYPE 为识别类型，params 为 `key=value` 格式参数。
+
+**支持的识别类型**：
+
+| 类型 | 必填参数 | 说明 |
+|------|---------|------|
+| `TemplateMatch` | `template` | 模板匹配（尺寸敏感，精确匹配） |
+| `FeatureMatch` | `template` | 特征匹配（对缩放/旋转/遮挡鲁棒） |
+| `ColorMatch` | `lower`, `upper` | 颜色范围匹配 |
+| `OCR` | (无) | 等同 `ocr` 命令 |
+
+**参数格式**：
+
+| 参数 | 格式 | 适用类型 |
+|------|------|---------|
+| `template` | `icon.png` 或 `a.png,b.png` | TemplateMatch, FeatureMatch |
+| `roi` | `x,y,w,h` | 所有类型 |
+| `threshold` | `0.8` | TemplateMatch, OCR |
+| `lower` / `upper` | `R,G,B` | ColorMatch |
+| `expected` | `设置,显示` | OCR |
+
+```bash
+# 模板匹配（需先 resource load-image）
+maafw-cli reco TemplateMatch template=button.png threshold=0.8
+
+# 特征匹配（对缩放/旋转鲁棒）
+maafw-cli reco FeatureMatch template=icon.png
+
+# 颜色匹配
+maafw-cli reco ColorMatch lower=200,0,0 upper=255,50,50
+
+# OCR（等同 ocr 命令）
+maafw-cli reco OCR expected=设置 roi=0,0,400,200
+
+# 原始 JSON 模式
+maafw-cli reco --raw '{"recognition":"TemplateMatch","template":["button.png"]}'
+```
+
+所有结果赋予 Element 引用（e1, e2, ...），可直接 `click e1`。
 
 ### `screenshot`
 
@@ -205,6 +249,15 @@ maafw-cli resource download-ocr
 
 ```bash
 maafw-cli resource status
+```
+
+### `resource load-image <PATH>`
+
+加载图片资源到 Resource，供 TemplateMatch / FeatureMatch 使用。PATH 可以是目录（加载全部图片）或单个文件。
+
+```bash
+maafw-cli resource load-image ./templates/         # 加载目录
+maafw-cli resource load-image ./button.png         # 加载单个文件
 ```
 
 ### `repl`

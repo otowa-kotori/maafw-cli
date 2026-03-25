@@ -9,11 +9,14 @@
 - [x] 守护进程 + 命名会话（`--as phone`, `--on notepad`）
 - [x] `session list/default/close` 管理
 - [x] `daemon start/stop/status`
+- [x] `reco` 命令——暴露 MaaFW 原生感知接口（TemplateMatch / FeatureMatch / ColorMatch / OCR）
+- [x] `resource load-image` 命令——加载图片模板到 Resource
+- [x] `device` 命令按名字过滤（`device win32 chrome`）
+- [x] daemon 自动发现 service 模块（pkgutil 扫描）
 
 ## 近期
 
 - [ ] `text:设置` 目标寻址——自动 OCR → 查找 → 点击
-- [ ] `reco` 命令——暴露 MaaFW 原生感知接口（TemplateMatch / ColorMatch 等）
 - [ ] `ocr` 顺便保存截图（已截图，可附带输出）
 
 ## 安全与健壮性

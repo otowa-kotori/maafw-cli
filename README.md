@@ -7,7 +7,8 @@ MaaFramework 命令行界面。让人、AI、脚本都能直接操作 Android / 
 ## 特性
 
 - **后台守护进程** — 后台 daemon 持有 Controller 连接以降低操作延迟
-- **Element 引用** — OCR 结果赋予 e1, e2, e3…，后续命令直接 `click e3`
+- **Element 引用** — OCR / reco 结果赋予 e1, e2, e3…，后续命令直接 `click e3`
+- **多种感知方式** — OCR、模板匹配、特征匹配、颜色匹配，统一通过 `reco` 命令暴露
 - **多设备** — `--as phone` 命名会话，`--on phone` 指定操作目标
 - **`--json` 输出** — 严格 JSON，方便脚本解析
 
@@ -39,6 +40,10 @@ maafw-cli connect win32 "记事本" --as notepad
 # OCR — 识别屏幕文字，输出 e1, e2, e3...
 maafw-cli ocr
 
+# 原生感知 — 模板匹配、颜色匹配等
+maafw-cli reco TemplateMatch template=button.png threshold=0.8
+maafw-cli reco ColorMatch lower=200,0,0 upper=255,50,50
+
 # 点击 — 用 Element 引用或坐标
 maafw-cli click e3
 maafw-cli click 452,387
@@ -54,16 +59,18 @@ maafw-cli screenshot
 
 | 命令 | 说明 |
 |------|------|
-| `device [adb\|win32\|all]` | 列出可用设备 |
+| `device [adb\|win32\|all] [FILTER]` | 列出可用设备（可按名字过滤） |
 | `connect adb <DEVICE> [--as NAME]` | 连接 ADB 设备 |
 | `connect win32 <WINDOW> [--as NAME]` | 连接 Win32 窗口 |
 | `ocr [--roi x,y,w,h] [--text-only]` | 屏幕 OCR |
+| `reco <TYPE> [params...] [--raw JSON]` | 原生感知（TemplateMatch / FeatureMatch / ColorMatch / OCR） |
 | `screenshot [-o FILE]` | 截图（默认保存到当前目录） |
 | `click <TARGET>` | 点击（e3 或 452,387） |
 | `swipe <FROM> <TO> [--duration MS]` | 滑动 |
 | `scroll <DX> <DY>` | 滚动（仅 Win32） |
 | `type <TEXT>` | 输入文本 |
 | `key <KEYCODE>` | 按键（enter / back / f5 / 0x0D） |
+| `resource download-ocr / status / load-image` | 管理资源（OCR 模型、图片模板） |
 | `session list / default / close` | 管理命名会话 |
 | `daemon start / stop / status` | 管理后台 daemon |
 | `repl` | 交互式 REPL |
@@ -98,6 +105,10 @@ daemon 空闲 5 分钟自动退出，下次命令自动重启。
 ```bash
 # JSON 输出，方便脚本解析
 maafw-cli --json ocr | jq '.results[] | .ref + " " + .text'
+
+# 模板匹配 + JSON
+maafw-cli resource load-image ./templates/
+maafw-cli --json reco TemplateMatch template=button.png threshold=0.8
 
 # 操作链
 maafw-cli ocr

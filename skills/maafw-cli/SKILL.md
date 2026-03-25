@@ -3,7 +3,7 @@ name: maafw-cli
 description: >
   Control Android (ADB) and Win32 devices via maafw-cli.
   Use when the user asks to interact with a device, emulator, or window:
-  click, OCR, screenshot, swipe, type, key press, scroll.
+  click, OCR, screenshot, swipe, type, key press, scroll, template match, color match.
 argument-hint: "[action description]"
 ---
 
@@ -36,6 +36,7 @@ maafw-cli resource download-ocr
 ```bash
 maafw-cli device adb               # show available ADB devices
 maafw-cli device win32             # show available Win32 windows
+maafw-cli device win32 chrome      # filter by name substring
 ```
 
 Run this first if you don't know the device address or window title.
@@ -81,6 +82,33 @@ maafw-cli key enter               # key: enter/back/home/esc/f1-f12/tab/space
 maafw-cli scroll 0 -360           # scroll (dx, dy) [Win32/PC only]
 maafw-cli screenshot              # save to current directory
 ```
+
+## Recognition — reco command
+
+For template matching, feature matching, and color matching beyond OCR:
+
+```bash
+# Load template images first
+maafw-cli resource load-image ./templates/       # load directory
+maafw-cli resource load-image ./button.png       # load single file
+
+# Template match (exact size match, high precision)
+maafw-cli reco TemplateMatch template=button.png threshold=0.8
+
+# Feature match (robust to scale/rotation/occlusion)
+maafw-cli reco FeatureMatch template=icon.png
+
+# Color match (find regions by RGB range)
+maafw-cli reco ColorMatch lower=200,0,0 upper=255,50,50
+
+# OCR with filters (same as ocr command)
+maafw-cli reco OCR expected=设置 roi=0,0,400,200
+
+# Raw JSON mode
+maafw-cli reco --raw '{"recognition":"TemplateMatch","template":["button.png"]}'
+```
+
+Results produce Element refs (e1, e2, ...) just like OCR — use `click e1` to act on them.
 
 ## Observe — act + sense in one step
 

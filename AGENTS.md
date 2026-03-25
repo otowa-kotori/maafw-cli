@@ -67,8 +67,9 @@ uv run maafw-cli --help          # 运行 CLI
 
 ## 测试注意事项
 
-- 集成测试（`test_win32_manual.py`、`test_daemon_e2e.py`）会自动启动 daemon。
-- 测试结束后 fixture teardown 会 `daemon stop`，保证不留残留进程。
+- 单元测试：`uv run pytest tests/ --ignore=tests/integration -v`
+- 集成测试：`uv run pytest tests/integration/ -v -s`（自动启动 mock 窗口，仅 Windows）
+- 集成测试结束后 fixture teardown 会 `daemon stop`，保证不留残留进程。
 - 若手动中断测试导致 daemon 残留，先 `uv run maafw-cli daemon stop` 再重跑。
 
 ## 新增功能 checklist

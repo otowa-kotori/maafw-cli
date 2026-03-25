@@ -118,34 +118,47 @@ $ maafw-cli pipeline run workflow.json --on phone --json | process_results.py
 ```
 maafw-cli
 ├── device                           # 设备发现
-│   ├── adb                          ✅
-│   ├── win32                        ✅
-│   └── all                          ✅
+│   ├── adb [FILTER]                 ✅
+│   ├── win32 [FILTER]               ✅
+│   └── all [FILTER]                 ✅
 │
 ├── connect                          # 连接
 │   ├── adb <device>                 ✅ [--screenshot-size]
 │   └── win32 <window>               ✅ [--screencap-method] [--input-method]
 │
 ├── ocr                              ✅ [--roi] [--text-only]
+├── reco <type> [params...]          ✅ [--raw] (TemplateMatch/FeatureMatch/ColorMatch/OCR)
 ├── screenshot                       ✅ [--output]
 ├── click <target>                   ✅ (e引用 / x,y坐标)
 │
-├── session list/default/close       （Phase 3: 命名会话）
-├── reco <type> [params...]          （Phase 2: 原生感知）
-├── swipe / scroll / type / key      （Phase 2: 交互命令）
+├── session list/default/close       ✅ (命名会话)
+├── reco <type> [params...]          ✅ (原生感知)
+├── swipe / scroll / type / key      ✅ (交互命令)
 ├── pipeline run/validate            （Phase 4: 工作流）
-├── resource download-ocr/status     （Phase 2）
-└── daemon start/stop/status         （Phase 3: 守护进程）
+├── resource download-ocr/status/load-image  ✅
+└── daemon start/stop/status         ✅ (守护进程)
 ```
 
-### 4.1 `reco` 命令详解（Phase 2）
+### 4.1 `reco` 命令详解（✅ 已实现）
 
 `reco` 暴露 MaaFramework 的原生感知接口，比 `ocr` 更底层、更灵活。
+
+**支持的识别类型**：
+
+| 类型 | 必填参数 | 说明 |
+|------|---------|------|
+| TemplateMatch | `template` | 模板匹配（尺寸敏感） |
+| FeatureMatch | `template` | 特征匹配（缩放/旋转鲁棒） |
+| ColorMatch | `lower`, `upper` | 颜色范围匹配 |
+| OCR | (无必填) | 等同 `ocr` 命令 |
 
 **主要形式**——结构化参数：
 ```bash
 # 模板匹配
 $ maafw-cli reco TemplateMatch template=button.png roi=0,0,400,200 threshold=0.8
+
+# 特征匹配（对缩放/旋转鲁棒）
+$ maafw-cli reco FeatureMatch template=icon.png
 
 # 颜色匹配
 $ maafw-cli reco ColorMatch lower=200,0,0 upper=255,50,50 roi=100,100,300,300
@@ -158,6 +171,14 @@ $ maafw-cli reco OCR expected=设置 roi=0,0,400,200
 ```bash
 $ maafw-cli reco --raw '{"recognition": "TemplateMatch", "template": ["button.png"], "threshold": 0.8}'
 ```
+
+**模板图片加载**：TemplateMatch / FeatureMatch 需要先将模板图片加载到 Resource：
+```bash
+$ maafw-cli resource load-image ./templates/    # 加载目录下所有图片
+$ maafw-cli reco TemplateMatch template=button.png
+```
+
+**Element 系统**：所有 `reco` 结果和 `ocr` 一样赋予 Element 引用（e1, e2, ...），可直接 `click e1`。
 
 `ocr` 是 `reco OCR` 的全屏快捷方式，返回所有结果并赋予 Element。
 
@@ -373,11 +394,14 @@ $ maafw-cli screenshot --output test.png
 
 ### Phase 2：交互命令扩展 ✅ 已完成
 
-- `dblclick`, `swipe`, `scroll`, `type`, `key`, `shortcut`
-- `text:` 目标寻址（自动 OCR + 查找 + 点击）
+- ~~`dblclick`,~~ `swipe`, `scroll`, `type`, `key` ~~, `shortcut`~~
+- ~~`text:` 目标寻址（自动 OCR + 查找 + 点击）~~
 - `--observe` 标志（动作后自动 OCR）
-- `reco` 命令（MaaFW 原生感知接口）
+- `reco` 命令（MaaFW 原生感知接口：TemplateMatch / FeatureMatch / ColorMatch / OCR）
+- `resource load-image` 命令（加载图片模板到 Resource）
+- `device` 命令支持名字过滤（`device win32 chrome`）
 - ~~Win32 支持：`device win32`, `connect win32`~~ ✅ 已实现
+- daemon 自动发现 service 模块（pkgutil 扫描，无需显式 import）
 - 完善错误信息和帮助文档
 
 #### Win32 窗口支持（✅ 已实现）
