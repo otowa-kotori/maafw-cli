@@ -72,6 +72,7 @@ addopts = "-m 'not manual'"
 asyncio_mode = "auto"
 markers = [
     "manual: manual integration tests requiring a real device (not run by default)",
+    "integration: integration tests (auto-sorted to run last)",
 ]
 
 [dependency-groups]

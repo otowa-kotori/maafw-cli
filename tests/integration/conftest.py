@@ -71,6 +71,10 @@ def safe_print(text: str) -> None:
         print(text.encode("ascii", errors="replace").decode("ascii"))
 
 
+# ── subprocess tracking ────────────────────────────────────────
+
+_child_procs: list[subprocess.Popen] = []
+
 # ── connection state ───────────────────────────────────────────
 
 _connected_sessions: set[str] = set()
@@ -109,6 +113,7 @@ def _launch_window(script: str, title_prefix: str):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+    _child_procs.append(proc)
     time.sleep(1.5)
 
     window = None
@@ -146,8 +151,6 @@ def mock_window():
     """Launch the READY/PRESS mock window."""
     window, proc = _launch_window(_MOCK_SCRIPT, "MaafwTest")
     yield window
-    proc.kill()
-    proc.wait()
 
 
 # ── session-scoped reco window (TemplateMatch / FeatureMatch) ──
@@ -172,18 +175,23 @@ def reco_window():
 
     yield window
 
-    proc.kill()
-    proc.wait()
-
 
 # ── teardown ─────────────────────────────────────────────────
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _cleanup():
-    """Stop daemon and clean up screenshot files after all tests."""
+    """Stop daemon, kill mock windows, and clean up after all tests."""
     yield
+    # Stop daemon
     runner.invoke(cli, ["daemon", "stop"])
+    # Kill all mock window processes
+    for proc in _child_procs:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait(timeout=5)
+    _child_procs.clear()
+    # Clean up screenshot files
     for f in glob.glob("screenshot_*.png"):
         try:
             Path(f).unlink()
