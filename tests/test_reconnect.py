@@ -116,53 +116,42 @@ class TestReconnectAdb:
 
 class TestReconnectWin32:
     def test_win32_success(self):
+        """Reconnect by saved HWND — no window discovery needed."""
         session = _make_session(type="win32", window_name="TestApp",
+                                address="0x1234",
                                 screencap_methods=2, input_methods=4)
-        window = _make_win32_window(window_name="TestApp")
         mock_ctrl = MagicMock()
 
         with patch("maafw_cli.core.reconnect.load_session", return_value=session), \
              patch("maafw_cli.maafw.init_toolkit"), \
-             patch("maafw_cli.maafw.win32.find_win32_windows", return_value=[window]), \
-             patch("maafw_cli.maafw.win32.connect_win32", return_value=mock_ctrl):
+             patch("maafw_cli.maafw.win32.connect_win32", return_value=mock_ctrl) as mock_connect:
             from maafw_cli.core.reconnect import reconnect
             result = reconnect()
             assert result is mock_ctrl
-
-    def test_win32_window_not_found(self):
-        session = _make_session(type="win32", window_name="MissingApp")
-
-        with patch("maafw_cli.core.reconnect.load_session", return_value=session), \
-             patch("maafw_cli.maafw.init_toolkit"), \
-             patch("maafw_cli.maafw.win32.find_win32_windows", return_value=[]):
-            with pytest.raises(DeviceConnectionError, match="no longer available"):
-                from maafw_cli.core.reconnect import reconnect
-                reconnect()
+            # Verify it used the HWND from session, not window discovery
+            called_window = mock_connect.call_args[0][0]
+            assert called_window.hwnd == 0x1234
 
     def test_win32_connect_fails(self):
+        """When the saved HWND is no longer valid (window closed)."""
         session = _make_session(type="win32", window_name="TestApp",
+                                address="0x1234",
                                 screencap_methods=2, input_methods=4)
-        window = _make_win32_window(window_name="TestApp")
 
         with patch("maafw_cli.core.reconnect.load_session", return_value=session), \
              patch("maafw_cli.maafw.init_toolkit"), \
-             patch("maafw_cli.maafw.win32.find_win32_windows", return_value=[window]), \
              patch("maafw_cli.maafw.win32.connect_win32", return_value=None):
             with pytest.raises(DeviceConnectionError, match="Failed to reconnect"):
                 from maafw_cli.core.reconnect import reconnect
                 reconnect()
 
-    def test_win32_case_insensitive_match(self):
-        """Window name matching is case-insensitive."""
-        session = _make_session(type="win32", window_name="testapp",
-                                screencap_methods=2, input_methods=4)
-        window = _make_win32_window(window_name="TestApp")
-        mock_ctrl = MagicMock()
+    def test_win32_invalid_hwnd(self):
+        """Invalid saved hwnd string should raise a clear error."""
+        session = _make_session(type="win32", window_name="TestApp",
+                                address="not-a-hex")
 
         with patch("maafw_cli.core.reconnect.load_session", return_value=session), \
-             patch("maafw_cli.maafw.init_toolkit"), \
-             patch("maafw_cli.maafw.win32.find_win32_windows", return_value=[window]), \
-             patch("maafw_cli.maafw.win32.connect_win32", return_value=mock_ctrl):
-            from maafw_cli.core.reconnect import reconnect
-            result = reconnect()
-            assert result is mock_ctrl
+             patch("maafw_cli.maafw.init_toolkit"):
+            with pytest.raises(DeviceConnectionError, match="Invalid saved hwnd"):
+                from maafw_cli.core.reconnect import reconnect
+                reconnect()

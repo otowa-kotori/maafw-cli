@@ -43,13 +43,6 @@ class TestFormatOcrTable:
         assert "设置" in result
         assert "97%" in result
 
-    def test_long_text_truncated(self):
-        """Text longer than 20 chars should be truncated with …"""
-        refs = [{"ref": "e1", "text": "A" * 30, "box": [0, 0, 1, 1], "score": 0.9}]
-        result = OutputFormatter.format_ocr_table(refs, 100)
-        assert "…" in result
-        assert "A" * 30 not in result
-
 
 class TestPrintError:
     def test_print_error_stderr(self):

@@ -72,38 +72,33 @@ def _reconnect_adb(session) -> Controller:
 
 
 def _reconnect_win32(session) -> Controller:
-    from maafw_cli.maafw.win32 import find_win32_windows, connect_win32
+    from maafw_cli.maafw.win32 import Win32WindowInfo, connect_win32
 
-    with Timer("window discovery", log=_log):
-        windows = find_win32_windows()
-
-    # Match by window title (more stable than hwnd across restarts)
-    needle = session.window_name.lower() if session.window_name else ""
-    matches = []
-    for w in windows:
-        if needle and needle in w.window_name.lower():
-            matches.append(w)
-
-    if not matches:
+    # Use the saved HWND directly — it's stable for the window's lifetime.
+    # No need to rediscover/match by title.
+    try:
+        hwnd = int(session.address, 16)
+    except (ValueError, TypeError):
         raise DeviceConnectionError(
-            f"Session window '{session.window_name}' no longer available."
+            f"Invalid saved hwnd '{session.address}'. Re-run 'connect win32'."
         )
 
-    if len(matches) > 1:
-        listing = ", ".join(f"{w.window_name} ({hex(w.hwnd)})" for w in matches)
-        _log.warning("Multiple windows match '%s': %s. Using first match.", session.window_name, listing)
-
-    match = matches[0]
+    window = Win32WindowInfo(
+        hwnd=hwnd,
+        class_name="",
+        window_name=session.window_name or "",
+    )
 
     with Timer("Win32 connection", log=_log):
         controller = connect_win32(
-            match,
+            window,
             screencap_method=session.screencap_methods,
             input_method=session.input_methods,
         )
 
     if controller is None:
         raise DeviceConnectionError(
-            f"Failed to reconnect to '{session.window_name}'."
+            f"Failed to reconnect to window {session.address}. "
+            f"The window may have been closed — re-run 'connect win32'."
         )
     return controller
