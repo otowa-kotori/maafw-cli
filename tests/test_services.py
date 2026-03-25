@@ -4,6 +4,7 @@ Service-level tests — business logic with MockController, no device needed.
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -316,3 +317,44 @@ class TestServiceDecorator:
         assert "device_list" in DISPATCH
         assert "connect_adb" in DISPATCH
         assert "resource_status" in DISPATCH
+
+
+# ── controller destroy on connection failure ──────────────────────
+
+
+class TestControllerDestroyOnFailure:
+    def test_adb_destroy_on_connect_failure(self):
+        """connect_adb should call ctrl.destroy() when connection fails."""
+        from maafw_cli.maafw.adb import AdbDeviceInfo, connect_adb
+
+        device = AdbDeviceInfo(
+            name="test", adb_path="/usr/bin/adb",
+            address="127.0.0.1:5555",
+            screencap_methods=1, input_methods=1, config={},
+        )
+
+        mock_ctrl = MagicMock()
+        mock_ctrl.post_connection.return_value.wait.return_value.succeeded = False
+        mock_ctrl.destroy = MagicMock()
+
+        with patch("maafw_cli.maafw.adb.AdbController", return_value=mock_ctrl):
+            result = connect_adb(device)
+
+        assert result is None
+        mock_ctrl.destroy.assert_called_once()
+
+    def test_win32_destroy_on_connect_failure(self):
+        """connect_win32 should call ctrl.destroy() when connection fails."""
+        from maafw_cli.maafw.win32 import Win32WindowInfo, connect_win32
+
+        window = Win32WindowInfo(hwnd=12345, class_name="Test", window_name="Test Window")
+
+        mock_ctrl = MagicMock()
+        mock_ctrl.post_connection.return_value.wait.return_value.succeeded = False
+        mock_ctrl.destroy = MagicMock()
+
+        with patch("maafw_cli.maafw.win32.Win32Controller", return_value=mock_ctrl):
+            result = connect_win32(window)
+
+        assert result is None
+        mock_ctrl.destroy.assert_called_once()

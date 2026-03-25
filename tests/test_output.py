@@ -86,3 +86,36 @@ class TestErrorExits:
         with pytest.raises(SystemExit) as exc_info:
             fmt.error("fatal")
         assert exc_info.value.code == 1
+
+
+class TestOutputNoBuf:
+    """OutputFormatter must work when stdout/stderr lack .buffer (e.g. StringIO)."""
+
+    def test_print_text_no_buffer(self):
+        fmt = OutputFormatter()
+        sio = io.StringIO()
+        fmt._print_text("hello 你好", file=sio)
+        assert sio.getvalue() == "hello 你好\n"
+
+    def test_print_json_no_buffer(self):
+        fmt = OutputFormatter()
+        sio = io.StringIO()
+        with patch.object(sys, "stdout", sio):
+            fmt._print_json({"key": "值"})
+        output = sio.getvalue()
+        assert '"key"' in output
+        assert "值" in output
+
+    def test_success_human_no_buffer(self):
+        fmt = OutputFormatter()
+        sio = io.StringIO()
+        with patch.object(sys, "stdout", sio):
+            fmt.success({"a": 1}, human="OK 成功")
+        assert "OK 成功" in sio.getvalue()
+
+    def test_print_error_no_buffer(self):
+        fmt = OutputFormatter()
+        sio = io.StringIO()
+        with patch.object(sys, "stderr", sio):
+            fmt.print_error("bad thing")
+        assert "Error: bad thing" in sio.getvalue()

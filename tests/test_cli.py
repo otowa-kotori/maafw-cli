@@ -6,6 +6,8 @@ These test the CLI layer in isolation — MaaFW calls are not executed
 - Global options parsing
 - Output format selection
 """
+from unittest.mock import patch
+
 from click.testing import CliRunner
 
 from maafw_cli.cli import cli
@@ -307,3 +309,24 @@ class TestKeyResolver:
     def test_default_session_type_is_win32(self):
         from maafw_cli.core.keymap import resolve_keycode
         assert resolve_keycode("enter") == 0x0D  # default = win32
+
+
+# ── Daemon command output ────────────────────────────────────────
+
+
+class TestDaemonCommands:
+    def test_daemon_stop_says_shutdown_requested(self):
+        """daemon stop should say 'Shutdown requested', not 'Daemon stopped'."""
+        with patch("maafw_cli.core.ipc.get_daemon_info", return_value=(123, 19799)), \
+             patch("maafw_cli.core.ipc.DaemonClient") as mock_client_cls:
+            mock_client_cls.return_value.send.return_value = {}
+            result = runner.invoke(cli, ["daemon", "stop"])
+            assert "Shutdown requested" in result.output
+
+    def test_daemon_status_unreachable_is_error(self):
+        """daemon status should report unreachable as error, not success."""
+        with patch("maafw_cli.core.ipc.get_daemon_info", return_value=(123, 19799)), \
+             patch("maafw_cli.core.ipc.DaemonClient") as mock_client_cls:
+            mock_client_cls.return_value.send.side_effect = OSError("refused")
+            result = runner.invoke(cli, ["daemon", "status"])
+            assert "unreachable" in result.output.lower()

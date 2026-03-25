@@ -9,7 +9,7 @@ import time
 import pytest
 
 from maafw_cli.daemon.protocol import encode, decode, make_request
-from maafw_cli.daemon.server import DaemonServer
+from maafw_cli.daemon.server import DaemonServer, _sanitize_params
 from maafw_cli.core.ipc import pid_file, port_file
 
 # Import services to populate DISPATCH
@@ -306,3 +306,99 @@ class TestDaemonServerMultipleRequests:
                 pass
             server._server.close()
             await server._server.wait_closed()
+
+
+class TestDaemonServerMessageLimit:
+    async def test_oversized_message_dropped(self):
+        """Server should drop connection when message exceeds MAX_LINE_LENGTH."""
+        server, port = await _start_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+        try:
+            reader, writer = await asyncio.open_connection("127.0.0.1", port)
+            huge_payload = b"x" * (DaemonServer.MAX_LINE_LENGTH + 100) + b"\n"
+            writer.write(huge_payload)
+            await writer.drain()
+
+            # Server should close the connection
+            line = await asyncio.wait_for(reader.readline(), timeout=5.0)
+            if line:
+                resp = decode(line)
+                assert resp["ok"] is False
+
+            writer.close()
+            await writer.wait_closed()
+        finally:
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()
+
+
+class TestDaemonServerEmptySessionName:
+    async def test_session_default_empty_name_rejected(self):
+        """session_default with empty name should return error."""
+        server, port = await _start_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+        try:
+            resp = await _send_recv(port, make_request("session_default", {"name": ""}))
+            assert resp["ok"] is False
+
+            resp = await _send_recv(port, make_request("session_default", {}))
+            assert resp["ok"] is False
+        finally:
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()
+
+    async def test_session_close_empty_name_rejected(self):
+        """session_close with empty name should return error."""
+        server, port = await _start_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+        try:
+            resp = await _send_recv(port, make_request("session_close", {"name": ""}))
+            assert resp["ok"] is False
+        finally:
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()
+
+
+class TestLogSanitization:
+    def test_sensitive_keys_redacted(self):
+        params = {
+            "device": "emu-5554",
+            "token": "secret123",
+            "api_key": "abc",
+            "password": "hunter2",
+            "normal_field": "visible",
+        }
+        sanitized = _sanitize_params(params)
+        assert sanitized["device"] == "emu-5554"
+        assert sanitized["token"] == "***"
+        assert sanitized["api_key"] == "***"
+        assert sanitized["password"] == "***"
+        assert sanitized["normal_field"] == "visible"
+
+    def test_empty_params(self):
+        assert _sanitize_params({}) == {}
+
+    def test_no_sensitive_keys(self):
+        params = {"x": 1, "y": 2}
+        assert _sanitize_params(params) == {"x": 1, "y": 2}
+
+
+class TestWatchdogTaskAttribute:
+    def test_watchdog_task_initially_none(self):
+        server = DaemonServer(port=0, idle_timeout=300)
+        assert server._watchdog_task is None

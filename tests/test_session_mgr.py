@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -244,3 +245,52 @@ class TestSessionManagerNeedsSession:
 
         # Clean up
         del DISPATCH["_test_global"]
+
+
+class TestSessionManagerConcurrency:
+    """Verify asyncio.Lock protects _sessions dict under concurrent access."""
+
+    def test_concurrent_adds_safe(self):
+        mgr = SessionManager()
+        info = SessionInfo(type="adb", device="test")
+
+        async def run():
+            await asyncio.gather(*[
+                mgr.add(f"s{i}", MockController(), info)
+                for i in range(20)
+            ])
+
+        _run(run())
+        assert mgr.count == 20
+
+    def test_concurrent_add_and_close(self):
+        mgr = SessionManager()
+        info = SessionInfo(type="adb", device="test")
+
+        async def run():
+            for i in range(5):
+                await mgr.add(f"s{i}", MockController(), info)
+
+            tasks = []
+            for i in range(5):
+                tasks.append(mgr.close(f"s{i}"))
+                tasks.append(mgr.add(f"new{i}", MockController(), info))
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        _run(run())
+        # Should not have crashed
+
+
+class TestSessionManagerDestroyInThread:
+    """Verify controller.destroy() is called via asyncio.to_thread."""
+
+    def test_destroy_called_on_close(self):
+        mgr = SessionManager()
+        ctrl = MockController()
+        ctrl.destroy = MagicMock()
+        info = SessionInfo(type="adb", device="test")
+
+        _run(mgr.add("test", ctrl, info))
+        _run(mgr.close("test"))
+
+        ctrl.destroy.assert_called_once()

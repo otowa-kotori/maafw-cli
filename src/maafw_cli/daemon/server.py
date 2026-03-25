@@ -138,7 +138,14 @@ class DaemonServer:
         _log.debug("PID/port files written: pid=%d port=%d", os.getpid(), self.port)
 
     def _install_signal_handlers(self) -> None:
-        """Install SIGTERM / SIGINT handlers for graceful shutdown."""
+        """Install SIGTERM / SIGINT handlers for graceful shutdown.
+
+        On Windows, ``loop.add_signal_handler`` raises ``NotImplementedError``
+        for all signals.  The daemon runs headless (pythonw.exe, no console),
+        so SIGINT has no source, and ``TerminateProcess`` (taskkill) is
+        uninterceptable.  Graceful shutdown on Windows relies on the
+        ``shutdown`` RPC command via ``daemon stop``.
+        """
         loop = asyncio.get_running_loop()
         for sig_name in ("SIGTERM", "SIGINT"):
             sig = getattr(signal, sig_name, None)
@@ -146,8 +153,7 @@ class DaemonServer:
                 try:
                     loop.add_signal_handler(sig, lambda s=sig_name: self._signal_shutdown(s))
                 except NotImplementedError:
-                    # Windows doesn't support add_signal_handler — use signal.signal fallback
-                    signal.signal(sig, lambda signum, frame, s=sig_name: self._signal_shutdown(s))
+                    _log.debug("add_signal_handler(%s) not supported on this platform", sig_name)
 
     def _signal_shutdown(self, sig_name: str) -> None:
         _log.info("Received %s, initiating shutdown", sig_name)

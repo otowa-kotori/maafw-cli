@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -12,6 +15,7 @@ from maafw_cli.core.ipc import (
     _cleanup_stale_files,
     _is_process_alive,
     _read_daemon_info,
+    _start_daemon_process,
     ensure_daemon,
 )
 from maafw_cli.daemon.protocol import encode, decode, make_request
@@ -178,3 +182,23 @@ class TestEnsureDaemon:
 
         with pytest.raises(MaafwError, match="Failed to start daemon"):
             ensure_daemon()
+
+
+class TestStartDaemonProcess:
+    def test_pythonw_uses_path_with_name(self, tmp_path):
+        """_start_daemon_process should use Path.with_name for pythonw.exe,
+        not str.replace which breaks when 'python.exe' appears in parent dirs."""
+        # Create a dir whose name contains "python.exe" to trip up str.replace
+        fake_dir = tmp_path / "python.exe_is_in_this_dir"
+        fake_dir.mkdir()
+        fake_python = fake_dir / "python.exe"
+        fake_pythonw = fake_dir / "pythonw.exe"
+        fake_python.write_text("fake")
+        fake_pythonw.write_text("fake")
+
+        with patch.object(sys, "executable", str(fake_python)), \
+             patch.object(sys, "platform", "win32"), \
+             patch("maafw_cli.core.ipc.subprocess.Popen") as mock_popen:
+            _start_daemon_process()
+            cmd = mock_popen.call_args[0][0]
+            assert cmd[0] == str(fake_pythonw)
