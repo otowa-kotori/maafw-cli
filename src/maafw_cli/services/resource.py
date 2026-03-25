@@ -1,5 +1,5 @@
 """
-Resource services — OCR model download and status.
+Resource services — OCR model download, status, and image loading.
 """
 from __future__ import annotations
 
@@ -37,3 +37,21 @@ def do_resource_status() -> dict:
     ocr_ready = check_ocr_files_exist(ocr_dir)
 
     return {"ocr_model": ocr_ready, "ocr_path": str(ocr_dir)}
+
+
+@service(name="resource_load_image", needs_session=False, human=lambda r: f"Loaded: {r['path']}")
+def do_load_image(path: str) -> dict:
+    """Load image resources into the global Resource (for TemplateMatch etc.)."""
+    from pathlib import Path
+
+    p = Path(path)
+    if not p.exists():
+        raise ActionError(f"Path not found: {path}")
+
+    from maafw_cli.maafw.vision import load_image
+
+    ok = load_image(p)
+    if not ok:
+        raise ActionError(f"Failed to load image resource from: {path}")
+
+    return {"path": str(p.absolute())}

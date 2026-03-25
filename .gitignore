@@ -33,6 +33,7 @@ htmlcov/
 # Runtime data
 *.log
 *.png
+!tests/fixtures/*.png
 *.onnx
 .env
 uv.lock

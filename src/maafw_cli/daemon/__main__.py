@@ -22,11 +22,12 @@ def main() -> None:
     from maafw_cli.daemon.log import setup_daemon_logging
     setup_daemon_logging(verbose=args.verbose)
 
-    # Populate the DISPATCH table with all service modules
-    import maafw_cli.services.connection  # noqa: F401
-    import maafw_cli.services.interaction  # noqa: F401
-    import maafw_cli.services.vision  # noqa: F401
-    import maafw_cli.services.resource  # noqa: F401
+    # Populate the DISPATCH table — auto-import all service modules
+    import importlib
+    import pkgutil
+    import maafw_cli.services as _svc_pkg
+    for _info in pkgutil.iter_modules(_svc_pkg.__path__):
+        importlib.import_module(f"maafw_cli.services.{_info.name}")
 
     from maafw_cli.daemon.server import DaemonServer
 

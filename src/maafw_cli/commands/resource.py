@@ -9,7 +9,7 @@ import click
 
 from maafw_cli.cli import pass_ctx, CliContext
 from maafw_cli.core.errors import MaafwError
-from maafw_cli.services.resource import do_download_ocr, do_resource_status
+from maafw_cli.services.resource import do_download_ocr, do_resource_status, do_load_image
 
 
 @click.group()
@@ -43,3 +43,14 @@ def resource_status(ctx: CliContext) -> None:
     result = do_resource_status()
     status = "ready" if result["ocr_model"] else "not downloaded"
     fmt.success(result, human=f"OCR model: {status} ({result['ocr_path']})")
+
+
+@resource.command("load-image")
+@click.argument("path", type=click.Path(exists=True))
+@pass_ctx
+def load_image_cmd(ctx: CliContext, path: str) -> None:
+    """Load image resources for TemplateMatch / FeatureMatch.
+
+    PATH can be a directory (all images inside are loaded) or a single image file.
+    """
+    ctx.run(do_load_image, path=path)
