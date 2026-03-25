@@ -2,4 +2,7 @@
 maafw-cli — A first-class command-line interface for MaaFramework.
 """
 
-__version__ = "0.1.0"
+try:
+    from maafw_cli._version import __version__
+except ImportError:
+    __version__ = "0.0.0.dev0+unknown"

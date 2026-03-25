@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "maafw-cli"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A command-line interface for MaaFramework"
 license = "MIT"
 readme = "README.md"
@@ -59,6 +59,12 @@ include = [
     "README.md",
     "LICENSE",
 ]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/maafw_cli/_version.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
