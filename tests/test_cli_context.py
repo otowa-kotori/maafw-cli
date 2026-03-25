@@ -195,6 +195,23 @@ class TestCliContextObserve:
         assert second_call[0][0] == "ocr"
 
 
+class TestCliContextOnSession:
+    """--on <session> routes IPC to the named session."""
+
+    def test_on_session_passed_to_daemon_send(self):
+        ctx = CliContext(on="phone")
+        mock_client = MagicMock()
+        mock_client.send.return_value = {"action": "test", "value": "ok"}
+
+        with patch("maafw_cli.core.ipc.ensure_daemon", return_value=19799), \
+             patch("maafw_cli.core.ipc.DaemonClient", return_value=mock_client):
+            ctx.run(_do_test_action)
+
+        # Verify session="phone" was passed to client.send
+        call_kwargs = mock_client.send.call_args
+        assert call_kwargs[1].get("session") == "phone" or call_kwargs[0][2] == "phone"
+
+
 # ── cleanup test services from DISPATCH ──────────────────────────
 
 def teardown_module():

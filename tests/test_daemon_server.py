@@ -402,3 +402,28 @@ class TestWatchdogTaskAttribute:
     def test_watchdog_task_initially_none(self):
         server = DaemonServer(port=0, idle_timeout=300)
         assert server._watchdog_task is None
+
+
+class TestPortRangeExhaustion:
+    """Server should raise RuntimeError when all ports in range are taken."""
+
+    async def test_all_ports_taken(self):
+        from maafw_cli.daemon.server import DEFAULT_PORT, PORT_RANGE_END
+
+        # Occupy all ports in range
+        occupied = []
+        for port in range(DEFAULT_PORT, PORT_RANGE_END):
+            try:
+                srv = await asyncio.start_server(lambda r, w: None, "127.0.0.1", port)
+                occupied.append(srv)
+            except OSError:
+                pass  # already in use
+
+        try:
+            server = DaemonServer()  # no explicit port → tries range
+            with pytest.raises(RuntimeError, match="Cannot bind"):
+                await server._bind()
+        finally:
+            for srv in occupied:
+                srv.close()
+                await srv.wait_closed()

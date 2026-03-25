@@ -128,6 +128,12 @@ class TestScrollService:
         with pytest.raises(ActionError, match="Scroll failed"):
             do_scroll(ctx, dx=0, dy=120)
 
+    def test_scroll_rejected_on_adb(self):
+        """Scroll should reject non-Win32 sessions."""
+        ctx = _make_ctx(session_type="adb")
+        with pytest.raises(ActionError, match="Win32"):
+            do_scroll(ctx, dx=0, dy=120)
+
 
 # ── type ─────────────────────────────────────────────────────────
 

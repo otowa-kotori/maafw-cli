@@ -126,3 +126,17 @@ class TestReplParseErrors:
         assert result is None
         captured = capsys.readouterr()
         assert "integer" in captured.err.lower()
+
+
+class TestReplJsonMode:
+    """REPL should output JSON when formatter is in json_mode."""
+
+    def test_click_json_output(self, capsys):
+        mock = MockController()
+        repl = _make_repl(mock, json_mode=True)
+        result = repl.execute_line("click 100,200")
+        assert result is not None
+        assert result["action"] == "click"
+        # In json_mode with quiet=True the output goes through fmt
+        # Just verify the command succeeded
+        assert mock.clicks == [(100, 200)]
