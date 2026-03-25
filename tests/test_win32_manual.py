@@ -164,6 +164,7 @@ def _ensure_connected_seize(win: dict) -> None:
     result = runner.invoke(cli, [
         "connect", "win32", win["hwnd"],
         "--input-method", "Seize",
+        "--as", "seize",
     ])
     if result.exit_code != 0:
         pytest.fail(_diagnose_connection_failure(win, "Failed to connect with Seize", result))
@@ -463,7 +464,7 @@ def test_win32_click_changes_label(mock_window):
     _ensure_connected_seize(mock_window)
 
     # First OCR to locate the "PRESS" button
-    result = runner.invoke(cli, ["--json", "ocr"])
+    result = runner.invoke(cli, ["--on", "seize", "--json", "ocr"])
     assert result.exit_code == 0
     data = _parse_json_output(result.output)
 
@@ -480,7 +481,7 @@ def test_win32_click_changes_label(mock_window):
     )
 
     # Click the button
-    result = runner.invoke(cli, ["click", f"{btn[0]},{btn[1]}"])
+    result = runner.invoke(cli, ["--on", "seize", "click", f"{btn[0]},{btn[1]}"])
     _safe_print(result.output)
     assert result.exit_code == 0
 
@@ -488,7 +489,7 @@ def test_win32_click_changes_label(mock_window):
     time.sleep(0.3)
 
     # OCR again — label should now say CLICKED
-    result = runner.invoke(cli, ["--json", "ocr"])
+    result = runner.invoke(cli, ["--on", "seize", "--json", "ocr"])
     assert result.exit_code == 0
     data = _parse_json_output(result.output)
     all_text = " ".join(r["text"] for r in data["results"])
@@ -502,14 +503,14 @@ def test_win32_swipe_changes_label(mock_window):
     _ensure_connected_seize(mock_window)
 
     # Swipe across the label area
-    result = runner.invoke(cli, ["swipe", "50,100", "350,100", "--duration", "300"])
+    result = runner.invoke(cli, ["--on", "seize", "swipe", "50,100", "350,100", "--duration", "300"])
     _safe_print(result.output)
     assert result.exit_code == 0
     assert "Swiped" in result.output
 
     # Verify via OCR that the mock detected the swipe
     time.sleep(0.3)
-    result = runner.invoke(cli, ["--json", "ocr"])
+    result = runner.invoke(cli, ["--on", "seize", "--json", "ocr"])
     if result.exit_code == 0:
         data = _parse_json_output(result.output)
         all_text = " ".join(r["text"] for r in data["results"])
@@ -525,12 +526,12 @@ def test_win32_key_changes_label(mock_window):
     _ensure_connected_seize(mock_window)
 
     # Press F5 key
-    result = runner.invoke(cli, ["key", "f5"])
+    result = runner.invoke(cli, ["--on", "seize", "key", "f5"])
     assert result.exit_code == 0
 
     # Wait for UI update and verify
     time.sleep(0.3)
-    result = runner.invoke(cli, ["--json", "ocr"])
+    result = runner.invoke(cli, ["--on", "seize", "--json", "ocr"])
     if result.exit_code == 0:
         data = _parse_json_output(result.output)
         all_text = " ".join(r["text"] for r in data["results"])
@@ -544,23 +545,23 @@ def test_win32_interaction_workflow(mock_window):
     _ensure_connected_seize(mock_window)
 
     # 1. Type text
-    r = runner.invoke(cli, ["type", "hello"])
+    r = runner.invoke(cli, ["--on", "seize", "type", "hello"])
     assert r.exit_code == 0, f"type failed: {r.output}"
 
     # 2. Press Enter
-    r = runner.invoke(cli, ["key", "enter"])
+    r = runner.invoke(cli, ["--on", "seize", "key", "enter"])
     assert r.exit_code == 0, f"key failed: {r.output}"
 
     # 3. Swipe
-    r = runner.invoke(cli, ["swipe", "50,150", "350,150"])
+    r = runner.invoke(cli, ["--on", "seize", "swipe", "50,150", "350,150"])
     assert r.exit_code == 0, f"swipe failed: {r.output}"
 
     # 4. Scroll
-    r = runner.invoke(cli, ["scroll", "0", "-120"])
+    r = runner.invoke(cli, ["--on", "seize", "scroll", "0", "-120"])
     assert r.exit_code == 0, f"scroll failed: {r.output}"
 
     # 5. Final OCR to verify window is still responsive
-    r = runner.invoke(cli, ["--json", "ocr"])
+    r = runner.invoke(cli, ["--on", "seize", "--json", "ocr"])
     assert r.exit_code == 0, f"ocr failed: {r.output}"
     data = _parse_json_output(r.output)
     _safe_print(f"  Final OCR: {len(data['results'])} results")
