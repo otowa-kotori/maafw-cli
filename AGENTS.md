@@ -60,7 +60,7 @@ stdout 放数据，stderr 放日志。`--json` 严格 JSON，`--quiet` 抑制非
 
 ```bash
 uv sync                          # 安装依赖
-uv run pytest tests/ -v          # 跑测试（230 单元 + 26 集成）
+uv run pytest tests/ -v          # 跑测试
 uv run ruff check src/           # lint
 uv run maafw-cli --help          # 运行 CLI
 ```

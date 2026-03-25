@@ -18,7 +18,7 @@ MaaFramework 命令行界面。让人、AI、脚本都能直接操作 Android / 
 uvx maafw-cli
 
 # 或从源码
-git clone https://github.com/user/maafw-cli.git
+git clone https://github.com/otowa-kotori/maafw-cli.git
 cd maafw-cli
 uv sync
 ```
@@ -61,7 +61,7 @@ maafw-cli screenshot
 | `screenshot [-o FILE]` | 截图（默认保存到当前目录） |
 | `click <TARGET>` | 点击（e3 或 452,387） |
 | `swipe <FROM> <TO> [--duration MS]` | 滑动 |
-| `scroll <DX> <DY>` | 滚动 |
+| `scroll <DX> <DY>` | 滚动（仅 Win32） |
 | `type <TEXT>` | 输入文本 |
 | `key <KEYCODE>` | 按键（enter / back / f5 / 0x0D） |
 | `session list / default / close` | 管理命名会话 |

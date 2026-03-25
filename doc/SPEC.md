@@ -240,7 +240,7 @@ JSON 模式：
 **端口管理**：
 - 默认端口 `19799`，可配置
 - 端口冲突时自动尝试 `19799-19810` 范围
-- 实际使用的端口写入 `~/.maafw/daemon.port`
+- 实际使用的端口写入 `platformdirs("maafw-cli", "MaaXYZ")/daemon.port`
 - 安全：仅绑定 `127.0.0.1`
 
 **通信协议**：JSON 行协议（每条消息一行 JSON + `\n`）
@@ -298,9 +298,8 @@ def ensure_daemon():
 - daemon 日志输出到 `~/.maafw/daemon.log`
 - `maafw-cli daemon status` 显示 PID、端口、连接数、uptime、会话列表
 - `--no-daemon` 全局标志：跳过 daemon 直接在进程内执行（调试用）
-- daemon 启动失败时自动 fallback 到进程内模式
 
-### 6.4 预估代码量
+### 6.4 预估代码量（历史参考，已超出）
 
 | 组件 | 行数 |
 |---|---|
@@ -372,7 +371,7 @@ $ maafw-cli click 200,300
 $ maafw-cli screenshot --output test.png
 ```
 
-### Phase 2：交互命令扩展
+### Phase 2：交互命令扩展 ✅ 已完成
 
 - `dblclick`, `swipe`, `scroll`, `type`, `key`, `shortcut`
 - `text:` 目标寻址（自动 OCR + 查找 + 点击）
@@ -433,7 +432,7 @@ $ maafw-cli connect win32 "游戏" --screencap-method FramePool --input-method S
 > - 需要点击 UWP 应用（计算器、设置等）：必须用 `Seize`
 > - 自动化时不想被干扰：优先 `PostMessage`；若无效，退而求其次用 `SendMessageWithCursorPos`（短暂移光标）；最后选 `Seize`
 
-**重连策略**：按 `window_name`（窗口标题）子串重新搜索。hwnd 每次重启会变，标题更稳定。
+**重连策略**：使用保存的 HWND 直接重连。HWND 在窗口生命周期内稳定，无需按标题重新搜索。
 
 **session.json 示例**：
 ```json
@@ -451,7 +450,7 @@ $ maafw-cli connect win32 "游戏" --screencap-method FramePool --input-method S
 - `click` 命令改用 `Controller.post_click()`（原 `post_touch_down/up` 对 Win32 SendMessage 系列无效）
 - `setup_logging()` 每次清理旧 handler，修复 CliRunner 多次调用后日志写入已关闭流的问题
 
-### Phase 3：守护进程 + 多会话
+### Phase 3：守护进程 + 多会话 ✅ 已完成
 
 - 守护进程实现（基于 Phase 0 调研结论）
 - 命名会话 `--as <name>`, `--on <session>`

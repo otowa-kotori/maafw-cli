@@ -30,6 +30,7 @@ maafw-cli daemon status                          # 查看 daemon 状态
 
 | 选项 | 说明 |
 |------|------|
+| `--version` | 显示版本号并退出 |
 | `--json` | 输出严格 JSON 到 stdout |
 | `--quiet` | 抑制非错误输出 |
 | `-v` / `--verbose` | 显示 DEBUG 级别日志（含耗时） |
