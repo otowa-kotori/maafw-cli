@@ -58,6 +58,34 @@ def _get_resource() -> Resource | None:
         return resource
 
 
+def load_image(path: str | Path) -> bool:
+    """Load additional image resources into the cached Resource.
+
+    *path* can be a directory (all images inside are loaded) or a single
+    image file.  Returns ``True`` on success.
+
+    Useful for TemplateMatch / FeatureMatch — templates must be loaded
+    into the Resource before they can be referenced by name.
+    """
+    resource = _get_resource()
+    if resource is None:
+        return False
+    with Timer("image resource load", log=_log):
+        return resource.post_image(str(path)).wait().succeeded
+
+
+def override_image(name: str, image) -> bool:
+    """Inject a numpy image into the cached Resource under *name*.
+
+    This lets callers register templates programmatically (e.g. from a
+    screenshot crop) without writing files to disk.
+    """
+    resource = _get_resource()
+    if resource is None:
+        return False
+    return resource.override_image(name, image)
+
+
 def _get_tasker(controller: Controller) -> Tasker | None:
     """Create a Tasker bound to *controller* with a (cached) Resource."""
     resource = _get_resource()

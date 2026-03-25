@@ -114,3 +114,38 @@ class OutputFormatter:
         lines.append("\u2500" * 60)
         lines.append(f"{len(refs)} results | {elapsed_ms}ms")
         return "\n".join(lines)
+
+    # ── recognition formatting ────────────────────────────────────
+
+    @staticmethod
+    def format_reco_table(
+        refs: list[dict],
+        elapsed_ms: int,
+        reco_type: str,
+        session_label: str = "default",
+    ) -> str:
+        """Format recognition results as a human-readable table.
+
+        Adapts display based on result type:
+        - For results with ``count`` field: shows ``count=N``
+        - For results with ``text`` field: shows text + score%
+        - Otherwise: shows score%
+        """
+        lines: list[str] = []
+        lines.append(f"Recognition: {reco_type} \u2014 {session_label}")
+        lines.append("\u2500" * 64)
+        for r in refs:
+            box = r["box"]
+            box_str = f"[{box[0]:>4},{box[1]:>4},{box[2]:>4},{box[3]:>4}]"
+            text = r.get("text") or "\u2014"
+            count = r.get("count")
+
+            if count is not None:
+                metric_str = f"count={count}"
+            else:
+                metric_str = f"{r['score'] * 100:.0f}%"
+
+            lines.append(f" {r['ref']:<4s} {text:<16s} {box_str}  {metric_str}")
+        lines.append("\u2500" * 64)
+        lines.append(f"{len(refs)} results | {elapsed_ms}ms")
+        return "\n".join(lines)
