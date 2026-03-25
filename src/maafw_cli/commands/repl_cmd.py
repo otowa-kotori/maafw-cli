@@ -132,6 +132,7 @@ class Repl:
                         kw["screencap_method"] = args[i + 1]
                         i += 2
                     else:
+                        print(f"Warning: unknown argument '{args[i]}'", file=sys.stderr)
                         i += 1
                 result = do_connect_win32(target, **kw)
             else:
@@ -216,6 +217,7 @@ class Repl:
                     return None
                 i += 2
             else:
+                print(f"Warning: unknown argument '{args[i]}'", file=sys.stderr)
                 i += 1
         return kw
 

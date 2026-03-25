@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import shutil
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from urllib.request import urlopen, Request
 from urllib.error import URLError
@@ -20,7 +20,7 @@ OCR_REQUIRED_FILES = ["det.onnx", "keys.txt", "rec.onnx"]
 
 
 def _log(log_file: Path, message: str) -> None:
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {message}\n")
 

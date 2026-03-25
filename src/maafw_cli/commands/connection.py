@@ -83,7 +83,7 @@ def connect():
 
 @connect.command("adb")
 @click.argument("device")
-@click.option("--screenshot-size", type=int, default=720,
+@click.option("--screenshot-size", type=click.IntRange(min=1), default=720,
               help="Screenshot short-side resolution (default 720).")
 @click.option("--as", "session_name", default=None,
               help="Name this session (default: device address).")
