@@ -21,12 +21,12 @@ def device():
     pass
 
 
-def _device_list(ctx: CliContext, *, adb_flag: bool, win32_flag: bool) -> None:
+def _device_list(ctx: CliContext, *, adb_flag: bool, win32_flag: bool, filter: str | None = None) -> None:
     """Shared implementation for device adb / win32 / all."""
     fmt = ctx.fmt
 
     try:
-        result = ctx.run_raw(do_device_list, adb=adb_flag, win32=win32_flag)
+        result = ctx.run_raw(do_device_list, adb=adb_flag, win32=win32_flag, filter=filter)
     except MaafwError as e:
         fmt.error(str(e), exit_code=e.exit_code)
         return
@@ -53,24 +53,27 @@ def _device_list(ctx: CliContext, *, adb_flag: bool, win32_flag: bool) -> None:
 
 
 @device.command("adb")
+@click.argument("filter", required=False, default=None)
 @pass_ctx
-def device_adb(ctx: CliContext) -> None:
-    """List ADB devices."""
-    _device_list(ctx, adb_flag=True, win32_flag=False)
+def device_adb(ctx: CliContext, filter: str | None) -> None:
+    """List ADB devices. Optionally filter by name or address substring."""
+    _device_list(ctx, adb_flag=True, win32_flag=False, filter=filter)
 
 
 @device.command("win32")
+@click.argument("filter", required=False, default=None)
 @pass_ctx
-def device_win32(ctx: CliContext) -> None:
-    """List Win32 windows."""
-    _device_list(ctx, adb_flag=False, win32_flag=True)
+def device_win32(ctx: CliContext, filter: str | None) -> None:
+    """List Win32 windows. Optionally filter by window name or class name substring."""
+    _device_list(ctx, adb_flag=False, win32_flag=True, filter=filter)
 
 
 @device.command("all")
+@click.argument("filter", required=False, default=None)
 @pass_ctx
-def device_all(ctx: CliContext) -> None:
-    """List both ADB devices and Win32 windows."""
-    _device_list(ctx, adb_flag=True, win32_flag=True)
+def device_all(ctx: CliContext, filter: str | None) -> None:
+    """List both ADB devices and Win32 windows. Optionally filter by name substring."""
+    _device_list(ctx, adb_flag=True, win32_flag=True, filter=filter)
 
 
 # ── connect ──────────────────────────────────────────────────────
