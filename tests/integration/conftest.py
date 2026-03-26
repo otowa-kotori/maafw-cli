@@ -1,10 +1,11 @@
 """
 Shared fixtures and helpers for integration tests.
 
-Three mock windows:
+Four mock windows:
 - ``mock_window`` — READY/PRESS/Entry for OCR + interaction tests
 - ``reco_window`` — fixture icons for TemplateMatch/FeatureMatch/ColorMatch
 - ``pipeline_window`` — multi-stage app for pipeline automation tests
+- ``game_window`` — clicking game for advanced pipeline tests (loop/branch)
 
 Usage:
     uv run pytest tests/integration/ -v -s
@@ -46,6 +47,7 @@ _TESTS_DIR = Path(__file__).parent.parent
 _MOCK_SCRIPT = str(_TESTS_DIR / "mock_win32_window.py")
 _RECO_SCRIPT = str(_TESTS_DIR / "mock_reco_window.py")
 _PIPELINE_SCRIPT = str(_TESTS_DIR / "mock_pipeline_window.py")
+_GAME_SCRIPT = str(_TESTS_DIR / "mock_clicking_game.py")
 _FIXTURES_DIR = _TESTS_DIR / "fixtures"
 _PIPELINE_FIXTURES_DIR = _FIXTURES_DIR / "pipeline"
 
@@ -95,6 +97,7 @@ def ensure_connected(
     win: dict,
     session_name: str | None = None,
     input_method: str | None = None,
+    screencap_method: str | None = None,
 ) -> None:
     """Connect to a window via daemon. Caches by session name."""
     key = session_name or win["hwnd"]
@@ -105,6 +108,8 @@ def ensure_connected(
         cmd += ["--as", session_name]
     if input_method:
         cmd += ["--input-method", input_method]
+    if screencap_method:
+        cmd += ["--screencap-method", screencap_method]
     print(f"[{_ts()}] Connecting: {' '.join(cmd)}")
     result = runner.invoke(cli, cmd)
     if result.exit_code != 0:
@@ -228,6 +233,47 @@ def pipeline_window():
     ])
     if r.exit_code != 0:
         _fixture_errors["pipeline_window"] = f"pipeline load failed: {r.output}"
+
+    yield window
+
+
+# ── session-scoped game window (clicking game) ──────────────
+
+
+@pytest.fixture(scope="session")
+def game_window():
+    """Launch the clicking game mock window.
+
+    Connects with Seize input (required for button clicks in tkinter),
+    loads fixture images (for TemplateMatch), and loads the clicking
+    game pipeline JSON.
+    On failure, records error for deferred fail/skip.
+    """
+    window, proc = _launch_window(_GAME_SCRIPT, "MaafwGame")
+
+    try:
+        ensure_connected(
+            window, session_name="game",
+            input_method="Seize", screencap_method="FramePool",
+        )
+    except RuntimeError as e:
+        _fixture_errors["game_window"] = str(e)
+        yield window
+        return
+
+    # Load fixture images (TemplateMatch needs them)
+    r = runner.invoke(cli, ["--on", "game", "resource", "load-image", str(_FIXTURES_DIR)])
+    if r.exit_code != 0:
+        _fixture_errors["game_window"] = f"resource load-image failed: {r.output}"
+        yield window
+        return
+
+    # Load clicking game pipeline
+    r = runner.invoke(cli, [
+        "--on", "game", "pipeline", "load", str(_PIPELINE_FIXTURES_DIR),
+    ])
+    if r.exit_code != 0:
+        _fixture_errors["game_window"] = f"pipeline load failed: {r.output}"
 
     yield window
 

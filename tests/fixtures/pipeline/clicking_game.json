@@ -1,0 +1,140 @@
+{
+    "ClickPlay": {
+        "recognition": "OCR",
+        "expected": "PLAY",
+        "action": "Click",
+        "post_wait_freezes": 0,
+        "next": [
+            "WaitGameScreen"
+        ]
+    },
+    "WaitGameScreen": {
+        "recognition": "OCR",
+        "expected": "Score",
+        "roi": [600, 0, 360, 60],
+        "action": "DoNothing",
+        "rate_limit": 0,
+        "next": [
+            "GameLoop"
+        ]
+    },
+    "GameLoop": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "rate_limit": 0,
+        "next": [
+            "GameOver_Detect",
+            "Target_APPLE",
+            "Target_LEMON",
+            "Target_GRAPE"
+        ]
+    },
+    "GameOver_Detect": {
+        "recognition": "ColorMatch",
+        "lower": [0, 0, 200],
+        "upper": [60, 60, 255],
+        "roi": [250, 300, 460, 120],
+        "count": 500,
+        "action": "DoNothing",
+        "rate_limit": 0,
+        "timeout": 500,
+        "next": [
+            "ReadScore"
+        ]
+    },
+    "Target_APPLE": {
+        "recognition": "TemplateMatch",
+        "template": ["game_apple_mask.png"],
+        "green_mask": true,
+        "roi": [150, 60, 660, 130],
+        "threshold": 0.7,
+        "action": "DoNothing",
+        "rate_limit": 0,
+        "timeout": 1500,
+        "next": [
+            "Click_APPLE"
+        ]
+    },
+    "Target_LEMON": {
+        "recognition": "TemplateMatch",
+        "template": ["game_lemon_mask.png"],
+        "green_mask": true,
+        "roi": [150, 60, 660, 130],
+        "threshold": 0.7,
+        "action": "DoNothing",
+        "rate_limit": 0,
+        "timeout": 1500,
+        "next": [
+            "Click_LEMON"
+        ]
+    },
+    "Target_GRAPE": {
+        "recognition": "TemplateMatch",
+        "template": ["game_grape_mask.png"],
+        "green_mask": true,
+        "roi": [150, 60, 660, 130],
+        "threshold": 0.7,
+        "action": "DoNothing",
+        "rate_limit": 0,
+        "timeout": 1500,
+        "next": [
+            "Click_GRAPE"
+        ]
+    },
+    "Click_APPLE": {
+        "recognition": "TemplateMatch",
+        "template": ["game_apple_mask.png"],
+        "green_mask": true,
+        "roi": [0, 200, 960, 400],
+        "threshold": 0.7,
+        "action": "Click",
+        "rate_limit": 0,
+        "post_wait_freezes": 0,
+        "next": [
+            "CursorReset"
+        ]
+    },
+    "Click_LEMON": {
+        "recognition": "TemplateMatch",
+        "template": ["game_lemon_mask.png"],
+        "green_mask": true,
+        "roi": [0, 200, 960, 400],
+        "threshold": 0.7,
+        "action": "Click",
+        "rate_limit": 0,
+        "post_wait_freezes": 0,
+        "next": [
+            "CursorReset"
+        ]
+    },
+    "Click_GRAPE": {
+        "recognition": "TemplateMatch",
+        "template": ["game_grape_mask.png"],
+        "green_mask": true,
+        "roi": [0, 200, 960, 400],
+        "threshold": 0.7,
+        "action": "Click",
+        "rate_limit": 0,
+        "post_wait_freezes": 0,
+        "next": [
+            "CursorReset"
+        ]
+    },
+    "CursorReset": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [480, 680, 0, 0],
+        "rate_limit": 0,
+        "post_wait_freezes": 0,
+        "next": [
+            "GameLoop"
+        ]
+    },
+    "ReadScore": {
+        "recognition": "OCR",
+        "expected": "Score:",
+        "roi": [0, 0, 960, 720],
+        "action": "DoNothing",
+        "next": []
+    }
+}

@@ -65,6 +65,73 @@ uv run ruff check src/           # lint
 uv run maafw-cli --help          # 运行 CLI
 ```
 
+## CLI 快速开始
+
+操作设备的完整流程：查找 → 连接 → 感知 → 操作。
+
+### 1. 查找设备
+
+```bash
+maafw-cli device win32 记事本       # 按名字子串过滤 Win32 窗口
+maafw-cli device win32 MaafwGame    # 过滤含 "MaafwGame" 的窗口
+maafw-cli device adb 127            # 过滤含 "127" 的 ADB 设备
+maafw-cli --json device win32 Game  # JSON 输出，方便脚本解析 hwnd
+```
+
+> **注意**：`device` 的 FILTER 参数是位置参数，不是 `--filter`。
+
+### 2. 连接
+
+```bash
+maafw-cli connect win32 "记事本" --as notepad         # 按标题子串连接
+maafw-cli connect win32 0x2217ae --as game            # 按 hwnd 连接
+maafw-cli connect win32 0x2217ae --as game --input-method Seize  # tkinter 按钮需要 Seize
+maafw-cli connect adb 127.0.0.1:16384 --as phone
+```
+
+### 3. 感知（OCR / 识别）
+
+```bash
+maafw-cli --on game ocr                               # 全屏 OCR
+maafw-cli --on game ocr --roi 0,0,400,300             # ROI 内 OCR
+maafw-cli --on game --json reco OCR expected=PLAY     # OCR 匹配特定文本
+maafw-cli --on game reco TemplateMatch template=icon.png threshold=0.8  # 模板匹配
+maafw-cli --on game reco TemplateMatch template=icon.png roi=0,200,960,400  # ROI 内模板匹配
+```
+
+### 4. 操作
+
+```bash
+maafw-cli --on game click e1                          # 点击 Element 引用
+maafw-cli --on game click 452,387                     # 点击坐标
+maafw-cli --on game type "hello"                      # 输入文本
+maafw-cli --on game key enter                         # 按键
+```
+
+### 5. 资源 & Pipeline
+
+```bash
+maafw-cli resource load-image ./tests/fixtures/       # 加载模板图片目录
+maafw-cli --on game resource load-image ./templates/  # 指定会话加载
+maafw-cli --on game pipeline load ./pipeline/         # 加载 pipeline JSON
+maafw-cli --on game pipeline list                     # 列出已加载节点
+maafw-cli --on game pipeline show NodeName            # 查看节点定义
+maafw-cli --on game pipeline validate ./pipeline/     # 验证 pipeline
+maafw-cli --on game pipeline run ./pipeline/ EntryNode # 运行 pipeline
+```
+
+### 6. 全局选项
+
+| 选项 | 说明 |
+|------|------|
+| `--json` | 输出严格 JSON |
+| `--on SESSION` | 指定目标会话 |
+| `--observe` | 动作后自动 OCR |
+| `--quiet` | 抑制非错误输出 |
+| `-v` | DEBUG 日志 |
+
+详细用法见 [USAGE.md](doc/USAGE.md)。
+
 ## 测试注意事项
 
 - 单元测试：`uv run pytest tests/ --ignore=tests/integration -v`

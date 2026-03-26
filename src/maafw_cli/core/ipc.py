@@ -238,7 +238,7 @@ class DaemonClient:
         """Connect, send request, read response — pure synchronous socket."""
         sock = socket.create_connection((self.host, self.port), timeout=5.0)
         try:
-            sock.settimeout(30.0)
+            sock.settimeout(300.0)  # pipeline runs can take minutes
             sock.sendall(encode(request))
             reader = sock.makefile("rb")
             try:
