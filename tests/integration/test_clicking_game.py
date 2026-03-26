@@ -277,7 +277,10 @@ class TestGamePipelineSetup:
         assert result.exit_code == 0
         data = parse_json_output(result.output)
         defn = data["definition"]
-        assert defn["recognition"] == "DirectHit"
+        reco_type = defn["recognition"]
+        if isinstance(reco_type, dict):
+            reco_type = reco_type["type"]
+        assert reco_type == "DirectHit"
         assert len(defn["next"]) == 4
 
 

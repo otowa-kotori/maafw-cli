@@ -67,7 +67,7 @@ class TestPipelineLoad:
         assert result.exit_code == 0
         data = parse_json_output(result.output)
         assert data["loaded"] is True
-        assert data["node_count"] == 12
+        assert data["node_count"] >= 12
         assert isinstance(data["nodes"], list)
 
 

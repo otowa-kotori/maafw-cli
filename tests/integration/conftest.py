@@ -30,13 +30,24 @@ from maafw_cli.cli import cli
 
 
 def pytest_collection_modifyitems(items):
-    """Auto-skip on non-Windows + mark all as 'integration'."""
+    """Auto-skip on non-Windows + mark all as 'integration'.
+
+    Also sort clicking_game tests to run last so they don't interfere
+    with other tests' default session (game_window's Seize input grabs
+    the cursor and its connect changes the default session).
+    """
     integration_mark = pytest.mark.integration
     skip_mark = pytest.mark.skip(reason="Integration tests require Windows")
+    regular, game = [], []
     for item in items:
         item.add_marker(integration_mark)
         if sys.platform != "win32":
             item.add_marker(skip_mark)
+        if "clicking_game" in str(item.fspath):
+            game.append(item)
+        else:
+            regular.append(item)
+    items[:] = regular + game
 
 
 # ── shared runner ──────────────────────────────────────────────
@@ -221,7 +232,10 @@ def pipeline_window():
     window, proc = _launch_window(_PIPELINE_SCRIPT, "MaafwPipeline")
 
     try:
-        ensure_connected(window, session_name="pipeline", input_method="Seize")
+        ensure_connected(
+            window, session_name="pipeline",
+            input_method="Seize", screencap_method="FramePool",
+        )
     except RuntimeError as e:
         _fixture_errors["pipeline_window"] = str(e)
         yield window
