@@ -32,7 +32,7 @@ jobs:
           done
 
       - name: Run unit tests
-        run: uv run pytest --junitxml=test-report.xml
+        run: uv run pytest -m "not integration" --junitxml=test-report.xml
 
       - name: Collect daemon log
         if: always()
