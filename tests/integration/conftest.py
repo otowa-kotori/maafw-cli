@@ -1,9 +1,10 @@
 """
 Shared fixtures and helpers for integration tests.
 
-Two mock windows:
+Three mock windows:
 - ``mock_window`` — READY/PRESS/Entry for OCR + interaction tests
 - ``reco_window`` — fixture icons for TemplateMatch/FeatureMatch/ColorMatch
+- ``pipeline_window`` — multi-stage app for pipeline automation tests
 
 Usage:
     uv run pytest tests/integration/ -v -s
@@ -44,7 +45,9 @@ runner = CliRunner(charset="utf-8")
 _TESTS_DIR = Path(__file__).parent.parent
 _MOCK_SCRIPT = str(_TESTS_DIR / "mock_win32_window.py")
 _RECO_SCRIPT = str(_TESTS_DIR / "mock_reco_window.py")
+_PIPELINE_SCRIPT = str(_TESTS_DIR / "mock_pipeline_window.py")
 _FIXTURES_DIR = _TESTS_DIR / "fixtures"
+_PIPELINE_FIXTURES_DIR = _FIXTURES_DIR / "pipeline"
 
 
 def _ts() -> str:
@@ -88,7 +91,11 @@ _fixture_errors: dict[str, str] = {}  # fixture name → error message
 _fixture_failed_once: set[str] = set()  # fixtures that already caused one FAIL
 
 
-def ensure_connected(win: dict, session_name: str | None = None) -> None:
+def ensure_connected(
+    win: dict,
+    session_name: str | None = None,
+    input_method: str | None = None,
+) -> None:
     """Connect to a window via daemon. Caches by session name."""
     key = session_name or win["hwnd"]
     if key in _connected_sessions:
@@ -96,6 +103,8 @@ def ensure_connected(win: dict, session_name: str | None = None) -> None:
     cmd = ["connect", "win32", win["hwnd"]]
     if session_name:
         cmd += ["--as", session_name]
+    if input_method:
+        cmd += ["--input-method", input_method]
     print(f"[{_ts()}] Connecting: {' '.join(cmd)}")
     result = runner.invoke(cli, cmd)
     if result.exit_code != 0:
@@ -189,6 +198,36 @@ def reco_window():
     r = runner.invoke(cli, ["resource", "load-image", str(_FIXTURES_DIR)])
     if r.exit_code != 0:
         _fixture_errors["reco_window"] = f"resource load-image failed: {r.output}"
+
+    yield window
+
+
+# ── session-scoped pipeline window (multi-stage app) ──────────
+
+
+@pytest.fixture(scope="session")
+def pipeline_window():
+    """Launch the multi-stage pipeline mock window.
+
+    Connects with Seize input (required for button clicks in tkinter)
+    and loads the pipeline fixture JSON into the daemon's Resource.
+    On failure, records error for deferred fail/skip.
+    """
+    window, proc = _launch_window(_PIPELINE_SCRIPT, "MaafwPipeline")
+
+    try:
+        ensure_connected(window, session_name="pipeline", input_method="Seize")
+    except RuntimeError as e:
+        _fixture_errors["pipeline_window"] = str(e)
+        yield window
+        return
+
+    # Load pipeline JSON into daemon's Resource
+    r = runner.invoke(cli, [
+        "--on", "pipeline", "pipeline", "load", str(_PIPELINE_FIXTURES_DIR),
+    ])
+    if r.exit_code != 0:
+        _fixture_errors["pipeline_window"] = f"pipeline load failed: {r.output}"
 
     yield window
 

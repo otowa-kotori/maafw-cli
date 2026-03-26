@@ -1,0 +1,101 @@
+{
+    "ClickStart": {
+        "recognition": "OCR",
+        "expected": "START",
+        "action": "Click",
+        "next": [
+            "FocusUsername"
+        ]
+    },
+    "FocusUsername": {
+        "recognition": "OCR",
+        "expected": "Username",
+        "action": "Click",
+        "target_offset": [200, 0, 0, 0],
+        "next": [
+            "TypeUsername"
+        ]
+    },
+    "TypeUsername": {
+        "recognition": "OCR",
+        "expected": "LOGIN",
+        "action": "InputText",
+        "input_text": "testuser",
+        "next": [
+            "FocusPassword"
+        ]
+    },
+    "FocusPassword": {
+        "recognition": "OCR",
+        "expected": "Password",
+        "action": "Click",
+        "target_offset": [200, 0, 0, 0],
+        "next": [
+            "TypePassword"
+        ]
+    },
+    "TypePassword": {
+        "recognition": "OCR",
+        "expected": "LOGIN",
+        "action": "InputText",
+        "input_text": "pass123",
+        "next": [
+            "ClickSubmit"
+        ]
+    },
+    "ClickSubmit": {
+        "recognition": "OCR",
+        "expected": "SUBMIT",
+        "action": "Click",
+        "next": [
+            "VerifyHome"
+        ]
+    },
+    "VerifyHome": {
+        "recognition": "OCR",
+        "expected": "HOME",
+        "action": "DoNothing",
+        "next": [
+            "ClickSettings"
+        ]
+    },
+    "ClickSettings": {
+        "recognition": "OCR",
+        "expected": "SETTINGS",
+        "roi": [0, 300, 500, 200],
+        "action": "Click",
+        "next": [
+            "VerifySettings"
+        ]
+    },
+    "VerifySettings": {
+        "recognition": "OCR",
+        "expected": "Nothing to configure",
+        "action": "DoNothing",
+        "next": [
+            "ClickBack"
+        ]
+    },
+    "ClickBack": {
+        "recognition": "OCR",
+        "expected": "BACK",
+        "action": "Click",
+        "next": [
+            "ClickLogout"
+        ]
+    },
+    "ClickLogout": {
+        "recognition": "OCR",
+        "expected": "LOGOUT",
+        "action": "Click",
+        "next": [
+            "VerifyComplete"
+        ]
+    },
+    "VerifyComplete": {
+        "recognition": "OCR",
+        "expected": "COMPLETE",
+        "action": "DoNothing",
+        "next": []
+    }
+}

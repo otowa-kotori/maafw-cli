@@ -149,3 +149,53 @@ class OutputFormatter:
         lines.append("\u2500" * 64)
         lines.append(f"{len(refs)} results | {elapsed_ms}ms")
         return "\n".join(lines)
+
+    # ── pipeline formatting ───────────────────────────────────────
+
+    @staticmethod
+    def format_pipeline_table(result: dict, verbose: bool = False) -> str:
+        """Format pipeline run results as a human-readable string.
+
+        *verbose* toggles between a compact summary and a full node trace.
+        """
+        entry = result.get("entry", "?")
+        session = result.get("session", "default")
+        status = result.get("status", "unknown")
+        node_count = result.get("node_count", 0)
+        elapsed = result.get("elapsed_ms", 0)
+        nodes = result.get("nodes", [])
+
+        lines: list[str] = []
+        lines.append(f"Pipeline: {entry} \u2014 {session}")
+
+        if verbose and nodes:
+            lines.append("\u2500" * 48)
+            for i, nd in enumerate(nodes, 1):
+                name = nd.get("name", "?")
+                completed = nd.get("completed", False)
+                mark = "\u2713" if completed else "\u2717"
+
+                # Recognition summary
+                reco = nd.get("recognition", {})
+                algo = reco.get("algorithm", "")
+                hit = reco.get("hit", False)
+                text = reco.get("text")
+                if text:
+                    reco_str = f'{algo} hit "{text}"' if hit else f"{algo} miss"
+                else:
+                    reco_str = f"{algo} hit" if hit else (f"{algo} miss" if algo else "")
+
+                # Action summary
+                action = nd.get("action", {})
+                action_type = action.get("type", "")
+
+                parts = [f"{i:>2}. {name:<16s} {mark}"]
+                if reco_str:
+                    parts.append(reco_str)
+                if action_type:
+                    parts.append(f"\u2192 {action_type}")
+                lines.append(" ".join(parts))
+            lines.append("\u2500" * 48)
+
+        lines.append(f"Status: {status} | {node_count} nodes | {elapsed}ms")
+        return "\n".join(lines)

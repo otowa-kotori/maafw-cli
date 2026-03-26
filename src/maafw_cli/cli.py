@@ -257,6 +257,7 @@ from maafw_cli.commands.resource import resource  # noqa: E402
 from maafw_cli.commands.repl_cmd import repl_cmd  # noqa: E402
 from maafw_cli.commands.daemon_cmd import daemon_group  # noqa: E402
 from maafw_cli.commands.session_cmd import session_group  # noqa: E402
+from maafw_cli.commands.pipeline import pipeline  # noqa: E402
 
 cli.add_command(device)
 cli.add_command(connect)
@@ -272,3 +273,4 @@ cli.add_command(resource)
 cli.add_command(repl_cmd, name="repl")
 cli.add_command(daemon_group, name="daemon")
 cli.add_command(session_group, name="session")
+cli.add_command(pipeline)
