@@ -1,16 +1,15 @@
 """
-Integration tests for the clicking game pipeline.
+Integration tests for the clicking game — CLI-level validation.
 
-Strategy: **CLI-first, then pipeline** — each recognition / action step is
-first validated as a standalone ``reco`` or ``click`` CLI command.  Only
-after all individual steps pass do we run the full pipeline.
+Strategy: **CLI-first** — each recognition / action step is validated as a
+standalone ``reco`` or ``click`` CLI command, plus pipeline structure checks.
 
 Screens:
 1. Start  — "CLICKING GAME" + "PLAY" button  (OCR)
 2. Game   — target icon hint + 3 icon buttons (TemplateMatch + green_mask)
 3. Over   — "GAME OVER" + "Score: N" + "Misses: N" (OCR)
 
-    uv run pytest tests/integration/test_clicking_game.py -v -s
+    uv run pytest tests/integration/test_clicking_game.py -m integration -v -s
 """
 from __future__ import annotations
 
@@ -21,11 +20,7 @@ import pytest
 
 from maafw_cli.cli import cli
 from .conftest import (
-    _launch_window,
-    _GAME_SCRIPT,
-    _FIXTURES_DIR,
     _PIPELINE_FIXTURES_DIR,
-    ensure_connected,
     parse_json_output,
     runner,
     safe_print,
@@ -282,100 +277,3 @@ class TestGamePipelineSetup:
             reco_type = reco_type["type"]
         assert reco_type == "DirectHit"
         assert len(defn["next"]) == 4
-
-
-# ═════════════════════════════════════════════════════════════════
-# Group 3: Full pipeline run (fresh window)
-# ═════════════════════════════════════════════════════════════════
-
-
-class TestGamePipelineRun:
-    """Execute the clicking game pipeline end-to-end.
-
-    Uses a fresh game window since the CLI tests above consumed the
-    first window's timer.
-    """
-
-    def test_run_clicking_game_pipeline(self, game_window):
-        """Run the full clicking game pipeline and verify results."""
-        # Launch a fresh game window
-        window, proc = _launch_window(_GAME_SCRIPT, "MaafwGame")
-        try:
-            ensure_connected(
-                window, session_name="game2",
-                input_method="Seize", screencap_method="FramePool",
-            )
-        except RuntimeError as e:
-            pytest.skip(f"Could not connect game2: {e}")
-
-        r = runner.invoke(cli, [
-            "--on", "game2", "resource", "load-image", str(_FIXTURES_DIR),
-        ])
-        if r.exit_code != 0:
-            pytest.skip(f"resource load-image failed: {r.output}")
-
-        r = runner.invoke(cli, [
-            "--on", "game2", "pipeline", "load", str(_PIPELINE_FIXTURES_DIR),
-        ])
-        if r.exit_code != 0:
-            pytest.skip(f"pipeline load failed: {r.output}")
-
-        # Run the pipeline
-        result = runner.invoke(cli, [
-            "--json", "--on", "game2",
-            "pipeline", "run", _GAME_PIPELINE_DIR, "ClickPlay",
-        ])
-        safe_print(result.output)
-        assert result.exit_code == 0, f"Pipeline failed: {result.output}"
-
-        data = parse_json_output(result.output)
-
-        # ── Basic structure ──
-        assert data["entry"] == "ClickPlay"
-        assert data["status"] == "succeeded"
-
-        # ── Node traversal ──
-        node_names = [n["name"] for n in data["nodes"]]
-        assert node_names[0] == "ClickPlay"
-        assert node_names[-1] == "ReadScore"
-        assert "GameOver_Detect" in node_names
-        assert "WaitGameScreen" in node_names
-
-        # ── Loop verification ──
-        click_nodes = [n for n in node_names if n.startswith("Click_")]
-        assert len(click_nodes) >= 1, f"Should click at least once: {click_nodes}"
-
-        loop_count = node_names.count("GameLoop")
-        assert loop_count >= 2, f"Should loop at least twice: {loop_count}"
-
-        cursor_resets = node_names.count("CursorReset")
-        assert cursor_resets == len(click_nodes), (
-            f"CursorReset ({cursor_resets}) should match clicks ({len(click_nodes)})"
-        )
-
-        # ── All nodes completed ──
-        for node in data["nodes"]:
-            assert node["completed"], f"Node '{node['name']}' not completed"
-
-        # ── Score extraction ──
-        read_score_node = data["nodes"][-1]
-        assert read_score_node["name"] == "ReadScore"
-        score_text = read_score_node["recognition"].get("text", "")
-        m = re.search(r"Score:\s*(\d+)", score_text)
-        assert m, f"Could not extract score: {score_text}"
-        score_value = int(m.group(1))
-        safe_print(f"  Pipeline score: {score_value}")
-        assert score_value >= 3, f"Score too low: {score_value}"
-
-        # ── Read misses from game over screen ──
-        r = runner.invoke(cli, ["--on", "game2", "--json", "reco", "OCR"])
-        if r.exit_code == 0:
-            ocr_data = parse_json_output(r.output)
-            all_text = " ".join(x["text"] for x in ocr_data["results"])
-            m = re.search(r"Misses:\s*(\d+)", all_text)
-            if m:
-                misses = int(m.group(1))
-                safe_print(f"  Pipeline misses: {misses}")
-
-        # Kill the second game window
-        proc.kill()

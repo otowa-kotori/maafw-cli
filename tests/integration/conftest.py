@@ -30,13 +30,15 @@ from maafw_cli.cli import cli
 
 
 def pytest_collection_modifyitems(items):
-    """Auto-skip on non-Windows + mark all as 'integration'."""
+    """Auto-skip on non-Windows + mark integration tests."""
     integration_mark = pytest.mark.integration
     skip_mark = pytest.mark.skip(reason="Integration tests require Windows")
+    integration_dir = str(Path(__file__).parent)
     for item in items:
-        item.add_marker(integration_mark)
-        if sys.platform != "win32":
-            item.add_marker(skip_mark)
+        if str(item.fspath).startswith(integration_dir):
+            item.add_marker(integration_mark)
+            if sys.platform != "win32":
+                item.add_marker(skip_mark)
 
 
 # ── shared runner ──────────────────────────────────────────────
@@ -82,10 +84,6 @@ def safe_print(text: str) -> None:
         print(text.encode("ascii", errors="replace").decode("ascii"))
 
 
-# ── subprocess tracking ────────────────────────────────────────
-
-_child_procs: list[subprocess.Popen] = []
-
 # ── connection state ───────────────────────────────────────────
 
 _connected_sessions: set[str] = set()
@@ -121,6 +119,18 @@ def ensure_connected(
     _connected_sessions.add(key)
 
 
+def _teardown_fixture(session_name: str, proc: subprocess.Popen) -> None:
+    """Close daemon session and kill the mock window process."""
+    # Close daemon session
+    runner.invoke(cli, ["session", "close", session_name])
+    _connected_sessions.discard(session_name)
+    # Kill mock window
+    if proc.poll() is None:
+        proc.kill()
+        proc.wait(timeout=5)
+    print(f"[{_ts()}] Teardown: {session_name}")
+
+
 # ── helper: launch a mock window ─────────────────────────────
 
 
@@ -138,7 +148,6 @@ def _launch_window(script: str, title_prefix: str):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    _child_procs.append(proc)
     print(f"[{_ts()}] Process started: pid={proc.pid}")
     time.sleep(1.5)
 
@@ -170,10 +179,10 @@ def _launch_window(script: str, title_prefix: str):
     return window, proc
 
 
-# ── session-scoped mock window (OCR / interaction) ────────────
+# ── module-scoped mock window (OCR / interaction) ────────────
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def mock_window():
     """Launch the READY/PRESS mock window."""
     window, proc = _launch_window(_MOCK_SCRIPT, "MaafwTest")
@@ -183,15 +192,18 @@ def mock_window():
     except RuntimeError as e:
         _fixture_errors["mock_window"] = str(e)
         yield window
+        proc.kill()
+        proc.wait(timeout=5)
         return
 
     yield window
+    _teardown_fixture("mock", proc)
 
 
-# ── session-scoped reco window (TemplateMatch / FeatureMatch) ──
+# ── module-scoped reco window (TemplateMatch / FeatureMatch) ──
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def reco_window():
     """Launch the reco mock window with fixture icons.
 
@@ -205,6 +217,8 @@ def reco_window():
     except RuntimeError as e:
         _fixture_errors["reco_window"] = str(e)
         yield window
+        proc.kill()
+        proc.wait(timeout=5)
         return
 
     # Load fixture images into daemon's Resource
@@ -213,12 +227,13 @@ def reco_window():
         _fixture_errors["reco_window"] = f"resource load-image failed: {r.output}"
 
     yield window
+    _teardown_fixture("reco", proc)
 
 
-# ── session-scoped pipeline window (multi-stage app) ──────────
+# ── module-scoped pipeline window (multi-stage app) ──────────
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def pipeline_window():
     """Launch the multi-stage pipeline mock window.
 
@@ -236,6 +251,8 @@ def pipeline_window():
     except RuntimeError as e:
         _fixture_errors["pipeline_window"] = str(e)
         yield window
+        proc.kill()
+        proc.wait(timeout=5)
         return
 
     # Load pipeline JSON into daemon's Resource
@@ -246,12 +263,13 @@ def pipeline_window():
         _fixture_errors["pipeline_window"] = f"pipeline load failed: {r.output}"
 
     yield window
+    _teardown_fixture("pipeline", proc)
 
 
-# ── session-scoped game window (clicking game) ──────────────
+# ── module-scoped game window (clicking game) ──────────────
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def game_window():
     """Launch the clicking game mock window.
 
@@ -270,6 +288,8 @@ def game_window():
     except RuntimeError as e:
         _fixture_errors["game_window"] = str(e)
         yield window
+        proc.kill()
+        proc.wait(timeout=5)
         return
 
     # Load fixture images (TemplateMatch needs them)
@@ -277,6 +297,7 @@ def game_window():
     if r.exit_code != 0:
         _fixture_errors["game_window"] = f"resource load-image failed: {r.output}"
         yield window
+        _teardown_fixture("game", proc)
         return
 
     # Load clicking game pipeline
@@ -287,6 +308,7 @@ def game_window():
         _fixture_errors["game_window"] = f"pipeline load failed: {r.output}"
 
     yield window
+    _teardown_fixture("game", proc)
 
 
 @pytest.fixture(autouse=True)
@@ -309,16 +331,10 @@ def _check_fixture_health(request):
 
 @pytest.fixture(scope="session", autouse=True)
 def _cleanup():
-    """Stop daemon, kill mock windows, and clean up after all tests."""
+    """Stop daemon and clean up screenshots after all tests."""
     yield
     # Stop daemon
     runner.invoke(cli, ["daemon", "stop"])
-    # Kill all mock window processes
-    for proc in _child_procs:
-        if proc.poll() is None:
-            proc.kill()
-            proc.wait(timeout=5)
-    _child_procs.clear()
     # Clean up screenshot files
     for f in glob.glob("screenshot_*.png"):
         try:

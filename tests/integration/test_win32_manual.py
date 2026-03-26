@@ -43,12 +43,12 @@ _MOCK_SCRIPT = str(Path(__file__).parent.parent / "mock_win32_window.py")
 # ── fixtures ────────────────────────────────────────────────────
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def mock_window():
     """Launch the mock tkinter window and return its window info dict.
 
     Yields ``{"hwnd": "0x...", "window_name": "MaafwTest_<token>", ...}``.
-    Kills the process on teardown.
+    Closes sessions and kills the process on teardown.
     """
     token = uuid.uuid4().hex[:8]
     expected_title = f"MaafwTest_{token}"
@@ -84,9 +84,9 @@ def mock_window():
 
     yield window
 
-    # Stop daemon so the next test run starts clean
-    runner.invoke(cli, ["daemon", "stop"])
-
+    # Close sessions and kill mock window
+    runner.invoke(cli, ["session", "close", "mock"])
+    runner.invoke(cli, ["session", "close", "seize"])
     proc.kill()
     proc.wait()
 
@@ -150,7 +150,7 @@ def _ensure_connected(win: dict) -> None:
     global _connected_mode
     if _connected_mode == "daemon":
         return
-    result = runner.invoke(cli, ["connect", "win32", win["hwnd"]])
+    result = runner.invoke(cli, ["connect", "win32", win["hwnd"], "--as", "mock"])
     if result.exit_code != 0:
         pytest.fail(_diagnose_connection_failure(win, "Failed to connect", result))
     _connected_mode = "daemon"
