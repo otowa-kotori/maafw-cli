@@ -248,7 +248,7 @@ def test_win32_screenshot(mock_window):
 
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "test.png"
-        result = runner.invoke(cli, ["screenshot", "--output", str(out)])
+        result = runner.invoke(cli, ["--on", "mock", "screenshot", "--output", str(out)])
         _safe_print(result.output)
         assert result.exit_code == 0
         assert out.exists()
@@ -259,7 +259,7 @@ def test_win32_screenshot_auto_name(mock_window):
     """Verify screenshot with auto-generated filename."""
     _ensure_connected(mock_window)
 
-    result = runner.invoke(cli, ["--json", "screenshot"])
+    result = runner.invoke(cli, ["--on", "mock", "--json", "screenshot"])
     _safe_print(result.output)
     assert result.exit_code == 0
     data = _parse_json_output(result.output)
@@ -277,7 +277,7 @@ def test_win32_ocr(mock_window):
     """Verify OCR returns results."""
     _ensure_connected(mock_window)
 
-    result = runner.invoke(cli, ["ocr"])
+    result = runner.invoke(cli, ["--on", "mock", "ocr"])
     _safe_print(result.output)
     assert result.exit_code == 0
     assert "Screen OCR" in result.output
@@ -287,7 +287,7 @@ def test_win32_ocr_json(mock_window):
     """Verify OCR --json returns structured data."""
     _ensure_connected(mock_window)
 
-    result = runner.invoke(cli, ["--json", "ocr"])
+    result = runner.invoke(cli, ["--on", "mock", "--json", "ocr"])
     _safe_print(result.output)
     assert result.exit_code == 0
     data = _parse_json_output(result.output)
@@ -305,7 +305,7 @@ def test_win32_ocr_sees_ready(mock_window):
     """Verify OCR reads 'READY' from the mock window."""
     _ensure_connected(mock_window)
 
-    result = runner.invoke(cli, ["--json", "ocr"])
+    result = runner.invoke(cli, ["--on", "mock", "--json", "ocr"])
     if result.exit_code != 0:
         pytest.skip("OCR failed")
 
@@ -318,7 +318,7 @@ def test_win32_swipe_json(mock_window):
     """Verify swipe --json returns structured data."""
     _ensure_connected(mock_window)
 
-    result = runner.invoke(cli, ["--json", "swipe", "100,200", "100,50"])
+    result = runner.invoke(cli, ["--on", "mock", "--json", "swipe", "100,200", "100,50"])
     _safe_print(result.output)
     assert result.exit_code == 0
     data = _parse_json_output(result.output)
@@ -335,7 +335,7 @@ def test_win32_swipe_with_elements(mock_window):
     _ensure_connected(mock_window)
 
     # Run OCR first to populate Elements
-    ocr_result = runner.invoke(cli, ["--json", "ocr"])
+    ocr_result = runner.invoke(cli, ["--on", "mock", "--json", "ocr"])
     if ocr_result.exit_code != 0:
         pytest.skip("OCR failed")
     data = _parse_json_output(ocr_result.output)
@@ -343,7 +343,7 @@ def test_win32_swipe_with_elements(mock_window):
         pytest.skip("Need at least 2 OCR results for swipe test")
 
     # Swipe from e1 to e2
-    result = runner.invoke(cli, ["swipe", "e1", "e2"])
+    result = runner.invoke(cli, ["--on", "mock", "swipe", "e1", "e2"])
     _safe_print(result.output)
     assert result.exit_code == 0
     assert "Swiped" in result.output
@@ -353,7 +353,7 @@ def test_win32_scroll(mock_window):
     """Verify scroll command executes successfully."""
     _ensure_connected(mock_window)
 
-    result = runner.invoke(cli, ["scroll", "0", "-360"])
+    result = runner.invoke(cli, ["--on", "mock", "scroll", "0", "-360"])
     _safe_print(result.output)
     assert result.exit_code == 0
     assert "Scrolled" in result.output
@@ -363,7 +363,7 @@ def test_win32_scroll_json(mock_window):
     """Verify scroll --json returns structured data."""
     _ensure_connected(mock_window)
 
-    result = runner.invoke(cli, ["--json", "scroll", "0", "120"])
+    result = runner.invoke(cli, ["--on", "mock", "--json", "scroll", "0", "120"])
     _safe_print(result.output)
     assert result.exit_code == 0
     data = _parse_json_output(result.output)
@@ -376,7 +376,7 @@ def test_win32_type(mock_window):
     """Verify type command executes successfully."""
     _ensure_connected(mock_window)
 
-    result = runner.invoke(cli, ["type", "Hello"])
+    result = runner.invoke(cli, ["--on", "mock", "type", "Hello"])
     _safe_print(result.output)
     assert result.exit_code == 0
     assert "Typed" in result.output
@@ -386,7 +386,7 @@ def test_win32_type_json(mock_window):
     """Verify type --json returns structured data."""
     _ensure_connected(mock_window)
 
-    result = runner.invoke(cli, ["--json", "type", "Test123"])
+    result = runner.invoke(cli, ["--on", "mock", "--json", "type", "Test123"])
     _safe_print(result.output)
     assert result.exit_code == 0
     data = _parse_json_output(result.output)
@@ -398,7 +398,7 @@ def test_win32_key_hex(mock_window):
     """Verify key command with hex code."""
     _ensure_connected(mock_window)
 
-    result = runner.invoke(cli, ["key", "0x0D"])
+    result = runner.invoke(cli, ["--on", "mock", "key", "0x0D"])
     _safe_print(result.output)
     assert result.exit_code == 0
     assert "Pressed" in result.output
@@ -408,7 +408,7 @@ def test_win32_key_json(mock_window):
     """Verify key --json returns structured data."""
     _ensure_connected(mock_window)
 
-    result = runner.invoke(cli, ["--json", "key", "tab"])
+    result = runner.invoke(cli, ["--on", "mock", "--json", "key", "tab"])
     _safe_print(result.output)
     assert result.exit_code == 0
     data = _parse_json_output(result.output)
@@ -422,24 +422,24 @@ def test_win32_full_workflow(mock_window):
     _ensure_connected(mock_window)
 
     # 1. Screenshot
-    r = runner.invoke(cli, ["--json", "screenshot"])
+    r = runner.invoke(cli, ["--on", "mock", "--json", "screenshot"])
     assert r.exit_code == 0, f"screenshot failed: {r.output}"
     data = _parse_json_output(r.output)
     assert Path(data["path"]).exists()
     print(f"Screenshot saved to {data['path']}")
 
     # 2. OCR
-    r = runner.invoke(cli, ["--json", "ocr"])
+    r = runner.invoke(cli, ["--on", "mock", "--json", "ocr"])
     assert r.exit_code == 0, f"ocr failed: {r.output}"
     ocr1 = _parse_json_output(r.output)
     print(f"OCR found {len(ocr1['results'])} results in {ocr1['elapsed_ms']}ms")
 
     # 3. Click somewhere safe
-    r = runner.invoke(cli, ["click", "100,100"])
+    r = runner.invoke(cli, ["--on", "mock", "click", "100,100"])
     assert r.exit_code == 0, f"click failed: {r.output}"
 
     # 4. OCR again
-    r = runner.invoke(cli, ["--json", "ocr"])
+    r = runner.invoke(cli, ["--on", "mock", "--json", "ocr"])
     assert r.exit_code == 0, f"second ocr failed: {r.output}"
     ocr2 = _parse_json_output(r.output)
     print(f"OCR found {len(ocr2['results'])} results in {ocr2['elapsed_ms']}ms")

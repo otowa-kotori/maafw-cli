@@ -108,7 +108,7 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
 @connect.command("win32")
 @click.argument("window")
 @click.option("--screencap-method", type=str,
-              default="FramePool,PrintWindow", show_default=True,
+              default="FramePool", show_default=True,
               help="Win32 screenshot method (comma-separated for fallback, e.g. FramePool,PrintWindow).")
 @click.option("--input-method", type=str,
               default="PostMessage", show_default=True,

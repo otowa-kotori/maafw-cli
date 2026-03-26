@@ -30,24 +30,13 @@ from maafw_cli.cli import cli
 
 
 def pytest_collection_modifyitems(items):
-    """Auto-skip on non-Windows + mark all as 'integration'.
-
-    Also sort clicking_game tests to run last so they don't interfere
-    with other tests' default session (game_window's Seize input grabs
-    the cursor and its connect changes the default session).
-    """
+    """Auto-skip on non-Windows + mark all as 'integration'."""
     integration_mark = pytest.mark.integration
     skip_mark = pytest.mark.skip(reason="Integration tests require Windows")
-    regular, game = [], []
     for item in items:
         item.add_marker(integration_mark)
         if sys.platform != "win32":
             item.add_marker(skip_mark)
-        if "clicking_game" in str(item.fspath):
-            game.append(item)
-        else:
-            regular.append(item)
-    items[:] = regular + game
 
 
 # ── shared runner ──────────────────────────────────────────────
@@ -188,6 +177,14 @@ def _launch_window(script: str, title_prefix: str):
 def mock_window():
     """Launch the READY/PRESS mock window."""
     window, proc = _launch_window(_MOCK_SCRIPT, "MaafwTest")
+
+    try:
+        ensure_connected(window, session_name="mock")
+    except RuntimeError as e:
+        _fixture_errors["mock_window"] = str(e)
+        yield window
+        return
+
     yield window
 
 
@@ -211,7 +208,7 @@ def reco_window():
         return
 
     # Load fixture images into daemon's Resource
-    r = runner.invoke(cli, ["resource", "load-image", str(_FIXTURES_DIR)])
+    r = runner.invoke(cli, ["--on", "reco", "resource", "load-image", str(_FIXTURES_DIR)])
     if r.exit_code != 0:
         _fixture_errors["reco_window"] = f"resource load-image failed: {r.output}"
 
@@ -234,7 +231,7 @@ def pipeline_window():
     try:
         ensure_connected(
             window, session_name="pipeline",
-            input_method="Seize", screencap_method="FramePool",
+            input_method="Seize",
         )
     except RuntimeError as e:
         _fixture_errors["pipeline_window"] = str(e)
@@ -268,7 +265,7 @@ def game_window():
     try:
         ensure_connected(
             window, session_name="game",
-            input_method="Seize", screencap_method="FramePool",
+            input_method="Seize",
         )
     except RuntimeError as e:
         _fixture_errors["game_window"] = str(e)

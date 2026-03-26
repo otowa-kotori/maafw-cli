@@ -31,15 +31,15 @@ class TestRecoOcr:
     """reco OCR should behave identically to the dedicated ocr command."""
 
     def test_human_output(self, mock_window):
-        ensure_connected(mock_window)
-        result = runner.invoke(cli, ["reco", "OCR"])
+        ensure_connected(mock_window, session_name="mock")
+        result = runner.invoke(cli, ["--on", "mock", "reco", "OCR"])
         safe_print(result.output)
         assert result.exit_code == 0
         assert "Recognition: OCR" in result.output
 
     def test_json_output(self, mock_window):
-        ensure_connected(mock_window)
-        result = runner.invoke(cli, ["--json", "reco", "OCR"])
+        ensure_connected(mock_window, session_name="mock")
+        result = runner.invoke(cli, ["--on", "mock", "--json", "reco", "OCR"])
         safe_print(result.output)
         assert result.exit_code == 0
         data = parse_json_output(result.output)
@@ -54,8 +54,8 @@ class TestRecoOcr:
             assert "score" in r
 
     def test_sees_ready(self, mock_window):
-        ensure_connected(mock_window)
-        result = runner.invoke(cli, ["--json", "reco", "OCR"])
+        ensure_connected(mock_window, session_name="mock")
+        result = runner.invoke(cli, ["--on", "mock", "--json", "reco", "OCR"])
         if result.exit_code != 0:
             pytest.skip("reco OCR failed")
         data = parse_json_output(result.output)
@@ -63,23 +63,23 @@ class TestRecoOcr:
         assert "READY" in all_text, f"Expected 'READY', got: {all_text}"
 
     def test_with_roi(self, mock_window):
-        ensure_connected(mock_window)
-        result = runner.invoke(cli, ["--json", "reco", "OCR", "roi=0,0,960,300"])
+        ensure_connected(mock_window, session_name="mock")
+        result = runner.invoke(cli, ["--on", "mock", "--json", "reco", "OCR", "roi=0,0,960,300"])
         safe_print(result.output)
         assert result.exit_code == 0
         data = parse_json_output(result.output)
         assert data["reco_type"] == "OCR"
 
     def test_with_expected(self, mock_window):
-        ensure_connected(mock_window)
-        result = runner.invoke(cli, ["--json", "reco", "OCR", "expected=READY"])
+        ensure_connected(mock_window, session_name="mock")
+        result = runner.invoke(cli, ["--on", "mock", "--json", "reco", "OCR", "expected=READY"])
         safe_print(result.output)
         assert result.exit_code == 0
 
     def test_raw_json(self, mock_window):
-        ensure_connected(mock_window)
+        ensure_connected(mock_window, session_name="mock")
         result = runner.invoke(cli, [
-            "--json", "reco",
+            "--on", "mock", "--json", "reco",
             "--raw", '{"recognition":"OCR"}',
         ])
         safe_print(result.output)
@@ -98,9 +98,9 @@ class TestRecoColorMatch:
 
     def test_white_background(self, mock_window):
         """Match near-white pixels — should find results with count > 0."""
-        ensure_connected(mock_window)
+        ensure_connected(mock_window, session_name="mock")
         result = runner.invoke(cli, [
-            "--json", "reco", "ColorMatch",
+            "--on", "mock", "--json", "reco", "ColorMatch",
             "lower=230,230,230", "upper=255,255,255",
         ])
         safe_print(result.output)
@@ -114,9 +114,9 @@ class TestRecoColorMatch:
 
     def test_nonexistent_color(self, mock_window):
         """Match vivid purple — should not find meaningful results."""
-        ensure_connected(mock_window)
+        ensure_connected(mock_window, session_name="mock")
         result = runner.invoke(cli, [
-            "--json", "reco", "ColorMatch",
+            "--on", "mock", "--json", "reco", "ColorMatch",
             "lower=200,0,200", "upper=210,10,210",
         ])
         safe_print(result.output)
@@ -127,9 +127,9 @@ class TestRecoColorMatch:
 
     def test_human_output_shows_count(self, mock_window):
         """Human output should display count=N, not score%."""
-        ensure_connected(mock_window)
+        ensure_connected(mock_window, session_name="mock")
         result = runner.invoke(cli, [
-            "reco", "ColorMatch",
+            "--on", "mock", "reco", "ColorMatch",
             "lower=230,230,230", "upper=255,255,255",
         ])
         safe_print(result.output)
@@ -139,8 +139,8 @@ class TestRecoColorMatch:
 
     def test_missing_params_errors(self, mock_window):
         """ColorMatch without lower/upper should error."""
-        ensure_connected(mock_window)
-        result = runner.invoke(cli, ["reco", "ColorMatch"])
+        ensure_connected(mock_window, session_name="mock")
+        result = runner.invoke(cli, ["--on", "mock", "reco", "ColorMatch"])
         assert result.exit_code != 0
 
 
@@ -352,8 +352,8 @@ class TestRecoFeatureMatch:
 
 class TestRecoErrors:
     def test_unknown_type(self, mock_window):
-        ensure_connected(mock_window)
-        result = runner.invoke(cli, ["reco", "FakeType"])
+        ensure_connected(mock_window, session_name="mock")
+        result = runner.invoke(cli, ["--on", "mock", "reco", "FakeType"])
         assert result.exit_code != 0
 
     def test_no_type(self):
@@ -369,9 +369,9 @@ class TestRecoErrors:
 class TestRecoElementRefs:
     def test_reco_refs_clickable(self, mock_window):
         """Element refs produced by reco should be usable by click."""
-        ensure_connected(mock_window)
+        ensure_connected(mock_window, session_name="mock")
 
-        r = runner.invoke(cli, ["--json", "reco", "OCR"])
+        r = runner.invoke(cli, ["--on", "mock", "--json", "reco", "OCR"])
         if r.exit_code != 0:
             pytest.skip("reco OCR failed")
         data = parse_json_output(r.output)
@@ -379,7 +379,7 @@ class TestRecoElementRefs:
             pytest.skip("No OCR results to test with")
 
         ref = data["results"][0]["ref"]
-        r = runner.invoke(cli, ["click", ref])
+        r = runner.invoke(cli, ["--on", "mock", "click", ref])
         safe_print(r.output)
         assert r.exit_code == 0
         assert "Clicked" in r.output
