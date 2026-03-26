@@ -13,11 +13,16 @@
 - [x] `resource load-image` 命令——加载图片模板到 Resource
 - [x] `device` 命令按名字过滤（`device win32 chrome`）
 - [x] daemon 自动发现 service 模块（pkgutil 扫描）
+- [x] `pipeline run/validate/show/list` 命令
+- [x] Pipeline 集成测试——12 节点 demo_flow 线性流程
+- [x] Pipeline 点击游戏集成测试——13 节点循环分支（TemplateMatch + green_mask + ColorMatch + DirectHit）
 
 ## 近期
 
 - [ ] `text:设置` 目标寻址——自动 OCR → 查找 → 点击
 - [ ] `ocr` 顺便保存截图（已截图，可附带输出）
+- [ ] Daemon IPC heartbeat 机制——长时间 pipeline 运行时保持连接活跃（当前 socket timeout 改为 300s 作为临时方案）
+- [ ] Pipeline `post_wait_freezes` / `rate_limit` 优化——当前 MaaFW 每个 action 后默认 200ms sleep，需要确认正确的字段名来消除不必要延迟
 
 ## 安全与健壮性
 
@@ -26,6 +31,12 @@
 - [ ] 下载 OCR 模型后校验 SHA256（需确定校验和来源）
 - [ ] CI/CD——添加 GitHub Actions 基础流水线（lint + test）
 - [ ] `daemon start --verbose` 参数传递给 daemon 进程
+- [ ] FramePool 截图在多 DPI 环境下的稳定性——默认 `FramePool,PrintWindow` fallback 在高 DPI 非 DPI-aware 窗口上可能 fallback 到 PrintWindow 导致截图异常，需调查根因
+
+## 已知问题
+
+- MaaFW `ColorMatch` 的 lower/upper 参数使用 **RGB** 顺序（非 BGR），与 OpenCV 约定不同
+- Seize 输入法点击后鼠标光标停留在点击位置，会干扰后续 TemplateMatch 识别——pipeline 中需要 CursorReset 节点移开光标
 
 ## 中期
 
@@ -37,6 +48,5 @@
 
 ## 远期
 
-- [ ] `pipeline run/validate/show/list`
 - [ ] Shell 补全
 - [ ] 彩色终端输出

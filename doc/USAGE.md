@@ -260,6 +260,76 @@ maafw-cli resource load-image ./templates/         # 加载目录
 maafw-cli resource load-image ./button.png         # 加载单个文件
 ```
 
+### `pipeline`
+
+Pipeline 自动化命令——加载、验证、执行 JSON 定义的多节点流程。
+
+#### `pipeline load <PATH>`
+
+加载 pipeline JSON 文件或目录到 Resource。
+
+```bash
+maafw-cli --on game pipeline load ./pipeline/
+```
+
+#### `pipeline list`
+
+列出当前已加载的所有节点名称。
+
+```bash
+maafw-cli --on game pipeline list
+```
+
+#### `pipeline show <NODE>`
+
+显示某个节点的完整 JSON 定义。
+
+```bash
+maafw-cli --on game pipeline show GameLoop
+```
+
+#### `pipeline validate <PATH>`
+
+验证 pipeline JSON 是否合法（不执行）。
+
+```bash
+maafw-cli --on game pipeline validate ./pipeline/
+```
+
+#### `pipeline run <PATH> [ENTRY] [--override JSON]`
+
+执行 pipeline。从 ENTRY 节点开始（默认第一个），沿 `next` 链自动推进。
+
+| 选项 | 说明 |
+|------|------|
+| `ENTRY` | 起始节点名，省略则用第一个节点 |
+| `--override` | 运行时覆盖参数，JSON 格式 |
+
+```bash
+maafw-cli --on game pipeline run ./pipeline/ ClickPlay
+maafw-cli --on game --json pipeline run ./pipeline/ ClickPlay   # JSON 输出含每个节点详情
+maafw-cli --on game pipeline run ./pipeline/ ClickPlay --override '{"NodeA": {"timeout": 5000}}'
+```
+
+Pipeline JSON 格式示例：
+
+```json
+{
+    "NodeName": {
+        "recognition": "OCR|TemplateMatch|ColorMatch|DirectHit",
+        "expected": "text",
+        "template": ["icon.png"],
+        "green_mask": true,
+        "roi": [x, y, w, h],
+        "threshold": 0.7,
+        "action": "Click|DoNothing|InputText|StopTask",
+        "timeout": 1500,
+        "rate_limit": 0,
+        "next": ["NextNode1", "NextNode2"]
+    }
+}
+```
+
 ### `repl`
 
 启动交互式 REPL。连接一次，后续操作复用 controller，零重连开销。
