@@ -84,7 +84,7 @@ def mock_window():
         if code != 0:
             time.sleep(0.5)
             continue
-        for w in data:
+        for w in data.get("win32", []):
             if title in w["window_name"]:
                 hwnd = w["hwnd"]
                 break

@@ -60,7 +60,7 @@ stdout 放数据，stderr 放日志。`--json` 严格 JSON，`--quiet` 抑制非
 
 ```bash
 uv sync                          # 安装依赖
-uv run pytest tests/ -v          # 跑测试
+uv run pytest -v                 # 跑单元测试（默认跳过集成测试）
 uv run ruff check src/           # lint
 uv run maafw-cli --help          # 运行 CLI
 ```
@@ -132,19 +132,41 @@ maafw-cli --on game pipeline run ./pipeline/ EntryNode # 运行 pipeline
 
 详细用法见 [USAGE.md](doc/USAGE.md)。
 
-## 测试注意事项
+## 测试
 
-- 单元测试：`uv run pytest tests/ --ignore=tests/integration -v`
-- 集成测试：`uv run pytest tests/integration/ -v -s`（自动启动 mock 窗口，仅 Windows）
-- 全部一起跑：`uv run pytest tests/ -v`（单元测试先跑，集成测试排最后）
-- 集成测试结束后 fixture teardown 会 `daemon stop`，保证不留残留进程。
-- 若手动中断测试导致 daemon 残留，先 `uv run maafw-cli daemon stop` 再重跑。
+### 单元测试
 
-## CI 制品
+```bash
+uv run pytest -v                 # 默认只跑单元测试
+```
 
-- CI 产出 `test-report.xml` 和 `daemon.log` 作为 artifact 上传。
+### 集成测试
+
+集成测试需要 Windows 桌面环境（自动启动 mock 窗口），CI 上跳过。
+
+```bash
+# 跑全部（单元 + 集成）
+uv run pytest -v -s
+
+# 只跑集成测试
+uv run pytest tests/integration/ -m integration -v -s
+
+# 只跑某个模块
+uv run pytest tests/integration/test_clicking_game.py -m integration -v -s
+```
+
+**注意事项**：
+- 集成测试使用 `integration` marker，CI 通过 `-m "not integration"` 跳过
+- 每个 mock 窗口的 fixture 是 module-scoped：模块结束后自动关闭 session 和杀进程
+- Seize 输入法会抢鼠标，测试运行期间不要移动鼠标
+- 若手动中断测试导致 daemon 残留，先 `uv run maafw-cli daemon stop` 再重跑
+
+## CI
+
+- CI 只跑单元测试（`-m "not integration"`），集成测试需要桌面环境无法在 CI 运行
+- CI 产出 `test-report.xml` 和 `daemon.log` 作为 artifact 上传
 - 拉取到本地：`gh run download <RUN_ID> --dir .local/artifacts`
-- `.local/` 已在 `.gitignore` 中，不会提交。
+- `.local/` 已在 `.gitignore` 中，不会提交
 
 ## 新增功能 checklist
 
