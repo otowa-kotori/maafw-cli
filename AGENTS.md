@@ -177,4 +177,12 @@ uv run pytest tests/integration/test_clicking_game.py -m integration -v -s
 
 ## Commit 规范
 
-`<type>: <简短描述>`（feat/fix/refactor/docs/test/chore），英文祈使语气，不加 AI 署名。
+`<type>: <简短描述>`（feat/fix/refactor/docs/test/chore），英文祈使语气，不加 AI 署名如 Coauthor by。
+
+## 问题排查原则
+
+1. **不逃避问题**——不加 retry/fallback/延长等待 来绕过，而是找到真正的根因
+2. **控制变量**——每次只改一个因素，用对照组确认是哪个环节出了问题
+3. **向下追溯**——CLI 正常？查 daemon。daemon 正常？查 vision.ocr()。vision.ocr() 正常？查 maafw 原生接口。直到定位到最小触发代码
+4. **必现复现**——写出纯 API 级别的最小复现脚本，多轮跑确保不是偶发，才能确认根因、才能报上游
+5. **记录归档**——排查过程和复现脚本放 `investigations/<日期>-<问题>/`（已 gitignore），留 README 记录根因和排查路径

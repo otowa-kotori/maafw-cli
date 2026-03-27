@@ -43,3 +43,6 @@ CLAUDE.md
 
 # Local artifacts
 .local/
+
+# Investigation / debug logs
+investigations/
