@@ -42,9 +42,12 @@ def _make_node_detail(name="TestNode", completed=True,
     )
 
 
-def _make_task_detail(nodes=None):
+def _make_task_detail(nodes=None, status=None):
     """Build a fake TaskDetail-like object."""
-    return SimpleNamespace(nodes=nodes or [])
+    if status is None:
+        from maa.define import Status
+        status = Status(3000) if nodes else Status(4000)  # succeeded / failed
+    return SimpleNamespace(nodes=nodes or [], status=status)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -255,6 +258,44 @@ class TestPipelineService:
         ctx = MagicMock()
         with pytest.raises(ActionError, match="Invalid override JSON"):
             do_pipeline_run(ctx, path="/tmp/p", entry="StartNode", override="{bad json}")
+
+    @patch("maafw_cli.services.pipeline.init_toolkit")
+    @patch("maafw_cli.maafw.pipeline.run_pipeline")
+    @patch("maafw_cli.maafw.pipeline.list_nodes", return_value=["StartNode"])
+    @patch("maafw_cli.maafw.pipeline.load_pipeline", return_value=True)
+    def test_do_pipeline_run_failed_status(self, mock_load, mock_list, mock_run, mock_init):
+        """Pipeline with nodes but failed status should report 'failed'."""
+        from maa.define import Status
+        from maafw_cli.services.pipeline import do_pipeline_run
+
+        detail = _make_task_detail(
+            [_make_node_detail("StartNode")],
+            status=Status(4000),  # failed
+        )
+        mock_run.return_value = detail
+
+        ctx = MagicMock()
+        ctx.session_name = "test"
+        result = do_pipeline_run(ctx, path="/tmp/p", entry="StartNode")
+        assert result["status"] == "failed"
+
+    @patch("maafw_cli.services.pipeline.init_toolkit")
+    @patch("maafw_cli.maafw.pipeline.run_pipeline")
+    @patch("maafw_cli.maafw.pipeline.list_nodes", return_value=["StartNode"])
+    @patch("maafw_cli.maafw.pipeline.load_pipeline", return_value=True)
+    def test_do_pipeline_run_succeeded_no_nodes(self, mock_load, mock_list, mock_run, mock_init):
+        """Pipeline with no nodes but succeeded status should report 'succeeded'."""
+        from maa.define import Status
+        from maafw_cli.services.pipeline import do_pipeline_run
+
+        detail = _make_task_detail([], status=Status(3000))  # succeeded
+        mock_run.return_value = detail
+
+        ctx = MagicMock()
+        ctx.session_name = "test"
+        result = do_pipeline_run(ctx, path="/tmp/p", entry="StartNode")
+        assert result["status"] == "succeeded"
+        assert result["node_count"] == 0
 
     @patch("maafw_cli.services.pipeline.init_toolkit")
     @patch("maafw_cli.maafw.pipeline.list_nodes", return_value=["A", "B"])

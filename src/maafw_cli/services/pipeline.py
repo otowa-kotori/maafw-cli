@@ -22,6 +22,32 @@ _log = logging.getLogger("maafw_cli.services.pipeline")
 # ── helpers ──────────────────────────────────────────────────────
 
 
+def _status_string(status: Any) -> str:
+    """Map a TaskDetail.status (Status wrapper) to a human-readable string."""
+    if hasattr(status, "succeeded"):
+        # maa.define.Status wrapper — check boolean properties
+        if status.succeeded:
+            return "succeeded"
+        if status.failed:
+            return "failed"
+        if status.running:
+            return "running"
+        if status.pending:
+            return "pending"
+        return "unknown"
+
+    # Fallback for raw MaaStatusEnum or int
+    from maa.define import MaaStatusEnum
+
+    _MAP = {
+        MaaStatusEnum.succeeded: "succeeded",
+        MaaStatusEnum.failed: "failed",
+        MaaStatusEnum.running: "running",
+        MaaStatusEnum.pending: "pending",
+    }
+    return _MAP.get(status, "unknown")
+
+
 def _summarize_node(nd: Any) -> dict[str, Any]:
     """Extract a JSON-serializable summary from a NodeDetail."""
     result: dict[str, Any] = {"name": nd.name, "completed": nd.completed}
@@ -98,7 +124,7 @@ def do_pipeline_run(
         detail = run_pipeline(ss, entry, override_dict)
 
     node_summaries = [_summarize_node(nd) for nd in detail.nodes] if detail.nodes else []
-    status = "succeeded" if detail.nodes else "no_nodes"
+    status = _status_string(detail.status)
 
     return {
         "session": ctx.session_name,
