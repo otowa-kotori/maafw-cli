@@ -6,7 +6,7 @@
 - [x] `ocr --roi` 实际过滤
 - [x] `swipe`, `scroll`, `type`, `key` 等交互命令
 - [x] `resource download-ocr` 命令
-- [x] 守护进程 + 命名会话（`--as phone`, `--on notepad`）
+- [x] 守护进程 + 命名会话（`--on notepad`）
 - [x] `session list/default/close` 管理
 - [x] `daemon start/stop/status`
 - [x] `reco` 命令——暴露 MaaFW 原生感知接口（TemplateMatch / FeatureMatch / ColorMatch / OCR）

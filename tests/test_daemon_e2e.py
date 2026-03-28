@@ -4,7 +4,7 @@ Daemon + named session end-to-end test on Win32.
 Uses the same mock tkinter window as test_win32_manual.py.
 Verifies:
   1. daemon start
-  2. connect win32 --as <name> (named session via daemon)
+  2. --on <name> connect win32 (named session via daemon)
   3. Sequential operations through daemon: ocr, click, ocr, key, ocr
   4. session list / status
   5. daemon log contains operation trace
