@@ -59,9 +59,9 @@ $ maafw-cli click e2    # 点击"显示"——无需坐标
 ### 2.4 命名会话
 
 ```bash
-$ maafw-cli connect adb "emulator-5554" --as phone
-$ maafw-cli ocr --on phone
-$ maafw-cli click e2 --on notepad
+$ maafw-cli --on phone connect adb "emulator-5554"
+$ maafw-cli --on phone ocr
+$ maafw-cli --on notepad click e2
 $ maafw-cli ocr          # 省略 --on → 使用默认（最近连接的）会话
 ```
 
@@ -76,9 +76,9 @@ $ maafw-cli ocr
 $ maafw-cli click e3
 
 # Level 2: 命名会话 + 多设备
-$ maafw-cli connect adb "emulator-5554" --as phone
-$ maafw-cli connect win32 "记事本" --as notepad
-$ maafw-cli ocr --on phone
+$ maafw-cli --on phone connect adb "emulator-5554"
+$ maafw-cli --on notepad connect win32 "记事本"
+$ maafw-cli --on phone ocr
 
 # Level 3: Pipeline 自动化
 $ maafw-cli pipeline run workflow.json --on phone
@@ -229,11 +229,13 @@ JSON 模式：
 │  maafw-cli ocr  │──IPC──▶│  maafw-daemon (长存)      │
 │  (thin client)  │◀───────│  ├─ Session "phone"       │──▶ ADB Device
 └─────────────────┘        │  │  ├─ Controller          │
-                           │  │  ├─ Tasker + Resource   │
-┌─────────────────┐        │  │  └─ Element 缓存        │
-│  maafw-cli ...  │──IPC──▶│  ├─ Session "notepad"     │──▶ Win32 Window
-│  (另一终端)      │◀───────│  └─ 共享 Resource          │
-└─────────────────┘        └──────────────────────────┘
+                           │  │  ├─ Resource            │
+┌─────────────────┐        │  │  └─ ElementStore        │
+│  maafw-cli ...  │──IPC──▶│  └─ Session "notepad"     │──▶ Win32 Window
+│  (另一终端)      │◀───────│     ├─ Controller          │
+└─────────────────┘        │     ├─ Resource            │
+                           │     └─ ElementStore        │
+                           └──────────────────────────┘
                                    │ 空闲超时自动退出
 ```
 
@@ -318,7 +320,6 @@ def ensure_daemon():
 
 - daemon 日志输出到 `~/.maafw/daemon.log`
 - `maafw-cli daemon status` 显示 PID、端口、连接数、uptime、会话列表
-- `--no-daemon` 全局标志：跳过 daemon 直接在进程内执行（调试用）
 
 ### 6.4 预估代码量（历史参考，已超出）
 
@@ -338,11 +339,11 @@ def ensure_daemon():
 
 结论：**localhost TCP**（server 用 asyncio，client 用同步 socket），详见第 6 节。约 400 行代码，Phase 3 实现。
 
-### Phase 1：最小可验证核心 ✅ 已完成
+### Phase 1：最小可验证核心 ✅ 已完成（已被 daemon 模式取代）
 
 **目标**：能跑通 `connect → ocr → click` 链路，端到端可测试。
 
-**会话方案（无 daemon）**：状态文件重连
+**会话方案（无 daemon）**：状态文件重连（已移除，统一走 daemon）
 - `connect` 将连接参数写入 `~/.maafw/session.json`（设备类型、ADB 地址等）
 - `ocr` 读取 session.json → 重新建立 MaaFW 连接 → 执行 OCR → 将 Element 写入 `~/.maafw/elements.json`
 - `click e2` 读取 session.json + elements.json → 重连 → 执行点击
@@ -477,10 +478,10 @@ $ maafw-cli connect win32 "游戏" --screencap-method FramePool --input-method S
 ### Phase 3：守护进程 + 多会话 ✅ 已完成
 
 - 守护进程实现（基于 Phase 0 调研结论）
-- 命名会话 `--as <name>`, `--on <session>`
+- 命名会话 `--on <name>` (connect 时命名 + 操作时指定)
 - `session list/default/close`
 - `daemon start/stop/status`
-- `--no-daemon` 调试模式
+- `--no-daemon` 调试模式（已移除，所有操作统一走 daemon）
 - Element 缓存跨命令持久（daemon 内存中）
 
 ### Phase 4：Pipeline + 资源管理

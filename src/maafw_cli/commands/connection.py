@@ -92,7 +92,7 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int) -> None:
     """Connect to an ADB device by name or address.
 
     DEVICE is the device name as shown by ``device adb``.
-    Use ``--on NAME`` to assign a session name (default: device address).
+    Use global ``--on NAME`` to assign a session name (default: device address).
     """
     name = ctx.on or device
     ctx.run(
@@ -118,7 +118,7 @@ def connect_win32_cmd(ctx: CliContext, window: str,
 
     WINDOW is a window title substring (case-insensitive) or a hex hwnd
     like ``0x000A0B2C``.
-    Use ``--on NAME`` to assign a session name (default: window title).
+    Use global ``--on NAME`` to assign a session name (default: window title).
     """
     name = ctx.on or window
     ctx.run(

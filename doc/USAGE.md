@@ -11,8 +11,8 @@ uv sync
 
 ```bash
 # 1. 连接设备（自动启动 daemon）
-maafw-cli connect adb 127.0.0.1:16384           # Android 模拟器
-maafw-cli connect win32 "记事本" --as notepad    # Win32 窗口，命名为 notepad
+maafw-cli connect adb 127.0.0.1:16384                  # Android 模拟器
+maafw-cli --on notepad connect win32 "记事本"           # Win32 窗口，命名为 notepad
 
 # 2. 操作（通过 daemon，零重连）
 maafw-cli ocr                                    # OCR，输出带 Element
@@ -36,7 +36,6 @@ maafw-cli daemon status                          # 查看 daemon 状态
 | `-v` / `--verbose` | 显示 DEBUG 级别日志（含耗时） |
 | `--observe` | 动作命令执行后自动 OCR，输出识别结果 |
 | `--on SESSION` | 指定目标 daemon 会话（默认使用最近连接的） |
-| `--no-daemon` | 跳过 daemon，使用 直连模式（每次重连） |
 
 ## 命令参考
 
@@ -59,11 +58,12 @@ maafw-cli device adb 127      # 只显示地址含 "127" 的设备
 | 选项 | 默认 | 说明 |
 |------|------|------|
 | `--screenshot-size` | 720 | 截图短边分辨率 |
-| `--as NAME` | 设备地址 | 命名此会话（daemon 模式） |
+
+会话名通过全局 `--on NAME` 指定，省略则默认用设备地址。
 
 ```bash
-maafw-cli connect adb 127.0.0.1:16384               # 会话名 = 设备地址
-maafw-cli connect adb 127.0.0.1:16384 --as phone     # 会话名 = phone
+maafw-cli connect adb 127.0.0.1:16384                        # 会话名 = 设备地址
+maafw-cli --on phone connect adb 127.0.0.1:16384              # 会话名 = phone
 ```
 
 ### `connect win32 <WINDOW>`
@@ -74,7 +74,8 @@ maafw-cli connect adb 127.0.0.1:16384 --as phone     # 会话名 = phone
 |------|------|------|
 | `--screencap-method` | FramePool | 截图方式 |
 | `--input-method` | PostMessage | 输入方式 |
-| `--as NAME` | 窗口标题 | 命名此会话（daemon 模式） |
+
+会话名通过全局 `--on NAME` 指定，省略则默认用窗口标题。
 
 **截图方式**：
 

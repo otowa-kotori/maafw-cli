@@ -14,6 +14,7 @@
 - [x] `device` 命令按名字过滤（`device win32 chrome`）
 - [x] daemon 自动发现 service 模块（pkgutil 扫描）
 - [x] `pipeline run/validate/show/list` 命令
+- [x] 统一 Session 类——合并 SessionState/SessionInfo/ManagedSession，移除 --no-daemon 和文件持久化
 - [x] Pipeline 集成测试——12 节点 demo_flow 线性流程
 - [x] Pipeline 点击游戏集成测试——13 节点循环分支（TemplateMatch + green_mask + ColorMatch + DirectHit）
 
