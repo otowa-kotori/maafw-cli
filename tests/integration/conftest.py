@@ -101,9 +101,10 @@ def ensure_connected(
     key = session_name or win["hwnd"]
     if key in _connected_sessions:
         return
-    cmd = ["connect", "win32", win["hwnd"]]
+    cmd = []
     if session_name:
-        cmd += ["--as", session_name]
+        cmd += ["--on", session_name]
+    cmd += ["connect", "win32", win["hwnd"]]
     if input_method:
         cmd += ["--input-method", input_method]
     if screencap_method:

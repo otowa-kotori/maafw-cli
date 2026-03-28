@@ -134,7 +134,7 @@ class TestDaemonE2E:
 
     def test_02_connect_named_session(self, daemon_running, mock_window):
         code, output = _invoke(
-            "connect", "win32", mock_window["hwnd"], "--as", "testwin",
+            "--on", "testwin", "connect", "win32", mock_window["hwnd"],
         )
         print(f"  connect: exit={code} output={output.strip()}")
         assert code == 0

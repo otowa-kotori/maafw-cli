@@ -150,7 +150,7 @@ def _ensure_connected(win: dict) -> None:
     global _connected_mode
     if _connected_mode == "daemon":
         return
-    result = runner.invoke(cli, ["connect", "win32", win["hwnd"], "--as", "mock"])
+    result = runner.invoke(cli, ["--on", "mock", "connect", "win32", win["hwnd"]])
     if result.exit_code != 0:
         pytest.fail(_diagnose_connection_failure(win, "Failed to connect", result))
     _connected_mode = "daemon"
@@ -162,9 +162,9 @@ def _ensure_connected_seize(win: dict) -> None:
     if _connected_mode == "seize":
         return
     result = runner.invoke(cli, [
+        "--on", "seize",
         "connect", "win32", win["hwnd"],
         "--input-method", "Seize",
-        "--as", "seize",
     ])
     if result.exit_code != 0:
         pytest.skip(f"Seize not supported in this environment: {result.output.strip()}")
