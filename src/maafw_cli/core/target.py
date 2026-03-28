@@ -40,10 +40,6 @@ def parse_target(target: str, store: ElementStore) -> Union[ResolvedTarget, str]
     if m:
         ref = store.resolve(target.lower())
         if ref is None:
-            # Try loading from disk
-            store.load()
-            ref = store.resolve(target.lower())
-        if ref is None:
             return f"Unknown reference '{target}'. Run 'maafw-cli ocr' first."
         cx, cy = ref.center
         return ResolvedTarget(x=cx, y=cy, source=f"ref:{ref.ref} \"{ref.text}\"")

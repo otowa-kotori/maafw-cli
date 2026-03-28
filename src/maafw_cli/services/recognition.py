@@ -53,7 +53,7 @@ def do_reco(
 
     with Timer("reco service") as t:
         resolved_type, results = recognize(
-            ctx.controller,
+            ctx.session,
             reco_type=reco_type or "",
             params=parsed_params,
             raw=raw,
@@ -63,10 +63,9 @@ def do_reco(
 
     store = ctx.get_element_store()
     elements = store.build_from_results(results, resolved_type)
-    store.save()
 
     return {
-        "session": ctx.session_name or "default",
+        "session": ctx.session_name,
         "reco_type": resolved_type,
         "results": [e.to_dict() for e in elements],
         "elapsed_ms": elapsed_ms,

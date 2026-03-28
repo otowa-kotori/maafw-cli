@@ -1,101 +1,28 @@
 """
 Vision operations — screenshot + OCR via MaaFramework.
+
+Functions that need a Resource or Tasker take a ``Session`` as
+their first argument.  Resource and controller lifecycle is managed
+by ``Session``.
 """
 from __future__ import annotations
 
 import logging
-import threading
 from pathlib import Path
 from typing import Any
 
 import cv2
 from maa.controller import Controller
 from maa.define import OCRResult
-from maa.resource import Resource
-from maa.tasker import Tasker, TaskDetail
+from maa.tasker import TaskDetail
 from maa.pipeline import JRecognitionType, JOCR
 
 from maafw_cli.core.errors import RecognitionError
 from maafw_cli.core.log import Timer
+from maafw_cli.core.session import Session
 from maafw_cli.download import check_ocr_files_exist
-from maafw_cli.paths import get_resource_dir
 
 _log = logging.getLogger("maafw_cli.vision")
-
-# ── cached resource ──────────────────────────────────────────────
-
-_cached_resource: Resource | None = None
-_resource_lock = threading.Lock()
-
-
-def _get_resource() -> Resource | None:
-    """Return a cached Resource instance, creating one on first call.
-
-    The Resource (OCR model bundle) is expensive to load (~200-500ms) but
-    stateless — it can safely be reused across controllers and OCR calls.
-    Thread-safe: uses a lock to prevent duplicate creation.
-    """
-    global _cached_resource
-    if _cached_resource is not None:
-        return _cached_resource
-
-    with _resource_lock:
-        # Double-check after acquiring lock
-        if _cached_resource is not None:
-            return _cached_resource
-
-        resource_path = get_resource_dir()
-        resource = Resource()
-
-        if not resource.use_directml():
-            _log.debug("DirectML not available, falling back to CPU inference")
-
-        with Timer("resource bundle load", log=_log):
-            if not resource.post_bundle(str(resource_path)).wait().succeeded:
-                return None
-
-        _cached_resource = resource
-        return resource
-
-
-def load_image(path: str | Path) -> bool:
-    """Load additional image resources into the cached Resource.
-
-    *path* can be a directory (all images inside are loaded) or a single
-    image file.  Returns ``True`` on success.
-
-    Useful for TemplateMatch / FeatureMatch — templates must be loaded
-    into the Resource before they can be referenced by name.
-    """
-    resource = _get_resource()
-    if resource is None:
-        return False
-    with Timer("image resource load", log=_log):
-        return resource.post_image(str(path)).wait().succeeded
-
-
-def override_image(name: str, image) -> bool:
-    """Inject a numpy image into the cached Resource under *name*.
-
-    This lets callers register templates programmatically (e.g. from a
-    screenshot crop) without writing files to disk.
-    """
-    resource = _get_resource()
-    if resource is None:
-        return False
-    return resource.override_image(name, image)
-
-
-def _get_tasker(controller: Controller) -> Tasker | None:
-    """Create a Tasker bound to *controller* with a (cached) Resource."""
-    resource = _get_resource()
-    if resource is None:
-        return None
-    tasker = Tasker()
-    tasker.bind(resource, controller)
-    if not tasker.inited:
-        return None
-    return tasker
 
 
 def screencap(controller: Controller) -> Any:
@@ -129,7 +56,10 @@ def screencap_to_file(controller: Controller, output: str | Path | None = None) 
     return output
 
 
-def ocr(controller: Controller, roi: tuple[int, int, int, int] | None = None) -> list[OCRResult]:
+def ocr(
+    session: Session,
+    roi: tuple[int, int, int, int] | None = None,
+) -> list[OCRResult]:
     """Run OCR, optionally restricted to *roi* ``(x, y, w, h)``.
 
     Returns a list of ``OCRResult`` (with ``.text``, ``.box``, ``.score``).
@@ -139,11 +69,11 @@ def ocr(controller: Controller, roi: tuple[int, int, int, int] | None = None) ->
         if not check_ocr_files_exist():
             raise RecognitionError("OCR model not found. Run: maafw-cli resource download-ocr")
 
-        tasker = _get_tasker(controller)
+        tasker = session.get_tasker()
         if tasker is None:
             raise RecognitionError("Failed to initialize OCR tasker (resource load failed).")
 
-        image = screencap(controller)
+        image = screencap(session.controller)
         if image is None:
             raise RecognitionError("Screenshot failed — cannot run OCR without an image.")
 

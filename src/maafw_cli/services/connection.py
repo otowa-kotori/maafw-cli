@@ -2,7 +2,7 @@
 Connection services — device discovery, ADB / Win32 connect.
 
 These services don't use ``ServiceContext.controller`` (they *create* it).
-They interact with Toolkit and session persistence directly.
+They interact with Toolkit directly.
 """
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from typing import Any
 
 from maafw_cli.core.errors import DeviceConnectionError
 from maafw_cli.core.log import logger
-from maafw_cli.core.session import SessionInfo, save_session
 from maafw_cli.maafw import init_toolkit
 from maafw_cli.services.registry import service
 
@@ -57,10 +56,10 @@ def do_device_list(*, adb: bool = True, win32: bool = False, filter: str | None 
 def _connect_adb_inner(
     device: str,
     screenshot_size: int = 720,
-) -> tuple[dict[str, Any], Any, SessionInfo]:
+) -> tuple[dict[str, Any], Any]:
     """Connect to an ADB device.
 
-    Returns (result_dict, Controller, SessionInfo) — no side effects.
+    Returns (result_dict, Controller) — no side effects.
     """
     init_toolkit()
     logger.info("Connecting to ADB device '%s'...", device)
@@ -83,24 +82,13 @@ def _connect_adb_inner(
     if controller is None:
         raise DeviceConnectionError(f"Failed to connect to '{device}'.")
 
-    info = SessionInfo(
-        type="adb",
-        device=match.name,
-        adb_path=match.adb_path,
-        address=match.address,
-        screencap_methods=match.screencap_methods,
-        input_methods=match.input_methods,
-        config=match.config,
-        screenshot_short_side=screenshot_size,
-    )
-
     result = {
         "type": "adb",
         "device": match.name,
         "address": match.address,
     }
 
-    return result, controller, info
+    return result, controller
 
 
 def _parse_method_flags(value: str, enum_cls: type, param_name: str) -> int:
@@ -134,10 +122,10 @@ def _connect_win32_inner(
     window: str,
     screencap_method: str = "FramePool,PrintWindow",
     input_method: str = "PostMessage",
-) -> tuple[dict[str, Any], Any, SessionInfo]:
+) -> tuple[dict[str, Any], Any]:
     """Connect to a Win32 window.
 
-    Returns (result_dict, Controller, SessionInfo) — no side effects.
+    Returns (result_dict, Controller) — no side effects.
     """
     init_toolkit()
     logger.info("Connecting to Win32 window '%s'...", window)
@@ -180,15 +168,6 @@ def _connect_win32_inner(
             f"Failed to connect to '{matched.window_name}' ({hex(matched.hwnd)})."
         )
 
-    info = SessionInfo(
-        type="win32",
-        device=matched.window_name,
-        address=hex(matched.hwnd),
-        screencap_methods=sc_val,
-        input_methods=in_val,
-        window_name=matched.window_name,
-    )
-
     result = {
         "type": "win32",
         "window_name": matched.window_name,
@@ -196,10 +175,10 @@ def _connect_win32_inner(
         "class_name": matched.class_name,
     }
 
-    return result, controller, info
+    return result, controller
 
 
-# ── public service wrappers (thin: call inner + persist) ──────
+# ── public service wrappers (daemon handles session creation) ──
 
 
 @service(
@@ -208,12 +187,13 @@ def _connect_win32_inner(
     human=lambda r: f"Connected to {r.get('device', '?')} ({r.get('address', '?')}) as '{r.get('session', 'default')}'",
 )
 def do_connect_adb(device: str, screenshot_size: int = 720, session_name: str = "default") -> dict:
-    """Connect to an ADB device and persist session."""
-    result, _controller, info = _connect_adb_inner(device, screenshot_size)
+    """Connect to an ADB device (direct-call fallback for DISPATCH table).
 
-    info.name = session_name
-    save_session(info)
-
+    In daemon mode, the server handles session creation directly via
+    ``_connect_adb_inner``.  This wrapper exists only so the service is
+    registered in DISPATCH for action-name lookup.
+    """
+    result, _controller = _connect_adb_inner(device, screenshot_size)
     result["session"] = session_name
     return result
 
@@ -229,11 +209,11 @@ def do_connect_win32(
     input_method: str = "PostMessage",
     session_name: str = "default",
 ) -> dict:
-    """Connect to a Win32 window and persist session."""
-    result, _controller, info = _connect_win32_inner(window, screencap_method, input_method)
+    """Connect to a Win32 window (direct-call fallback for DISPATCH table).
 
-    info.name = session_name
-    save_session(info)
-
+    In daemon mode, the server handles session creation directly via
+    ``_connect_win32_inner``.
+    """
+    result, _controller = _connect_win32_inner(window, screencap_method, input_method)
     result["session"] = session_name
     return result

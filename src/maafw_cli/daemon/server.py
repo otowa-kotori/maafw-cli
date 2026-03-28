@@ -332,18 +332,23 @@ class DaemonServer:
     async def _handle_connect_adb(
         self, params: dict[str, Any], request: dict[str, Any],
     ) -> dict[str, Any]:
-        """Handle connect_adb: create a named session via inner function."""
+        """Handle connect_adb: ensure session exists and attach controller."""
         from maafw_cli.services.connection import _connect_adb_inner
 
         device = params.get("device", "")
         screenshot_size = params.get("screenshot_size", 720)
-        session_name = params.get("session_name") or request.get("session_name") or device
+        session_name = (
+            request.get("session")
+            or params.get("session_name")
+            or device
+        )
 
-        result, controller, info = await asyncio.to_thread(
+        result, controller = await asyncio.to_thread(
             _connect_adb_inner, device, screenshot_size,
         )
-        info.name = session_name
-        await self.session_mgr.add(session_name, controller, info)
+        session = await self.session_mgr.ensure(session_name)
+        async with session.lock:
+            session.attach(controller, "adb", result["device"])
 
         result["session"] = session_name
         return result
@@ -351,19 +356,24 @@ class DaemonServer:
     async def _handle_connect_win32(
         self, params: dict[str, Any], request: dict[str, Any],
     ) -> dict[str, Any]:
-        """Handle connect_win32: create a named session via inner function."""
+        """Handle connect_win32: ensure session exists and attach controller."""
         from maafw_cli.services.connection import _connect_win32_inner
 
         window = params.get("window", "")
         screencap_method = params.get("screencap_method", "FramePool,PrintWindow")
         input_method = params.get("input_method", "PostMessage")
-        session_name = params.get("session_name") or request.get("session_name") or window
+        session_name = (
+            request.get("session")
+            or params.get("session_name")
+            or window
+        )
 
-        result, controller, info = await asyncio.to_thread(
+        result, controller = await asyncio.to_thread(
             _connect_win32_inner, window, screencap_method, input_method,
         )
-        info.name = session_name
-        await self.session_mgr.add(session_name, controller, info)
+        session = await self.session_mgr.ensure(session_name)
+        async with session.lock:
+            session.attach(controller, "win32", result["window_name"])
 
         result["session"] = session_name
         return result

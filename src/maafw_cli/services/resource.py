@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from maafw_cli.core.errors import ActionError
 from maafw_cli.core.log import logger
+from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.registry import service
 
 
@@ -39,18 +40,16 @@ def do_resource_status() -> dict:
     return {"ocr_model": ocr_ready, "ocr_path": str(ocr_dir)}
 
 
-@service(name="resource_load_image", needs_session=False, human=lambda r: f"Loaded: {r['path']}")
-def do_load_image(path: str) -> dict:
-    """Load image resources into the global Resource (for TemplateMatch etc.)."""
+@service(name="resource_load_image", human=lambda r: f"Loaded: {r['path']}")
+def do_load_image(ctx: ServiceContext, path: str) -> dict:
+    """Load image resources into the session-scoped Resource (for TemplateMatch etc.)."""
     from pathlib import Path
 
     p = Path(path)
     if not p.exists():
         raise ActionError(f"Path not found: {path}")
 
-    from maafw_cli.maafw.vision import load_image
-
-    ok = load_image(p)
+    ok = ctx.session.load_image(str(p))
     if not ok:
         raise ActionError(f"Failed to load image resource from: {path}")
 

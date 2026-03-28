@@ -7,16 +7,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from maafw_cli.core.errors import DeviceConnectionError
-from maafw_cli.core.session import SessionInfo
-from maafw_cli.daemon.session_mgr import ManagedSession, SessionManager
+from maafw_cli.core.session import Session
+from maafw_cli.daemon.session_mgr import SessionManager
 from mock_controller import MockController
 
 # Import services to populate DISPATCH table
 import maafw_cli.services.interaction  # noqa: F401
-
-
-def _make_info(type_: str = "adb", device: str = "emu-5554") -> SessionInfo:
-    return SessionInfo(type=type_, device=device)
 
 
 def _run(coro):
@@ -28,19 +24,19 @@ class TestSessionManagerBasics:
     def test_add_and_get(self):
         mgr = SessionManager()
         ctrl = MockController()
-        _run(mgr.add("phone", ctrl, _make_info()))
+        _run(mgr.add("phone", ctrl, "adb", "emu-5554"))
         session = mgr.get("phone")
         assert session.name == "phone"
         assert session.controller is ctrl
 
     def test_first_session_becomes_default(self):
         mgr = SessionManager()
-        _run(mgr.add("phone", MockController(), _make_info()))
+        _run(mgr.add("phone", MockController(), "adb", "emu-5554"))
         assert mgr.default_name == "phone"
 
     def test_get_none_returns_default(self):
         mgr = SessionManager()
-        _run(mgr.add("phone", MockController(), _make_info()))
+        _run(mgr.add("phone", MockController(), "adb", "emu-5554"))
         session = mgr.get(None)
         assert session.name == "phone"
 
@@ -56,8 +52,8 @@ class TestSessionManagerBasics:
 
     def test_list_sessions(self):
         mgr = SessionManager()
-        _run(mgr.add("phone", MockController(), _make_info(device="emu-5554")))
-        _run(mgr.add("tablet", MockController(), _make_info(device="emu-5556")))
+        _run(mgr.add("phone", MockController(), "adb", "emu-5554"))
+        _run(mgr.add("tablet", MockController(), "adb", "emu-5556"))
         result = mgr.list_sessions()
         assert len(result) == 2
         names = {s["name"] for s in result}
@@ -70,20 +66,20 @@ class TestSessionManagerBasics:
     def test_count(self):
         mgr = SessionManager()
         assert mgr.count == 0
-        _run(mgr.add("phone", MockController(), _make_info()))
+        _run(mgr.add("phone", MockController(), "adb", "emu-5554"))
         assert mgr.count == 1
 
     def test_session_names(self):
         mgr = SessionManager()
-        _run(mgr.add("a", MockController(), _make_info()))
-        _run(mgr.add("b", MockController(), _make_info()))
+        _run(mgr.add("a", MockController(), "adb", "emu"))
+        _run(mgr.add("b", MockController(), "adb", "emu"))
         assert set(mgr.session_names) == {"a", "b"}
 
 
 class TestSessionManagerClose:
     def test_close_session(self):
         mgr = SessionManager()
-        _run(mgr.add("phone", MockController(), _make_info()))
+        _run(mgr.add("phone", MockController(), "adb", "emu-5554"))
         _run(mgr.close("phone"))
         assert mgr.count == 0
 
@@ -94,8 +90,8 @@ class TestSessionManagerClose:
 
     def test_close_default_switches(self):
         mgr = SessionManager()
-        _run(mgr.add("phone", MockController(), _make_info()))
-        _run(mgr.add("tablet", MockController(), _make_info()))
+        _run(mgr.add("phone", MockController(), "adb", "emu-5554"))
+        _run(mgr.add("tablet", MockController(), "adb", "emu-5556"))
         assert mgr.default_name == "phone"
         _run(mgr.close("phone"))
         # Default switches to remaining session
@@ -103,14 +99,14 @@ class TestSessionManagerClose:
 
     def test_close_last_session_clears_default(self):
         mgr = SessionManager()
-        _run(mgr.add("phone", MockController(), _make_info()))
+        _run(mgr.add("phone", MockController(), "adb", "emu-5554"))
         _run(mgr.close("phone"))
         assert mgr.default_name is None
 
     def test_close_all(self):
         mgr = SessionManager()
-        _run(mgr.add("a", MockController(), _make_info()))
-        _run(mgr.add("b", MockController(), _make_info()))
+        _run(mgr.add("a", MockController(), "adb", "emu"))
+        _run(mgr.add("b", MockController(), "adb", "emu"))
         _run(mgr.close_all())
         assert mgr.count == 0
         assert mgr.default_name is None
@@ -119,8 +115,8 @@ class TestSessionManagerClose:
 class TestSessionManagerDefault:
     def test_set_default(self):
         mgr = SessionManager()
-        _run(mgr.add("phone", MockController(), _make_info()))
-        _run(mgr.add("tablet", MockController(), _make_info()))
+        _run(mgr.add("phone", MockController(), "adb", "emu"))
+        _run(mgr.add("tablet", MockController(), "adb", "emu"))
         mgr.set_default("tablet")
         assert mgr.default_name == "tablet"
 
@@ -135,24 +131,21 @@ class TestSessionManagerReplace:
         mgr = SessionManager()
         ctrl1 = MockController()
         ctrl2 = MockController()
-        _run(mgr.add("phone", ctrl1, _make_info(device="old")))
-        _run(mgr.add("phone", ctrl2, _make_info(device="new")))
+        _run(mgr.add("phone", ctrl1, "adb", "old"))
+        _run(mgr.add("phone", ctrl2, "adb", "new"))
         session = mgr.get("phone")
         assert session.controller is ctrl2
-        assert session.session_info.device == "new"
+        assert session.device == "new"
         assert mgr.count == 1
 
 
-class TestManagedSession:
+class TestSessionServiceContext:
     def test_make_service_context(self):
         ctrl = MockController()
-        info = _make_info(type_="adb", device="emu")
-        session = ManagedSession(
-            name="phone",
-            controller=ctrl,
-            session_info=info,
-        )
-        svc_ctx = session.make_service_context()
+        session = Session(name="phone")
+        session.attach(ctrl, "adb", "emu")
+        from maafw_cli.services.context import ServiceContext
+        svc_ctx = ServiceContext(session)
         assert svc_ctx.controller is ctrl
         assert svc_ctx.session_type == "adb"
         assert svc_ctx.session_name == "phone"
@@ -162,7 +155,7 @@ class TestSessionManagerExecute:
     def test_execute_click(self):
         mgr = SessionManager()
         ctrl = MockController()
-        _run(mgr.add("phone", ctrl, _make_info()))
+        _run(mgr.add("phone", ctrl, "adb", "emu-5554"))
 
         result = _run(
             mgr.execute("click", {"target": "100,200"}, session_name="phone")
@@ -174,7 +167,7 @@ class TestSessionManagerExecute:
 
     def test_execute_unknown_action_raises(self):
         mgr = SessionManager()
-        _run(mgr.add("phone", MockController(), _make_info()))
+        _run(mgr.add("phone", MockController(), "adb", "emu-5554"))
 
         with pytest.raises(ValueError, match="Unknown action"):
             _run(
@@ -184,7 +177,7 @@ class TestSessionManagerExecute:
     def test_execute_uses_default_session(self):
         mgr = SessionManager()
         ctrl = MockController()
-        _run(mgr.add("phone", ctrl, _make_info()))
+        _run(mgr.add("phone", ctrl, "adb", "emu-5554"))
 
         result = _run(
             mgr.execute("click", {"target": "50,60"})
@@ -252,11 +245,10 @@ class TestSessionManagerConcurrency:
 
     def test_concurrent_adds_safe(self):
         mgr = SessionManager()
-        info = SessionInfo(type="adb", device="test")
 
         async def run():
             await asyncio.gather(*[
-                mgr.add(f"s{i}", MockController(), info)
+                mgr.add(f"s{i}", MockController(), "adb", "test")
                 for i in range(20)
             ])
 
@@ -265,16 +257,15 @@ class TestSessionManagerConcurrency:
 
     def test_concurrent_add_and_close(self):
         mgr = SessionManager()
-        info = SessionInfo(type="adb", device="test")
 
         async def run():
             for i in range(5):
-                await mgr.add(f"s{i}", MockController(), info)
+                await mgr.add(f"s{i}", MockController(), "adb", "test")
 
             tasks = []
             for i in range(5):
                 tasks.append(mgr.close(f"s{i}"))
-                tasks.append(mgr.add(f"new{i}", MockController(), info))
+                tasks.append(mgr.add(f"new{i}", MockController(), "adb", "test"))
             await asyncio.gather(*tasks, return_exceptions=True)
 
         _run(run())
@@ -288,9 +279,8 @@ class TestSessionManagerDestroyInThread:
         mgr = SessionManager()
         ctrl = MockController()
         ctrl.destroy = MagicMock()
-        info = SessionInfo(type="adb", device="test")
 
-        _run(mgr.add("test", ctrl, info))
+        _run(mgr.add("test", ctrl, "adb", "test"))
         _run(mgr.close("test"))
 
         ctrl.destroy.assert_called_once()

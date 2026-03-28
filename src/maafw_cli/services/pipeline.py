@@ -1,9 +1,8 @@
 """
 Pipeline services — run, load, list, show, validate.
 
-``pipeline_run`` needs a session (controller) to execute pipelines.
-All other services are ``needs_session=False`` — they only operate on
-the global cached Resource.
+All pipeline services require a session to ensure per-session resource
+isolation (template images and pipeline definitions).
 """
 from __future__ import annotations
 
@@ -35,7 +34,6 @@ def _summarize_node(nd: Any) -> dict[str, Any]:
         }
         if reco.box:
             reco_info["box"] = list(reco.box)
-        # best_result may carry score / text depending on algorithm
         if reco.best_result:
             br = reco.best_result
             if hasattr(br, "score") and br.score is not None:
@@ -73,28 +71,22 @@ def do_pipeline_run(
     entry: str | None = None,
     override: str | None = None,
 ) -> dict:
-    """Load a pipeline and execute it from *entry*.
-
-    If *entry* is ``None``, defaults to the first loaded node.
-    *override* is a JSON string of per-node overrides.
-    """
+    """Load a pipeline and execute it from *entry*."""
     from maafw_cli.maafw.pipeline import load_pipeline, run_pipeline, list_nodes
 
     init_toolkit()
+    ss = ctx.session
 
-    # 1. Load pipeline definitions
-    ok = load_pipeline(path)
+    ok = load_pipeline(ss, path)
     if not ok:
         raise ActionError(f"Failed to load pipeline from: {path}")
 
-    # 2. Resolve entry
     if entry is None:
-        nodes = list_nodes()
+        nodes = list_nodes(ss)
         if not nodes:
             raise ActionError("Pipeline loaded but contains no nodes.")
         entry = nodes[0]
 
-    # 3. Parse override JSON
     override_dict: dict[str, Any] | None = None
     if override is not None:
         try:
@@ -102,17 +94,14 @@ def do_pipeline_run(
         except json.JSONDecodeError as exc:
             raise ActionError(f"Invalid override JSON: {exc}")
 
-    # 4. Execute
     with Timer("pipeline_run service", log=_log) as t:
-        detail = run_pipeline(ctx.controller, entry, override_dict)
+        detail = run_pipeline(ss, entry, override_dict)
 
-    # 5. Summarise
     node_summaries = [_summarize_node(nd) for nd in detail.nodes] if detail.nodes else []
-
     status = "succeeded" if detail.nodes else "no_nodes"
 
     return {
-        "session": ctx.session_name or "default",
+        "session": ctx.session_name,
         "entry": entry,
         "status": status,
         "nodes": node_summaries,
@@ -123,50 +112,49 @@ def do_pipeline_run(
 
 @service(
     name="pipeline_load",
-    needs_session=False,
     human=lambda r: f"Loaded {r['node_count']} nodes from pipeline.",
 )
-def do_pipeline_load(path: str) -> dict:
-    """Load pipeline definitions into the Resource (without executing)."""
+def do_pipeline_load(ctx: ServiceContext, path: str) -> dict:
+    """Load pipeline definitions into the session-scoped Resource."""
     from maafw_cli.maafw.pipeline import load_pipeline, list_nodes
 
     init_toolkit()
-    ok = load_pipeline(path)
+    ss = ctx.session
+    ok = load_pipeline(ss, path)
     if not ok:
         raise ActionError(f"Failed to load pipeline from: {path}")
 
-    nodes = list_nodes()
+    nodes = list_nodes(ss)
     return {"loaded": True, "nodes": nodes, "node_count": len(nodes)}
 
 
 @service(
     name="pipeline_list",
-    needs_session=False,
     human=lambda r: "\n".join(r["nodes"]) if r["nodes"] else "(no nodes loaded)",
 )
-def do_pipeline_list() -> dict:
-    """List all node names currently loaded in the Resource."""
+def do_pipeline_list(ctx: ServiceContext) -> dict:
+    """List all node names currently loaded in the session-scoped Resource."""
     from maafw_cli.maafw.pipeline import list_nodes
 
-    nodes = list_nodes()
+    nodes = list_nodes(ctx.session)
     return {"nodes": nodes, "node_count": len(nodes)}
 
 
-@service(name="pipeline_show", needs_session=False)
-def do_pipeline_show(node: str) -> dict:
+@service(name="pipeline_show")
+def do_pipeline_show(ctx: ServiceContext, node: str) -> dict:
     """Return the full JSON definition of a single node."""
     from maafw_cli.maafw.pipeline import get_node_data
 
-    definition = get_node_data(node)
+    definition = get_node_data(ctx.session, node)
     if definition is None:
         raise ActionError(f"Node not found: {node}")
     return {"node": node, "definition": definition}
 
 
-@service(name="pipeline_validate", needs_session=False)
-def do_pipeline_validate(path: str) -> dict:
+@service(name="pipeline_validate")
+def do_pipeline_validate(ctx: ServiceContext, path: str) -> dict:
     """Validate a pipeline JSON/directory by attempting to load it."""
     from maafw_cli.maafw.pipeline import validate_pipeline
 
     init_toolkit()
-    return validate_pipeline(path)
+    return validate_pipeline(ctx.session, path)

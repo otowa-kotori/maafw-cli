@@ -9,7 +9,6 @@ import json
 import logging
 from typing import Any
 
-from maa.controller import Controller
 from maa.pipeline import (
     JColorMatch,
     JFeatureMatch,
@@ -21,8 +20,9 @@ from maa.tasker import TaskDetail
 
 from maafw_cli.core.errors import RecognitionError
 from maafw_cli.core.log import Timer
+from maafw_cli.core.session import Session
 from maafw_cli.download import check_ocr_files_exist
-from maafw_cli.maafw.vision import _get_tasker, screencap
+from maafw_cli.maafw.vision import screencap
 
 _log = logging.getLogger("maafw_cli.recognition")
 
@@ -260,7 +260,7 @@ def _build_from_raw_dict(reco_type: str, data: dict) -> Any:
 # ── main entry point ─────────────────────────────────────────────
 
 def recognize(
-    controller: Controller,
+    session: Session,
     reco_type: str,
     params: dict[str, str] | None = None,
     raw: str | None = None,
@@ -269,8 +269,8 @@ def recognize(
 
     Parameters
     ----------
-    controller:
-        Connected MaaFW controller.
+    session:
+        Session (provides controller, Resource, Tasker).
     reco_type:
         Recognition type name (e.g. ``"TemplateMatch"``).
         Ignored when *raw* is provided.
@@ -307,11 +307,11 @@ def recognize(
         if reco_enum == JRecognitionType.OCR and not check_ocr_files_exist():
             raise RecognitionError("OCR model not found. Run: maafw-cli resource download-ocr")
 
-        tasker = _get_tasker(controller)
+        tasker = session.get_tasker()
         if tasker is None:
             raise RecognitionError("Failed to initialize tasker (resource load failed).")
 
-        image = screencap(controller)
+        image = screencap(session.controller)
         if image is None:
             raise RecognitionError("Screenshot failed — cannot run recognition without an image.")
 

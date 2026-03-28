@@ -1,44 +1,21 @@
 """
-SessionManager — named sessions with controllers and elements in memory.
+SessionManager — named sessions backed by :class:`Session`.
 
-Each ``ManagedSession`` holds a Controller, ElementStore, SessionInfo,
-and a per-session asyncio Lock for concurrency safety.
+Each session holds a controller, Resource, ElementStore, and an asyncio Lock
+for daemon concurrency protection.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
 from typing import Any
 
 from maafw_cli.core.errors import DeviceConnectionError
-from maafw_cli.core.session import SessionInfo
-from maafw_cli.core.element import ElementStore
+from maafw_cli.core.session import Session
 from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.registry import DISPATCH
 
 _log = logging.getLogger("maafw_cli.daemon.session_mgr")
-
-
-@dataclass
-class ManagedSession:
-    """A live daemon session — controller + metadata."""
-
-    name: str
-    controller: Any  # Controller (typed as Any to allow mocking)
-    session_info: SessionInfo
-    element_store: ElementStore = field(default_factory=lambda: ElementStore(path=None))
-    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-
-    def make_service_context(self) -> ServiceContext:
-        """Build a ServiceContext for executing service functions."""
-        return ServiceContext(
-            get_controller=lambda: self.controller,
-            elements_path=None,
-            session_type=self.session_info.type,
-            element_store=self.element_store,
-            session_name=self.name,
-        )
 
 
 class SessionManager:
@@ -49,42 +26,47 @@ class SessionManager:
     """
 
     def __init__(self) -> None:
-        self._sessions: dict[str, ManagedSession] = {}
+        self._sessions: dict[str, Session] = {}
         self._default: str | None = None
         self._lock = asyncio.Lock()
 
-    # ── add / get / close ───────────────────────────────────────
+    # ── ensure / add / get / close ───────────────────────────────
+
+    async def ensure(self, name: str) -> Session:
+        """Return the session *name*, creating an empty one if it doesn't exist.
+
+        The first session created automatically becomes the default.
+        """
+        async with self._lock:
+            if name in self._sessions:
+                return self._sessions[name]
+
+            session = Session(name=name)
+            self._sessions[name] = session
+
+            if self._default is None:
+                self._default = name
+
+            _log.info("Created empty session '%s'", name)
+            return session
 
     async def add(
         self,
         name: str,
         controller: Any,
-        session_info: SessionInfo,
-    ) -> ManagedSession:
-        """Add a named session.  If *name* already exists, close the old one first."""
-        async with self._lock:
-            if name in self._sessions:
-                _log.info("Replacing existing session '%s'", name)
-                await self._close_session_unlocked(name)
+        type: str,
+        device: str,
+    ) -> Session:
+        """Ensure session *name* exists and attach a controller to it."""
+        session = await self.ensure(name)
+        async with session.lock:
+            session.attach(controller, type, device)
+        return session
 
-            session = ManagedSession(
-                name=name,
-                controller=controller,
-                session_info=session_info,
-            )
-            self._sessions[name] = session
-
-            # First session becomes default automatically
-            if self._default is None:
-                self._default = name
-
-            _log.info("Added session '%s' (type=%s, device=%s)", name, session_info.type, session_info.device)
-            return session
-
-    def get(self, name: str | None = None) -> ManagedSession:
+    def get(self, name: str | None = None) -> Session:
         """Get a session by name, or the default if *name* is None.
 
-        Raises :class:`ConnectionError` if no matching session.
+        Raises :class:`DeviceConnectionError` if no matching session.
         """
         if name is None:
             name = self._default
@@ -113,16 +95,17 @@ class SessionManager:
             return
 
         # Try to destroy the controller (may block — run in thread)
-        try:
-            if hasattr(session.controller, "destroy"):
-                await asyncio.to_thread(session.controller.destroy)
-        except Exception:
-            _log.warning("Error destroying controller for session '%s'", name, exc_info=True)
+        ctrl = session._controller
+        if ctrl is not None:
+            try:
+                if hasattr(ctrl, "destroy"):
+                    await asyncio.to_thread(ctrl.destroy)
+            except Exception:
+                _log.warning("Error destroying controller for session '%s'", name, exc_info=True)
 
         # Update default if needed
         if self._default == name:
             if self._sessions:
-                # Pick the most recently added remaining session
                 self._default = next(iter(self._sessions))
             else:
                 self._default = None
@@ -136,8 +119,9 @@ class SessionManager:
         return [
             {
                 "name": s.name,
-                "type": s.session_info.type,
-                "device": s.session_info.device,
+                "type": s.type or None,
+                "device": s.device or None,
+                "connected": s.has_controller,
                 "is_default": s.name == self._default,
             }
             for s in self._sessions.values()
@@ -176,6 +160,9 @@ class SessionManager:
 
         Services marked with ``needs_session=False`` are executed directly
         without a session context (e.g. ``device_list``, ``resource_status``).
+
+        For session-scoped services, the session is auto-created if it
+        doesn't exist yet (via :meth:`ensure`).
         """
         service_fn = DISPATCH.get(action)
         if service_fn is None:
@@ -184,14 +171,12 @@ class SessionManager:
         needs_session = getattr(service_fn, "needs_session", True)
 
         if not needs_session:
-            # Global service — no session required, run in thread directly
             result = await asyncio.to_thread(service_fn, **params)
             return result
 
-        session = self.get(session_name)
+        session = await self.ensure(session_name or self._default or "default")
 
         async with session.lock:
-            svc_ctx = session.make_service_context()
-            # Service functions do blocking I/O — run in thread
+            svc_ctx = ServiceContext(session)
             result = await asyncio.to_thread(service_fn, svc_ctx, **params)
             return result

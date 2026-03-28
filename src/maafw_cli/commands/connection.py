@@ -87,16 +87,14 @@ def connect():
 @click.argument("device")
 @click.option("--screenshot-size", type=click.IntRange(min=1), default=720,
               help="Screenshot short-side resolution (default 720).")
-@click.option("--as", "session_name", default=None,
-              help="Name this session (default: device address).")
 @pass_ctx
-def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
-                session_name: str | None) -> None:
+def connect_adb(ctx: CliContext, device: str, screenshot_size: int) -> None:
     """Connect to an ADB device by name or address.
 
     DEVICE is the device name as shown by ``device adb``.
+    Use ``--on NAME`` to assign a session name (default: device address).
     """
-    name = session_name or device
+    name = ctx.on or device
     ctx.run(
         do_connect_adb,
         device=device,
@@ -113,18 +111,16 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
 @click.option("--input-method", type=str,
               default="PostMessage", show_default=True,
               help="Win32 input method (comma-separated for fallback, e.g. PostMessage,Seize).")
-@click.option("--as", "session_name", default=None,
-              help="Name this session (default: window title).")
 @pass_ctx
 def connect_win32_cmd(ctx: CliContext, window: str,
-                      screencap_method: str, input_method: str,
-                      session_name: str | None) -> None:
+                      screencap_method: str, input_method: str) -> None:
     """Connect to a Win32 window by title or hwnd (0x...).
 
     WINDOW is a window title substring (case-insensitive) or a hex hwnd
     like ``0x000A0B2C``.
+    Use ``--on NAME`` to assign a session name (default: window title).
     """
-    name = session_name or window
+    name = ctx.on or window
     ctx.run(
         do_connect_win32,
         window=window,

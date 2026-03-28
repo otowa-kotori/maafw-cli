@@ -28,16 +28,15 @@ def do_ocr(ctx: ServiceContext, roi: str | None = None) -> dict:
         from maafw_cli.maafw.vision import ocr as _ocr
 
         roi_tuple = _parse_roi(roi)
-        results = _ocr(ctx.controller, roi=roi_tuple)
+        results = _ocr(ctx.session, roi=roi_tuple)
 
     elapsed_ms = t.elapsed_ms
 
     store = ctx.get_element_store()
     elements = store.build_from_ocr(results)
-    store.save()
 
     return {
-        "session": "default",
+        "session": ctx.session_name,
         "results": [e.to_dict() for e in elements],
         "elapsed_ms": elapsed_ms,
     }

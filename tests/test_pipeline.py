@@ -53,108 +53,102 @@ def _make_task_detail(nodes=None):
 
 
 class TestPipelineMaafw:
-    """Low-level pipeline functions with mocked Resource/Tasker."""
+    """Low-level pipeline functions with mocked Session."""
 
-    @patch("maafw_cli.maafw.pipeline._get_resource")
-    def test_load_pipeline_success(self, mock_res):
+    def _make_session(self):
+        return MagicMock()
+
+    def test_load_pipeline_success(self):
         from maafw_cli.maafw.pipeline import load_pipeline
 
-        resource = MagicMock()
-        resource.post_pipeline.return_value.wait.return_value.succeeded = True
-        mock_res.return_value = resource
+        session = self._make_session()
+        session.load_pipeline.return_value = True
 
-        assert load_pipeline("/tmp/pipeline") is True
-        resource.post_pipeline.assert_called_once_with("/tmp/pipeline")
+        assert load_pipeline(session, "/tmp/pipeline") is True
+        session.load_pipeline.assert_called_once_with("/tmp/pipeline")
 
-    @patch("maafw_cli.maafw.pipeline._get_resource")
-    def test_load_pipeline_failure(self, mock_res):
+    def test_load_pipeline_failure(self):
         from maafw_cli.maafw.pipeline import load_pipeline
 
-        resource = MagicMock()
-        resource.post_pipeline.return_value.wait.return_value.succeeded = False
-        mock_res.return_value = resource
+        session = self._make_session()
+        session.load_pipeline.return_value = False
 
-        assert load_pipeline("/tmp/pipeline") is False
+        assert load_pipeline(session, "/tmp/pipeline") is False
 
-    @patch("maafw_cli.maafw.pipeline._get_resource")
-    def test_load_pipeline_no_resource(self, mock_res):
+    def test_load_pipeline_no_resource(self):
         from maafw_cli.maafw.pipeline import load_pipeline
 
-        mock_res.return_value = None
+        session = self._make_session()
+        session.load_pipeline.side_effect = ActionError("Resource initialization failed.")
 
         with pytest.raises(ActionError, match="Resource initialization failed"):
-            load_pipeline("/tmp/pipeline")
+            load_pipeline(session, "/tmp/pipeline")
 
-    @patch("maafw_cli.maafw.pipeline._get_tasker")
-    def test_run_pipeline_success(self, mock_tasker_fn):
+    def test_run_pipeline_success(self):
         from maafw_cli.maafw.pipeline import run_pipeline
 
         detail = _make_task_detail([_make_node_detail()])
+        session = self._make_session()
         tasker = MagicMock()
         tasker.post_task.return_value.wait.return_value.get.return_value = detail
-        mock_tasker_fn.return_value = tasker
+        session.get_tasker.return_value = tasker
 
-        controller = MagicMock()
-        result = run_pipeline(controller, "StartNode", {"A": {}})
+        result = run_pipeline(session, "StartNode", {"A": {}})
 
         tasker.post_task.assert_called_once_with("StartNode", {"A": {}})
         assert result is detail
 
-    @patch("maafw_cli.maafw.pipeline._get_tasker")
-    def test_run_pipeline_no_tasker(self, mock_tasker_fn):
+    def test_run_pipeline_no_tasker(self):
         from maafw_cli.maafw.pipeline import run_pipeline
 
-        mock_tasker_fn.return_value = None
+        session = self._make_session()
+        session.get_tasker.return_value = None
 
         with pytest.raises(ActionError, match="Failed to initialize tasker"):
-            run_pipeline(MagicMock(), "StartNode")
+            run_pipeline(session, "StartNode")
 
-    @patch("maafw_cli.maafw.pipeline._get_tasker")
-    def test_run_pipeline_no_result(self, mock_tasker_fn):
+    def test_run_pipeline_no_result(self):
         from maafw_cli.maafw.pipeline import run_pipeline
 
+        session = self._make_session()
         tasker = MagicMock()
         tasker.post_task.return_value.wait.return_value.get.return_value = None
-        mock_tasker_fn.return_value = tasker
+        session.get_tasker.return_value = tasker
 
         with pytest.raises(ActionError, match="returned no result"):
-            run_pipeline(MagicMock(), "StartNode")
+            run_pipeline(session, "StartNode")
 
-    @patch("maafw_cli.maafw.pipeline._get_resource")
-    def test_list_nodes(self, mock_res):
+    def test_list_nodes(self):
         from maafw_cli.maafw.pipeline import list_nodes
 
-        resource = MagicMock()
-        resource.node_list = ["A", "B", "C"]
-        mock_res.return_value = resource
+        session = self._make_session()
+        session.list_nodes.return_value = ["A", "B", "C"]
 
-        assert list_nodes() == ["A", "B", "C"]
+        assert list_nodes(session) == ["A", "B", "C"]
 
-    @patch("maafw_cli.maafw.pipeline._get_resource")
-    def test_list_nodes_no_resource(self, mock_res):
+    def test_list_nodes_no_resource(self):
         from maafw_cli.maafw.pipeline import list_nodes
 
-        mock_res.return_value = None
+        session = self._make_session()
+        session.list_nodes.side_effect = ActionError("Resource not initialized.")
 
         with pytest.raises(ActionError, match="Resource not initialized"):
-            list_nodes()
+            list_nodes(session)
 
-    @patch("maafw_cli.maafw.pipeline._get_resource")
-    def test_get_node_data(self, mock_res):
+    def test_get_node_data(self):
         from maafw_cli.maafw.pipeline import get_node_data
 
-        resource = MagicMock()
-        resource.get_node_data.return_value = {"action": "Click"}
-        mock_res.return_value = resource
+        session = self._make_session()
+        session.get_node_data.return_value = {"action": "Click"}
 
-        assert get_node_data("NodeA") == {"action": "Click"}
+        assert get_node_data(session, "NodeA") == {"action": "Click"}
 
-    @patch("maafw_cli.maafw.pipeline._get_resource")
-    def test_get_node_data_no_resource(self, mock_res):
+    def test_get_node_data_no_resource(self):
         from maafw_cli.maafw.pipeline import get_node_data
 
-        mock_res.return_value = None
-        assert get_node_data("NodeA") is None
+        session = self._make_session()
+        session.get_node_data.return_value = None
+        assert get_node_data(session, "NodeA") is None
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -178,21 +172,21 @@ class TestPipelineService:
         from maafw_cli.services.pipeline import do_pipeline_run
         assert do_pipeline_run.needs_session is True
 
-    def test_load_no_session(self):
+    def test_load_needs_session(self):
         from maafw_cli.services.pipeline import do_pipeline_load
-        assert do_pipeline_load.needs_session is False
+        assert do_pipeline_load.needs_session is True
 
-    def test_list_no_session(self):
+    def test_list_needs_session(self):
         from maafw_cli.services.pipeline import do_pipeline_list
-        assert do_pipeline_list.needs_session is False
+        assert do_pipeline_list.needs_session is True
 
-    def test_show_no_session(self):
+    def test_show_needs_session(self):
         from maafw_cli.services.pipeline import do_pipeline_show
-        assert do_pipeline_show.needs_session is False
+        assert do_pipeline_show.needs_session is True
 
-    def test_validate_no_session(self):
+    def test_validate_needs_session(self):
         from maafw_cli.services.pipeline import do_pipeline_validate
-        assert do_pipeline_validate.needs_session is False
+        assert do_pipeline_validate.needs_session is True
 
     @patch("maafw_cli.services.pipeline.init_toolkit")
     @patch("maafw_cli.maafw.pipeline.run_pipeline")
@@ -268,7 +262,8 @@ class TestPipelineService:
     def test_do_pipeline_load(self, mock_load, mock_list, mock_init):
         from maafw_cli.services.pipeline import do_pipeline_load
 
-        result = do_pipeline_load(path="/tmp/p")
+        ctx = MagicMock()
+        result = do_pipeline_load(ctx, path="/tmp/p")
         assert result["loaded"] is True
         assert result["nodes"] == ["A", "B"]
         assert result["node_count"] == 2
@@ -277,7 +272,8 @@ class TestPipelineService:
     def test_do_pipeline_list(self, mock_list):
         from maafw_cli.services.pipeline import do_pipeline_list
 
-        result = do_pipeline_list()
+        ctx = MagicMock()
+        result = do_pipeline_list(ctx)
         assert result["nodes"] == ["X", "Y", "Z"]
         assert result["node_count"] == 3
 
@@ -285,7 +281,8 @@ class TestPipelineService:
     def test_do_pipeline_show(self, mock_get):
         from maafw_cli.services.pipeline import do_pipeline_show
 
-        result = do_pipeline_show(node="NodeA")
+        ctx = MagicMock()
+        result = do_pipeline_show(ctx, node="NodeA")
         assert result["node"] == "NodeA"
         assert result["definition"] == {"action": "Click"}
 
@@ -293,8 +290,9 @@ class TestPipelineService:
     def test_do_pipeline_show_not_found(self, mock_get):
         from maafw_cli.services.pipeline import do_pipeline_show
 
+        ctx = MagicMock()
         with pytest.raises(ActionError, match="Node not found"):
-            do_pipeline_show(node="Missing")
+            do_pipeline_show(ctx, node="Missing")
 
     @patch("maafw_cli.services.pipeline.init_toolkit")
     @patch("maafw_cli.maafw.pipeline.validate_pipeline")
@@ -302,7 +300,8 @@ class TestPipelineService:
         from maafw_cli.services.pipeline import do_pipeline_validate
 
         mock_val.return_value = {"valid": True, "nodes": ["A"], "node_count": 1}
-        result = do_pipeline_validate(path="/tmp/p")
+        ctx = MagicMock()
+        result = do_pipeline_validate(ctx, path="/tmp/p")
         assert result["valid"] is True
 
     @patch("maafw_cli.services.pipeline.init_toolkit")
@@ -311,7 +310,8 @@ class TestPipelineService:
         from maafw_cli.services.pipeline import do_pipeline_validate
 
         mock_val.return_value = {"valid": False, "error": "bad json", "nodes": [], "node_count": 0}
-        result = do_pipeline_validate(path="/tmp/p")
+        ctx = MagicMock()
+        result = do_pipeline_validate(ctx, path="/tmp/p")
         assert result["valid"] is False
         assert "bad json" in result["error"]
 

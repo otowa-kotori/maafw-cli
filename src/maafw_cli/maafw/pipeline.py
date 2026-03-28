@@ -1,44 +1,31 @@
 """
 Pipeline operations — load, run, list, get, validate via MaaFramework.
 
-Reuses the cached Resource from ``vision.py`` for the OCR model bundle,
-and provides pipeline-specific wrappers around ``Resource.post_pipeline()``,
-``Tasker.post_task()``, etc.
+All functions take a ``Session`` as their first argument for
+per-session resource isolation.
 """
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Any
 
-from maa.controller import Controller
-from maa.resource import Resource
-from maa.tasker import Tasker, TaskDetail
+from maa.tasker import TaskDetail
 
 from maafw_cli.core.errors import ActionError
 from maafw_cli.core.log import Timer
-from maafw_cli.maafw.vision import _get_resource, _get_tasker
+from maafw_cli.core.session import Session
 
 _log = logging.getLogger("maafw_cli.maafw.pipeline")
 
 
-def load_pipeline(path: str | Path) -> bool:
-    """Load pipeline JSON/directory into the cached Resource.
-
-    *path* can be a directory containing pipeline JSON files or a single
-    JSON file.  Returns ``True`` on success.
-    """
-    resource = _get_resource()
-    if resource is None:
-        raise ActionError("Resource initialization failed.")
-
-    with Timer("pipeline load", log=_log):
-        return resource.post_pipeline(str(path)).wait().succeeded
+def load_pipeline(session: Session, path: str | Path) -> bool:
+    """Load pipeline JSON/directory into the session's Resource."""
+    return session.load_pipeline(str(path))
 
 
 def run_pipeline(
-    controller: Controller,
+    session: Session,
     entry: str,
     pipeline_override: dict[str, Any] | None = None,
 ) -> TaskDetail:
@@ -47,7 +34,7 @@ def run_pipeline(
     Blocks until the pipeline finishes.  Raises :class:`ActionError` if
     the tasker cannot be initialised or if the pipeline returns no result.
     """
-    tasker = _get_tasker(controller)
+    tasker = session.get_tasker()
     if tasker is None:
         raise ActionError("Failed to initialize tasker.")
 
@@ -60,30 +47,24 @@ def run_pipeline(
     return detail
 
 
-def list_nodes() -> list[str]:
-    """Return all node names currently loaded in the Resource."""
-    resource = _get_resource()
-    if resource is None:
-        raise ActionError("Resource not initialized.")
-    return resource.node_list
+def list_nodes(session: Session) -> list[str]:
+    """Return all node names currently loaded in the session's Resource."""
+    return session.list_nodes()
 
 
-def get_node_data(name: str) -> dict[str, Any] | None:
+def get_node_data(session: Session, name: str) -> dict[str, Any] | None:
     """Return the JSON definition of a single node, or ``None``."""
-    resource = _get_resource()
-    if resource is None:
-        return None
-    return resource.get_node_data(name)
+    return session.get_node_data(name)
 
 
-def validate_pipeline(path: str | Path) -> dict[str, Any]:
+def validate_pipeline(session: Session, path: str | Path) -> dict[str, Any]:
     """Validate a pipeline JSON/directory by attempting to load it.
 
     Returns ``{"valid": True, "nodes": [...], "node_count": N}`` on success,
     or ``{"valid": False, "error": "..."}`` on failure.
     """
     try:
-        ok = load_pipeline(path)
+        ok = load_pipeline(session, path)
     except ActionError as exc:
         return {"valid": False, "error": str(exc), "nodes": [], "node_count": 0}
 
@@ -91,7 +72,7 @@ def validate_pipeline(path: str | Path) -> dict[str, Any]:
         return {"valid": False, "error": "Pipeline loading failed.", "nodes": [], "node_count": 0}
 
     try:
-        nodes = list_nodes()
+        nodes = list_nodes(session)
     except ActionError:
         nodes = []
 

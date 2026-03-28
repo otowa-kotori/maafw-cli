@@ -139,8 +139,18 @@ class TestBuildParamsFromRaw:
 class TestRecognize:
     """Test maafw/recognition.py::recognize()."""
 
+    def _make_session(self, *, tasker=None, image="fake_img"):
+        """Create a mock Session with the interface recognize() expects."""
+        session = MagicMock()
+        session.controller = MagicMock()
+        if tasker is not None:
+            session.get_tasker.return_value = tasker
+        else:
+            session.get_tasker.return_value = MagicMock()
+        return session
+
     def _mock_recognition_pipeline(
-        self, *, all_results=None, info=None, tasker=None, image="fake_img",
+        self, *, all_results=None, info=None, session=None, image="fake_img",
         ocr_exists=True,
     ):
         """Helper to set up mocks for the recognize pipeline."""
@@ -153,25 +163,25 @@ class TestRecognize:
             mock_detail.nodes = [mock_node]
             info = mock_detail
 
-        mock_tasker = MagicMock() if tasker is None else tasker
+        if session is None:
+            session = self._make_session()
         if info is not None:
-            mock_tasker.post_recognition.return_value.wait.return_value.get.return_value = info
+            session.get_tasker.return_value.post_recognition.return_value.wait.return_value.get.return_value = info
 
         patches = {
-            "_get_tasker": patch.object(mod, "_get_tasker", return_value=mock_tasker),
             "screencap": patch.object(mod, "screencap", return_value=image),
             "ocr_check": patch.object(mod, "check_ocr_files_exist", return_value=ocr_exists),
         }
-        return patches
+        return session, patches
 
     def test_template_match_returns_results(self):
         from maa.define import BoxAndScoreResult
         fake_results = [BoxAndScoreResult(box=[10, 20, 30, 40], score=0.95)]
 
-        patches = self._mock_recognition_pipeline(all_results=fake_results)
-        with patches["_get_tasker"], patches["screencap"], patches["ocr_check"]:
+        session, patches = self._mock_recognition_pipeline(all_results=fake_results)
+        with patches["screencap"], patches["ocr_check"]:
             reco_type, results = recognize(
-                MagicMock(), "TemplateMatch", {"template": "btn.png"}
+                session, "TemplateMatch", {"template": "btn.png"}
             )
         assert reco_type == "TemplateMatch"
         assert len(results) == 1
@@ -181,10 +191,10 @@ class TestRecognize:
         from maa.define import BoxAndCountResult
         fake_results = [BoxAndCountResult(box=[100, 200, 50, 50], count=1542)]
 
-        patches = self._mock_recognition_pipeline(all_results=fake_results)
-        with patches["_get_tasker"], patches["screencap"], patches["ocr_check"]:
+        session, patches = self._mock_recognition_pipeline(all_results=fake_results)
+        with patches["screencap"], patches["ocr_check"]:
             reco_type, results = recognize(
-                MagicMock(), "ColorMatch", {"lower": "200,0,0", "upper": "255,50,50"}
+                session, "ColorMatch", {"lower": "200,0,0", "upper": "255,50,50"}
             )
         assert reco_type == "ColorMatch"
         assert len(results) == 1
@@ -194,9 +204,9 @@ class TestRecognize:
         from maa.define import OCRResult
         fake_results = [OCRResult(box=[10, 20, 30, 40], score=0.97, text="设置")]
 
-        patches = self._mock_recognition_pipeline(all_results=fake_results, ocr_exists=True)
-        with patches["_get_tasker"], patches["screencap"], patches["ocr_check"]:
-            reco_type, results = recognize(MagicMock(), "OCR", {})
+        session, patches = self._mock_recognition_pipeline(all_results=fake_results, ocr_exists=True)
+        with patches["screencap"], patches["ocr_check"]:
+            reco_type, results = recognize(session, "OCR", {})
         assert reco_type == "OCR"
         assert results[0].text == "设置"
 
@@ -204,10 +214,10 @@ class TestRecognize:
         from maa.define import BoxAndScoreResult
         fake_results = [BoxAndScoreResult(box=[1, 2, 3, 4], score=0.5)]
 
-        patches = self._mock_recognition_pipeline(all_results=fake_results)
-        with patches["_get_tasker"], patches["screencap"], patches["ocr_check"]:
+        session, patches = self._mock_recognition_pipeline(all_results=fake_results)
+        with patches["screencap"], patches["ocr_check"]:
             reco_type, results = recognize(
-                MagicMock(), reco_type="",
+                session, reco_type="",
                 raw='{"recognition":"TemplateMatch","template":["b.png"]}'
             )
         assert reco_type == "TemplateMatch"
@@ -218,32 +228,32 @@ class TestRecognize:
 
     def test_screenshot_failure_raises(self):
         from maafw_cli.maafw import recognition as mod
-        with patch.object(mod, "_get_tasker", return_value=MagicMock()), \
-             patch.object(mod, "screencap", return_value=None), \
+        session = self._make_session()
+        with patch.object(mod, "screencap", return_value=None), \
              patch.object(mod, "check_ocr_files_exist", return_value=True):
             with pytest.raises(RecognitionError, match="Screenshot failed"):
-                recognize(MagicMock(), "TemplateMatch", {"template": "a.png"})
+                recognize(session, "TemplateMatch", {"template": "a.png"})
 
     def test_tasker_init_failure_raises(self):
         from maafw_cli.maafw import recognition as mod
-        with patch.object(mod, "_get_tasker", return_value=None), \
-             patch.object(mod, "check_ocr_files_exist", return_value=True):
+        session = self._make_session(tasker=None)
+        session.get_tasker.return_value = None
+        with patch.object(mod, "check_ocr_files_exist", return_value=True):
             with pytest.raises(RecognitionError, match="tasker"):
-                recognize(MagicMock(), "TemplateMatch", {"template": "a.png"})
+                recognize(session, "TemplateMatch", {"template": "a.png"})
 
     def test_empty_nodes_raises(self):
         from maafw_cli.maafw import recognition as mod
         mock_detail = MagicMock()
         mock_detail.nodes = []
 
-        mock_tasker = MagicMock()
-        mock_tasker.post_recognition.return_value.wait.return_value.get.return_value = mock_detail
+        session = self._make_session()
+        session.get_tasker.return_value.post_recognition.return_value.wait.return_value.get.return_value = mock_detail
 
-        with patch.object(mod, "_get_tasker", return_value=mock_tasker), \
-             patch.object(mod, "screencap", return_value="fake_img"), \
+        with patch.object(mod, "screencap", return_value="fake_img"), \
              patch.object(mod, "check_ocr_files_exist", return_value=True):
             with pytest.raises(RecognitionError, match="empty nodes"):
-                recognize(MagicMock(), "TemplateMatch", {"template": "a.png"})
+                recognize(session, "TemplateMatch", {"template": "a.png"})
 
     def test_no_reco_type_and_no_raw_raises(self):
         with pytest.raises(RecognitionError, match="required"):

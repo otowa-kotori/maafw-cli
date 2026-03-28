@@ -10,6 +10,7 @@ import pytest
 
 from maafw_cli.core.errors import ActionError
 from maafw_cli.core.element import ElementStore, Element
+from maafw_cli.core.session import Session
 from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.interaction import do_click, do_swipe, do_scroll, do_type, do_key
 from mock_controller import MockController
@@ -17,17 +18,14 @@ from mock_controller import MockController
 
 def _make_ctx(
     mock: MockController | None = None,
-    elements_path: Path | None = None,
     session_type: str = "win32",
 ) -> ServiceContext:
     """Build a ServiceContext backed by a MockController."""
     if mock is None:
         mock = MockController()
-    return ServiceContext(
-        get_controller=lambda: mock,
-        elements_path=elements_path or Path("/nonexistent"),
-        session_type=session_type,
-    )
+    session = Session(name="test")
+    session.attach(mock, session_type, "test-device")
+    return ServiceContext(session)
 
 
 # ── click ────────────────────────────────────────────────────────
@@ -43,13 +41,13 @@ class TestClickService:
         assert result["y"] == 200
         assert mock.clicks == [(100, 200)]
 
-    def test_click_by_element(self, tmp_path):
-        store = ElementStore(tmp_path / "elements.json")
-        store._elements = [Element(ref="e1", text="Hello", box=[120, 40, 80, 20], score=0.95)]
-        store.save()
-
+    def test_click_by_element(self):
         mock = MockController()
-        ctx = _make_ctx(mock, elements_path=tmp_path / "elements.json")
+        ctx = _make_ctx(mock)
+        # Pre-populate element store
+        ctx.session.element_store._elements = [
+            Element(ref="e1", text="Hello", box=[120, 40, 80, 20], score=0.95)
+        ]
         result = do_click(ctx, target="e1")
         assert result["x"] == 160  # 120 + 80//2
         assert result["y"] == 50   # 40 + 20//2
@@ -206,41 +204,15 @@ class TestKeyService:
 
 
 class TestServiceContext:
-    def test_controller_cached(self):
-        """Controller is created once, then reused."""
-        call_count = 0
-
-        def factory():
-            nonlocal call_count
-            call_count += 1
-            return MockController()
-
-        ctx = ServiceContext(
-            get_controller=factory,
-            elements_path=Path("/nonexistent"),
-            session_type="win32",
-        )
-        _ = ctx.controller
-        _ = ctx.controller
-        assert call_count == 1
-
-    def test_invalidate_controller(self):
-        call_count = 0
-
-        def factory():
-            nonlocal call_count
-            call_count += 1
-            return MockController()
-
-        ctx = ServiceContext(
-            get_controller=factory,
-            elements_path=Path("/nonexistent"),
-            session_type="win32",
-        )
-        _ = ctx.controller
-        ctx.invalidate_controller()
-        _ = ctx.controller
-        assert call_count == 2
+    def test_controller_from_session(self):
+        """Controller comes from the session."""
+        mock = MockController()
+        session = Session(name="test")
+        session.attach(mock, "win32", "test-device")
+        ctx = ServiceContext(session)
+        assert ctx.controller is mock
+        # Accessing again returns the same
+        assert ctx.controller is mock
 
     def test_resolve_target_coords(self):
         ctx = _make_ctx()

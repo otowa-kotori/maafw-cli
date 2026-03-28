@@ -1,68 +1,162 @@
 """
-Session management — file-based single session (--no-daemon mode).
+Session — unified per-session state container.
 
-Stores connection parameters in the data dir so each CLI
-invocation can reconnect to the same device.
+Each session owns an independent Resource instance (for template images and
+pipeline definitions), an ElementStore, and an optional controller reference.
+Multiple sessions do not pollute each other.
 """
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass, asdict, field
-from pathlib import Path
+import asyncio
+import logging
+import threading
 from typing import Any
 
-from maafw_cli.paths import get_data_dir
+from maa.controller import Controller
+from maa.resource import Resource
+from maa.tasker import Tasker
+
+from maafw_cli.core.errors import DeviceConnectionError
+from maafw_cli.core.log import Timer
+from maafw_cli.paths import get_resource_dir
+
+_log = logging.getLogger("maafw_cli.core.session")
 
 
-# ── paths ──────────────────────────────────────────────────────
+class Session:
+    """Unified per-session state — owns controller, Resource, ElementStore."""
 
+    def __init__(self, name: str = "default") -> None:
+        self.name: str = name
+        self.type: str = ""       # "adb" / "win32", set on attach
+        self.device: str = ""     # device name, set on attach
 
-def session_file() -> Path:
-    return get_data_dir() / "session.json"
+        self._controller: Controller | None = None
+        self._resource: Resource | None = None
+        self._resource_lock = threading.Lock()
+        self.lock: asyncio.Lock = asyncio.Lock()
 
+        # Lazy import to avoid circular dependency
+        from maafw_cli.core.element import ElementStore
+        self.element_store: ElementStore = ElementStore()
 
-def elements_file() -> Path:
-    return get_data_dir() / "elements.json"
+    # ── controller ───────────────────────────────────────────────
 
+    def attach(self, controller: Controller, type: str, device: str) -> None:
+        """Bind (or replace) a controller and device metadata.
 
-# ── session data ───────────────────────────────────────────────
+        If a previous controller exists and has a ``destroy`` method,
+        it is called synchronously before replacement.
+        """
+        old_ctrl = self._controller
+        if old_ctrl is not None and hasattr(old_ctrl, "destroy"):
+            try:
+                old_ctrl.destroy()
+            except Exception:
+                _log.warning(
+                    "Error destroying old controller for session '%s'",
+                    self.name, exc_info=True,
+                )
+        self._controller = controller
+        self.type = type
+        self.device = device
+        _log.info(
+            "Attached controller to session '%s' (type=%s, device=%s)",
+            self.name, type, device,
+        )
 
-@dataclass
-class SessionInfo:
-    """Serialisable connection parameters."""
-    type: str              # "adb" or "win32"
-    device: str            # device name / address
-    adb_path: str = ""     # path to adb binary
-    address: str = ""      # e.g. "127.0.0.1:5554"
-    screencap_methods: int = 0
-    input_methods: int = 0
-    config: dict[str, Any] = field(default_factory=dict)
-    screenshot_short_side: int = 720
-    window_name: str = ""  # Win32 window title (used for reconnection)
-    name: str = ""         # Session name (daemon mode)
+    @property
+    def controller(self) -> Controller:
+        """Return the controller.
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        Raises :class:`DeviceConnectionError` if no controller is available.
+        """
+        if self._controller is None:
+            raise DeviceConnectionError(
+                f"Session '{self.name}' has no device connected."
+            )
+        return self._controller
 
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "SessionInfo":
-        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+    @property
+    def has_controller(self) -> bool:
+        """Check whether a controller is available."""
+        return self._controller is not None
 
+    # ── resource management ──────────────────────────────────────
 
-def save_session(info: SessionInfo) -> None:
-    """Persist session info to disk."""
-    path = session_file()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(info.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+    def get_resource(self) -> Resource | None:
+        """Return the session's Resource, creating one on first call.
 
+        Thread-safe.  Returns ``None`` if the OCR model bundle fails to load.
+        """
+        if self._resource is not None:
+            return self._resource
 
-def load_session() -> SessionInfo | None:
-    """Load session info from disk.  Returns None if missing."""
-    path = session_file()
-    if not path.exists():
-        return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return SessionInfo.from_dict(data)
-    except (json.JSONDecodeError, TypeError, KeyError):
-        return None
+        with self._resource_lock:
+            if self._resource is not None:
+                return self._resource
+
+            resource_path = get_resource_dir()
+            resource = Resource()
+
+            if not resource.use_directml():
+                _log.debug("DirectML not available, falling back to CPU inference")
+
+            with Timer("resource bundle load", log=_log):
+                if not resource.post_bundle(str(resource_path)).wait().succeeded:
+                    return None
+
+            self._resource = resource
+            return resource
+
+    def get_tasker(self) -> Tasker | None:
+        """Create a Tasker bound to this session's controller and Resource."""
+        resource = self.get_resource()
+        if resource is None:
+            return None
+        tasker = Tasker()
+        tasker.bind(resource, self.controller)
+        if not tasker.inited:
+            return None
+        return tasker
+
+    def load_image(self, path: str) -> bool:
+        """Load image templates into this session's Resource."""
+        resource = self.get_resource()
+        if resource is None:
+            return False
+        with Timer("image resource load", log=_log):
+            return resource.post_image(path).wait().succeeded
+
+    def override_image(self, name: str, image: Any) -> bool:
+        """Inject a numpy image into this session's Resource under *name*."""
+        resource = self.get_resource()
+        if resource is None:
+            return False
+        return resource.override_image(name, image)
+
+    def load_pipeline(self, path: str) -> bool:
+        """Load pipeline JSON/directory into this session's Resource."""
+        from maafw_cli.core.errors import ActionError
+
+        resource = self.get_resource()
+        if resource is None:
+            raise ActionError("Resource initialization failed.")
+        with Timer("pipeline load", log=_log):
+            return resource.post_pipeline(path).wait().succeeded
+
+    def list_nodes(self) -> list[str]:
+        """Return all node names currently loaded in this session's Resource."""
+        from maafw_cli.core.errors import ActionError
+
+        resource = self.get_resource()
+        if resource is None:
+            raise ActionError("Resource not initialized.")
+        return resource.node_list
+
+    def get_node_data(self, name: str) -> dict[str, Any] | None:
+        """Return the JSON definition of a single node, or ``None``."""
+        resource = self.get_resource()
+        if resource is None:
+            return None
+        return resource.get_node_data(name)

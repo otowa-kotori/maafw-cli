@@ -14,7 +14,7 @@ Tests are organized into three groups:
 
 1. **Device discovery** — no connection needed, no mock_window fixture
 2. **Daemon-mode tests** — default path, connect via daemon, operations via IPC
-3. **Direct-mode tests** — ``--no-daemon``, verify file persistence (session.json)
+3. **Seize-mode tests** — ``--input-method Seize``, verify real interaction effects
 """
 from __future__ import annotations
 
@@ -170,16 +170,6 @@ def _ensure_connected_seize(win: dict) -> None:
         pytest.skip(f"Seize not supported in this environment: {result.output.strip()}")
     _connected_mode = "seize"
 
-
-def _ensure_connected_direct(win: dict) -> None:
-    """Connect in --no-daemon mode for file persistence tests."""
-    global _connected_mode
-    result = runner.invoke(cli, [
-        "--no-daemon", "connect", "win32", win["hwnd"],
-    ])
-    if result.exit_code != 0:
-        pytest.skip(f"Direct connect not supported in this environment: {result.output.strip()}")
-    _connected_mode = "direct"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -567,51 +557,3 @@ def test_win32_interaction_workflow(mock_window):
     _safe_print(f"  Final OCR: {len(data['results'])} results")
 
     print("Full interaction workflow passed.")
-
-
-# ═══════════════════════════════════════════════════════════════════
-# Group 4: Direct-mode tests (--no-daemon, file persistence)
-# ═══════════════════════════════════════════════════════════════════
-
-
-def test_win32_connect_with_options(mock_window):
-    """Verify --screencap-method and --input-method persist to session.json."""
-    result = runner.invoke(cli, [
-        "--no-daemon", "connect", "win32", mock_window["hwnd"],
-        "--screencap-method", "FramePool",
-        "--input-method", "PostMessage",
-    ])
-    if result.exit_code != 0:
-        pytest.skip(f"Direct connect not supported in this environment: {result.output.strip()}")
-    _safe_print(result.output)
-
-    from maafw_cli.core.session import load_session
-    from maa.define import MaaWin32ScreencapMethodEnum, MaaWin32InputMethodEnum
-
-    session = load_session()
-    assert session.screencap_methods == int(MaaWin32ScreencapMethodEnum.FramePool)
-    assert session.input_methods == int(MaaWin32InputMethodEnum.PostMessage)
-
-
-def test_win32_session_persistence(mock_window):
-    """Verify session is saved to disk and can be reloaded."""
-    _ensure_connected_direct(mock_window)
-
-    from maafw_cli.core.session import load_session
-
-    session = load_session()
-    assert session is not None
-    assert session.type == "win32"
-    assert session.window_name != ""
-    assert session.address.startswith("0x")
-    assert session.screencap_methods != 0
-    assert session.input_methods != 0
-
-
-def test_win32_reconnect(mock_window):
-    """Verify reconnection works via session file (--no-daemon)."""
-    _ensure_connected_direct(mock_window)
-
-    result = runner.invoke(cli, ["--no-daemon", "-v", "screenshot"])
-    _safe_print(result.output)
-    assert result.exit_code == 0

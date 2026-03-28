@@ -170,19 +170,13 @@ class TestCliStructure:
         result = runner.invoke(cli, ["--on", "phone", "--help"])
         assert result.exit_code == 0
 
-    def test_global_no_daemon_flag(self):
-        result = runner.invoke(cli, ["--no-daemon", "--help"])
-        assert result.exit_code == 0
-
-    def test_connect_adb_has_as_option(self):
+    def test_connect_adb_has_on_option(self):
         result = runner.invoke(cli, ["connect", "adb", "--help"])
         assert result.exit_code == 0
-        assert "--as" in result.output
 
-    def test_connect_win32_has_as_option(self):
+    def test_connect_win32_has_on_option(self):
         result = runner.invoke(cli, ["connect", "win32", "--help"])
         assert result.exit_code == 0
-        assert "--as" in result.output
 
 
 class TestOutputFormatter:

@@ -25,24 +25,25 @@ class TestInitToolkit:
 
 
 class TestOcrFailureExceptions:
+    def _make_session(self):
+        """Create a mock Session with the interface ocr() expects."""
+        session = MagicMock()
+        session.controller = MagicMock()
+        return session
+
     def test_empty_nodes_raises_recognition_error(self):
         """ocr() should raise RecognitionError when info.nodes is empty."""
         from maafw_cli.maafw import vision
 
-        mock_controller = MagicMock()
+        session = self._make_session()
+        mock_detail = MagicMock()
+        mock_detail.nodes = []
+        session.get_tasker.return_value.post_recognition.return_value.wait.return_value.get.return_value = mock_detail
 
         with patch.object(vision, "check_ocr_files_exist", return_value=True), \
-             patch.object(vision, "_get_tasker") as mock_tasker, \
              patch.object(vision, "screencap", return_value="fake_image"):
-
-            mock_detail = MagicMock()
-            mock_detail.nodes = []
-
-            mock_tasker_inst = mock_tasker.return_value
-            mock_tasker_inst.post_recognition.return_value.wait.return_value.get.return_value = mock_detail
-
             with pytest.raises(RecognitionError, match="empty nodes"):
-                vision.ocr(mock_controller)
+                vision.ocr(session)
 
     def test_no_ocr_model_raises(self):
         """ocr() should raise RecognitionError when OCR model is missing."""
@@ -50,23 +51,27 @@ class TestOcrFailureExceptions:
 
         with patch.object(vision, "check_ocr_files_exist", return_value=False):
             with pytest.raises(RecognitionError, match="OCR model not found"):
-                vision.ocr(MagicMock())
+                vision.ocr(self._make_session())
 
     def test_screenshot_failure_raises(self):
         """ocr() should raise RecognitionError when screenshot fails."""
         from maafw_cli.maafw import vision
 
+        session = self._make_session()
+        session.get_tasker.return_value = MagicMock()
+
         with patch.object(vision, "check_ocr_files_exist", return_value=True), \
-             patch.object(vision, "_get_tasker", return_value=MagicMock()), \
              patch.object(vision, "screencap", return_value=None):
             with pytest.raises(RecognitionError, match="Screenshot failed"):
-                vision.ocr(MagicMock())
+                vision.ocr(session)
 
     def test_tasker_init_failure_raises(self):
         """ocr() should raise RecognitionError when tasker fails to init."""
         from maafw_cli.maafw import vision
 
-        with patch.object(vision, "check_ocr_files_exist", return_value=True), \
-             patch.object(vision, "_get_tasker", return_value=None):
+        session = self._make_session()
+        session.get_tasker.return_value = None
+
+        with patch.object(vision, "check_ocr_files_exist", return_value=True):
             with pytest.raises(RecognitionError, match="tasker"):
-                vision.ocr(MagicMock())
+                vision.ocr(session)

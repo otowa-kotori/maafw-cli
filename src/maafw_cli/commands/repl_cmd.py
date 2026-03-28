@@ -1,5 +1,5 @@
 """
-``maafw-cli repl`` — interactive REPL with a persistent controller.
+``maafw-cli repl`` — interactive REPL with persistent daemon session.
 
 One connect, many operations, zero reconnection overhead.
 """
@@ -13,7 +13,6 @@ import click
 from maafw_cli.cli import pass_ctx, CliContext
 from maafw_cli.core.errors import MaafwError
 from maafw_cli.core.output import OutputFormatter
-from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.registry import DISPATCH
 
 # Ensure all services are registered in DISPATCH
@@ -23,11 +22,11 @@ import maafw_cli.services.connection  # noqa: F401
 
 
 class Repl:
-    """Interactive REPL that keeps the controller alive across commands."""
+    """Interactive REPL that routes commands through the daemon."""
 
-    def __init__(self, fmt: OutputFormatter):
+    def __init__(self, fmt: OutputFormatter, on_session: str | None = None):
         self.fmt = fmt
-        self._svc_ctx: ServiceContext | None = None
+        self.on = on_session  # target session name
         self.observe: bool = False
 
     # ── public API ──────────────────────────────────────────────
@@ -69,27 +68,22 @@ class Repl:
             self._toggle_observe(args)
             return None
 
-        # Connection commands (special — they don't use ServiceContext)
+        # Connection commands (special — routed through daemon)
         if cmd == "connect":
             return self._handle_connect(args)
 
-        # Regular service dispatch
+        # Regular service dispatch via daemon
         handler = DISPATCH.get(cmd)
         if handler is None:
             print(f"Unknown command: {cmd}. Type 'help' for available commands.", file=sys.stderr)
             return None
-
-        if self._svc_ctx is None:
-            self._ensure_service_context()
-            if self._svc_ctx is None:
-                return None
 
         kwargs = self._parse_service_args(cmd, args)
         if kwargs is None:
             return None
 
         try:
-            result = handler(self._svc_ctx, **kwargs)
+            result = self._send(cmd, kwargs)
         except MaafwError as e:
             print(f"Error: {e}", file=sys.stderr)
             return None
@@ -105,6 +99,16 @@ class Repl:
 
         return result
 
+    # ── daemon IPC ─────────────────────────────────────────────
+
+    def _send(self, action: str, params: dict) -> dict:
+        """Send a command to the daemon."""
+        from maafw_cli.core.ipc import DaemonClient, ensure_daemon
+
+        port = ensure_daemon()
+        client = DaemonClient(port)
+        return client.send(action, params, session=self.on)
+
     # ── connection handling ─────────────────────────────────────
 
     def _handle_connect(self, args: list[str]) -> dict | None:
@@ -117,12 +121,10 @@ class Repl:
 
         try:
             if subtype == "adb":
-                from maafw_cli.services.connection import do_connect_adb
-                result = do_connect_adb(target)
+                result = self._send("connect_adb", {"device": target})
             elif subtype == "win32":
-                from maafw_cli.services.connection import do_connect_win32
                 # Parse optional --input-method / --screencap-method
-                kw: dict = {}
+                kw: dict = {"window": target}
                 i = 2
                 while i < len(args):
                     if args[i] == "--input-method" and i + 1 < len(args):
@@ -134,7 +136,7 @@ class Repl:
                     else:
                         print(f"Warning: unknown argument '{args[i]}'", file=sys.stderr)
                         i += 1
-                result = do_connect_win32(target, **kw)
+                result = self._send("connect_win32", kw)
             else:
                 print(f"Unknown connect type: {subtype}", file=sys.stderr)
                 return None
@@ -142,37 +144,12 @@ class Repl:
             print(f"Error: {e}", file=sys.stderr)
             return None
 
-        # Invalidate cached controller and rebuild service context
-        self._rebuild_service_context()
+        # Update target session if the connect returned one
+        if "session" in result:
+            self.on = result["session"]
+
         self.fmt.success(result, human=f"Connected to {target}")
         return result
-
-    # ── service context management ─────────────────────────────
-
-    def _ensure_service_context(self) -> None:
-        """Try to build a ServiceContext from the existing session."""
-        from maafw_cli.core.session import load_session, elements_file
-        session = load_session()
-        if session is None:
-            print("No active session. Run 'connect adb <device>' or 'connect win32 <window>' first.",
-                  file=sys.stderr)
-            return
-
-        from maafw_cli.core.reconnect import reconnect
-
-        # Build a ServiceContext that connects lazily
-        self._svc_ctx = ServiceContext(
-            get_controller=lambda: reconnect(),
-            elements_path=elements_file(),
-            session_type=session.type,
-        )
-
-    def _rebuild_service_context(self) -> None:
-        """Rebuild after a connect command — invalidate cached controller."""
-        if self._svc_ctx is not None:
-            self._svc_ctx.invalidate_controller()
-        self._svc_ctx = None  # force fresh build on next command
-        self._ensure_service_context()
 
     # ── argument parsing ───────────────────────────────────────
 
@@ -288,15 +265,20 @@ class Repl:
         print("\n".join(cmds))
 
     def _print_status(self) -> None:
-        from maafw_cli.core.session import load_session
-        session = load_session()
-        if session is None:
-            print("No active session.")
-        else:
-            print(f"Session: {session.type} | {session.device} | {session.address}")
-            has_ctrl = self._svc_ctx is not None and "controller" in self._svc_ctx.__dict__
-            print(f"Controller cached: {has_ctrl}")
+        try:
+            result = self._send("session_list", {})
+            sessions = result.get("sessions", [])
+            if not sessions:
+                print("No active sessions.")
+            else:
+                for s in sessions:
+                    default = " (default)" if s.get("is_default") else ""
+                    connected = "connected" if s.get("connected") else "disconnected"
+                    print(f"  {s['name']}{default}: {s.get('type', '?')} | {s.get('device', '?')} | {connected}")
+            print(f"Target session: {self.on or '(default)'}")
             print(f"Observe: {'on' if self.observe else 'off'}")
+        except MaafwError as e:
+            print(f"Error: {e}", file=sys.stderr)
 
     def _toggle_observe(self, args: list[str]) -> None:
         if not args or args[0] not in ("on", "off"):
@@ -307,16 +289,13 @@ class Repl:
 
     def _run_observe(self) -> None:
         """Run OCR after an action (best-effort)."""
-        from maafw_cli.services.vision import do_ocr
-        from maafw_cli.core.output import OutputFormatter
-
         try:
-            ocr_result = do_ocr(self._svc_ctx)
+            ocr_result = self._send("ocr", {})
         except MaafwError:
             return
 
-        refs = ocr_result["results"]
-        elapsed_ms = ocr_result["elapsed_ms"]
+        refs = ocr_result.get("results", [])
+        elapsed_ms = ocr_result.get("elapsed_ms", 0)
         if not refs:
             return
 
@@ -331,5 +310,5 @@ class Repl:
 @pass_ctx
 def repl_cmd(ctx: CliContext) -> None:
     """Start an interactive REPL with persistent controller."""
-    repl = Repl(ctx.fmt)
+    repl = Repl(ctx.fmt, on_session=ctx.on)
     repl.run()

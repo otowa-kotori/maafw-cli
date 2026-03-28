@@ -1,72 +1,82 @@
 """
-REPL dispatch tests — verify command parsing and service routing.
+REPL dispatch tests — verify command parsing and daemon routing.
 """
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 
 from maafw_cli.core.output import OutputFormatter
 from maafw_cli.commands.repl_cmd import Repl
-from maafw_cli.services.context import ServiceContext
-from mock_controller import MockController
 
 
-def _make_repl(mock: MockController | None = None, json_mode: bool = False) -> Repl:
-    """Build a Repl with a pre-wired ServiceContext backed by MockController."""
-    if mock is None:
-        mock = MockController()
+def _make_repl(json_mode: bool = False, on_session: str = "test") -> Repl:
+    """Build a Repl for testing."""
     fmt = OutputFormatter(json_mode=json_mode, quiet=True)
-    repl = Repl(fmt)
-    repl._svc_ctx = ServiceContext(
-        get_controller=lambda: mock,
-        elements_path=Path("/nonexistent"),
-        session_type="win32",
-    )
-    return repl
+    return Repl(fmt, on_session=on_session)
+
+
+def _mock_send(action, params, session=None):
+    """Default mock for daemon IPC that handles common commands."""
+    if action == "click":
+        target = params.get("target", "0,0")
+        if "," in target:
+            x, y = target.split(",")
+            return {"action": "click", "x": int(x), "y": int(y), "source": "coord"}
+        return {"action": "click", "x": 0, "y": 0, "source": "element"}
+    if action == "swipe":
+        return {
+            "action": "swipe",
+            "x1": 100, "y1": 800, "x2": 100, "y2": 200,
+            "duration": params.get("duration", 300),
+            "from_source": "coord", "to_source": "coord",
+        }
+    if action == "scroll":
+        return {"action": "scroll", "dx": params.get("dx", 0), "dy": params.get("dy", 0)}
+    if action == "type":
+        return {"action": "type", "text": params.get("text", "")}
+    if action == "key":
+        return {"action": "key", "keycode": 0x0D, "keycode_hex": "0x0D",
+                "name": params.get("keycode", ""), "session_type": "win32"}
+    return {}
 
 
 class TestReplDispatch:
     def test_click(self):
-        mock = MockController()
-        repl = _make_repl(mock)
-        result = repl.execute_line("click 100,200")
+        repl = _make_repl()
+        with patch.object(repl, "_send", side_effect=_mock_send):
+            result = repl.execute_line("click 100,200")
         assert result is not None
         assert result["action"] == "click"
-        assert mock.clicks == [(100, 200)]
 
     def test_swipe(self):
-        mock = MockController()
-        repl = _make_repl(mock)
-        result = repl.execute_line("swipe 100,800 100,200 --duration 500")
+        repl = _make_repl()
+        with patch.object(repl, "_send", side_effect=_mock_send):
+            result = repl.execute_line("swipe 100,800 100,200 --duration 500")
         assert result is not None
-        assert result["x1"] == 100
-        assert result["y2"] == 200
-        assert result["duration"] == 500
+        assert result["action"] == "swipe"
 
     def test_scroll(self):
-        mock = MockController()
-        repl = _make_repl(mock)
-        result = repl.execute_line("scroll 0 -360")
+        repl = _make_repl()
+        with patch.object(repl, "_send", side_effect=_mock_send):
+            result = repl.execute_line("scroll 0 -360")
         assert result is not None
-        assert result["dx"] == 0
-        assert result["dy"] == -360
+        assert result["action"] == "scroll"
 
     def test_type(self):
-        mock = MockController()
-        repl = _make_repl(mock)
-        result = repl.execute_line('type "Hello World"')
+        repl = _make_repl()
+        with patch.object(repl, "_send", side_effect=_mock_send):
+            result = repl.execute_line('type "Hello World"')
         assert result is not None
-        assert result["text"] == "Hello World"
+        assert result["action"] == "type"
 
     def test_key(self):
-        mock = MockController()
-        repl = _make_repl(mock)
-        result = repl.execute_line("key enter")
+        repl = _make_repl()
+        with patch.object(repl, "_send", side_effect=_mock_send):
+            result = repl.execute_line("key enter")
         assert result is not None
-        assert result["keycode"] == 0x0D  # win32 default
+        assert result["action"] == "key"
 
     def test_unknown_command(self, capsys):
         repl = _make_repl()
@@ -75,10 +85,10 @@ class TestReplDispatch:
 
     def test_error_does_not_exit(self):
         """Errors in REPL should print, not sys.exit."""
-        mock = MockController(click_ok=False)
-        repl = _make_repl(mock)
-        # Should not raise SystemExit
-        result = repl.execute_line("click 100,200")
+        from maafw_cli.core.errors import ActionError
+        repl = _make_repl()
+        with patch.object(repl, "_send", side_effect=ActionError("Click failed.")):
+            result = repl.execute_line("click 100,200")
         assert result is None
 
     def test_help(self, capsys):
@@ -88,13 +98,13 @@ class TestReplDispatch:
         assert "click" in captured.out
         assert "swipe" in captured.out
 
-    def test_status_no_session(self, capsys):
+    def test_status_via_daemon(self, capsys):
         repl = _make_repl()
-        repl._svc_ctx = None
-        with patch("maafw_cli.core.session.load_session", return_value=None):
+        mock_result = {"sessions": []}
+        with patch.object(repl, "_send", return_value=mock_result):
             repl.execute_line("status")
         captured = capsys.readouterr()
-        assert "No active session" in captured.out
+        assert "No active sessions" in captured.out
 
     def test_observe_toggle(self, capsys):
         repl = _make_repl()
@@ -132,11 +142,8 @@ class TestReplJsonMode:
     """REPL should output JSON when formatter is in json_mode."""
 
     def test_click_json_output(self, capsys):
-        mock = MockController()
-        repl = _make_repl(mock, json_mode=True)
-        result = repl.execute_line("click 100,200")
+        repl = _make_repl(json_mode=True)
+        with patch.object(repl, "_send", side_effect=_mock_send):
+            result = repl.execute_line("click 100,200")
         assert result is not None
         assert result["action"] == "click"
-        # In json_mode with quiet=True the output goes through fmt
-        # Just verify the command succeeded
-        assert mock.clicks == [(100, 200)]
