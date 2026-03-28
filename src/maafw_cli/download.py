@@ -109,6 +109,12 @@ def download_and_extract_ocr(ocr_dir: Path | None = None) -> bool:
         except OSError:
             pass
 
+        # Validate that all required files were extracted
+        missing = [f for f in OCR_REQUIRED_FILES if not (ocr_dir / f).exists()]
+        if missing:
+            _log(log_file, f"Extraction incomplete, missing files: {missing}")
+            return False
+
         _log(log_file, f"Extraction complete, OCR resources saved to: {ocr_dir}")
         return True
 

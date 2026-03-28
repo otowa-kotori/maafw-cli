@@ -138,3 +138,26 @@ class TestDownloadAndExtract:
             result = download_and_extract_ocr(ocr_dir)
 
         assert result is False
+
+    def test_missing_files_in_zip(self, tmp_path, monkeypatch):
+        """Zip that lacks required files should return False."""
+        from maafw_cli.download import download_and_extract_ocr
+
+        ocr_dir = tmp_path / "ocr"
+        model_dir = tmp_path / "model"
+        monkeypatch.setattr("maafw_cli.download.get_model_dir", lambda: model_dir)
+
+        # Build a zip with only one of the required files (missing det.onnx and rec.onnx)
+        test_zip = tmp_path / "test.zip"
+        _make_test_zip(test_zip, {"keys.txt": b"fake keys"})
+
+        mock_response = MagicMock()
+        mock_response.headers = {"Content-Length": str(test_zip.stat().st_size)}
+        mock_response.read.side_effect = [test_zip.read_bytes(), b""]
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = lambda s, *a: None
+
+        with patch("maafw_cli.download.urlopen", return_value=mock_response):
+            result = download_and_extract_ocr(ocr_dir)
+
+        assert result is False
