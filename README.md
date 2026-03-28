@@ -4,6 +4,7 @@
 </p>
 
 <div align="center">
+
 # maafw-cli
 
 ![license](https://img.shields.io/github/license/otowa-kotori/maafw-cli)
@@ -20,6 +21,7 @@ MaaFramework 命令行界面。让人、AI、脚本都能直接操作 Android / 
 
 **MCP**：MCP 仍然适合需要持久连接的场景。如果你需要维持持续会话，进行探索性的自动化，自修复测试，动态维护pipeline节点图等，或许使用具有持久状态的MCP是更好地选择。你可以了解更多有关 [MaaMCP](https://github.com/MAA-AI/MaaMCP) 的信息。
 </div>
+
 ## 特性
 
 - **后台守护进程** — 后台 daemon 持有 Controller 连接以降低操作延迟
