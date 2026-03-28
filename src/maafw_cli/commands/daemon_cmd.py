@@ -74,7 +74,8 @@ def daemon_status(ctx: CliContext) -> None:
                 f"uptime {uptime}s, {len(sessions)} session(s)"
             ),
         )
-    except Exception:
-        fmt.print_error(
-            f"Daemon PID {pid} on port {port} is unreachable."
+    except Exception as e:
+        fmt.error(
+            f"Daemon PID {pid} on port {port} is unreachable: {e}",
+            exit_code=3,
         )

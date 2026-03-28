@@ -6,8 +6,9 @@ These test the CLI layer in isolation — MaaFW calls are not executed
 - Global options parsing
 - Output format selection
 """
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
+import pytest
 from click.testing import CliRunner
 
 from maafw_cli.cli import cli
@@ -323,4 +324,52 @@ class TestDaemonCommands:
              patch("maafw_cli.core.ipc.DaemonClient") as mock_client_cls:
             mock_client_cls.return_value.send.side_effect = OSError("refused")
             result = runner.invoke(cli, ["daemon", "status"])
+            assert result.exit_code == 3
             assert "unreachable" in result.output.lower()
+
+
+# ── Device all command ────────────────────────────────────────
+
+
+class TestDeviceAll:
+    """Test device all when one source is empty."""
+
+    def _make_ctx(self):
+        """Build a mock CliContext with a real OutputFormatter."""
+        from maafw_cli.core.output import OutputFormatter
+        ctx = MagicMock()
+        ctx.fmt = OutputFormatter(json_mode=False, quiet=False)
+        return ctx
+
+    def test_device_all_only_adb(self):
+        """device all should succeed when only ADB has results."""
+        from maafw_cli.commands.connection import _device_list
+
+        ctx = self._make_ctx()
+        ctx.run_raw.return_value = {
+            "adb": [{"name": "device1", "address": "127.0.0.1:5555"}],
+            "win32": [],
+        }
+        # Should not call sys.exit (no error)
+        _device_list(ctx, adb_flag=True, win32_flag=True)
+
+    def test_device_all_only_win32(self):
+        """device all should succeed when only Win32 has results."""
+        from maafw_cli.commands.connection import _device_list
+
+        ctx = self._make_ctx()
+        ctx.run_raw.return_value = {
+            "adb": [],
+            "win32": [{"hwnd": "0x1234", "window_name": "Test", "class_name": "Cls"}],
+        }
+        _device_list(ctx, adb_flag=True, win32_flag=True)
+
+    def test_device_all_both_empty(self):
+        """device all should fail when both sides are empty."""
+        from maafw_cli.commands.connection import _device_list
+
+        ctx = self._make_ctx()
+        ctx.run_raw.return_value = {"adb": [], "win32": []}
+        with pytest.raises(SystemExit) as exc_info:
+            _device_list(ctx, adb_flag=True, win32_flag=True)
+        assert exc_info.value.code == 3
