@@ -13,7 +13,9 @@
 [![MaaFramework](https://img.shields.io/badge/MaaFramework-v5-green)](https://github.com/MaaXYZ/MaaFramework)
 [![PyPI](https://img.shields.io/pypi/v/maafw-cli?logo=pypi&logoColor=white)](https://pypi.org/project/maafw-cli/)
 
-MaaFramework 命令行界面。让人、AI、脚本都能直接操作 Android / Win32 设备。
+[MaaFramework](https://github.com/MaaXYZ/MaaFramework) 命令行界面。让人、AI、脚本直接通过命令形式操作 Android / Win32 设备。
+
+**注意：该项目是一个实验性项目，目前正处于早期开发阶段。接口和功能可能随开发进程随时变化，如有造成不便敬请谅解。**
 
 </div>
 
@@ -28,7 +30,7 @@ MaaFramework 命令行界面。让人、AI、脚本都能直接操作 Android / 
 - **后台守护进程** — 后台 daemon 持有 Controller 连接以降低操作延迟
 - **Element 引用** — OCR / reco 结果赋予 e1, e2, e3…，后续命令直接 `click e3`
 - **多种感知方式** — OCR、模板匹配、特征匹配、颜色匹配，统一通过 `reco` 命令暴露
-- **多设备** — `--as phone` 命名会话，`--on phone` 指定操作目标
+- **多会话** — `--as phone` 命名会话，`--on phone` 指定操作目标
 - **`--json` 输出** — 严格 JSON，方便脚本解析
 
 ## 安装
