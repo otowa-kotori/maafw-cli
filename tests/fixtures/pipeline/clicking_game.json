@@ -21,7 +21,6 @@
     "GameLoop": {
         "recognition": "DirectHit",
         "action": "DoNothing",
-        "rate_limit": 0,
         "next": [
             "GameOver_Detect",
             "Target_APPLE",
@@ -36,7 +35,6 @@
         "roi": [250, 300, 460, 120],
         "count": 500,
         "action": "DoNothing",
-        "rate_limit": 0,
         "timeout": 500,
         "next": [
             "ReadScore"
@@ -49,9 +47,9 @@
         "roi": [150, 60, 660, 130],
         "threshold": 0.7,
         "action": "DoNothing",
-        "rate_limit": 0,
         "timeout": 1500,
         "next": [
+            "GameOver_Detect",
             "Click_APPLE"
         ]
     },
@@ -62,9 +60,9 @@
         "roi": [150, 60, 660, 130],
         "threshold": 0.7,
         "action": "DoNothing",
-        "rate_limit": 0,
         "timeout": 1500,
         "next": [
+            "GameOver_Detect",
             "Click_LEMON"
         ]
     },
@@ -75,9 +73,9 @@
         "roi": [150, 60, 660, 130],
         "threshold": 0.7,
         "action": "DoNothing",
-        "rate_limit": 0,
         "timeout": 1500,
         "next": [
+            "GameOver_Detect",
             "Click_GRAPE"
         ]
     },
