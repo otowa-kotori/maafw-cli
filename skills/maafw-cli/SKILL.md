@@ -44,18 +44,18 @@ Run this first if you don't know the device address or window title.
 ## Connect
 
 ```bash
-maafw-cli connect adb 127.0.0.1:16384 --as phone
-maafw-cli connect win32 "记事本" --as notepad
+maafw-cli connect adb 127.0.0.1:16384
+maafw-cli connect win32 "记事本"
+maafw-cli connect win32 0x1A2B3C
 ```
 
-If you get "No active session", connect first.
+If you get "No active session", connect first. Single-device use doesn't need `--on`.
 
 ## OCR — see the screen
 
 ```bash
 maafw-cli ocr                          # human-readable, good for showing user
 maafw-cli --json ocr                   # structured, good for parsing in scripts
-maafw-cli --on phone ocr               # target specific session
 maafw-cli ocr --roi 0,0,400,300        # region only
 ```
 
@@ -116,12 +116,20 @@ Results produce Element refs (e1, e2, ...) just like OCR — use `click e1` to a
 maafw-cli --observe click e3      # clicks, then auto-OCR and shows result
 ```
 
-## Multi-device
+## Multi-device (only when needed)
+
+Use `--on NAME` to name sessions and switch between them. Not needed for single-device use.
 
 ```bash
+# Name sessions when connecting
+maafw-cli --on phone connect adb 127.0.0.1:16384
+maafw-cli --on notepad connect win32 "记事本"
+
+# Target a session (--on goes before the subcommand)
 maafw-cli --on phone ocr
 maafw-cli --on notepad click e1
 maafw-cli session list            # see all sessions
+maafw-cli session close phone     # close a session
 ```
 
 ## Rules
