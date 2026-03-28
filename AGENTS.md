@@ -46,7 +46,7 @@ def click_cmd(ctx: CliContext, target: str) -> None:
     ctx.run(do_click, target=target)
 ```
 
-`ctx.run()` 根据 `needs_session` 自动分派：daemon IPC（默认）或 direct 直连（`--no-daemon`）。
+`ctx.run()` 统一通过 daemon IPC 分派。
 
 ### 错误类型
 
@@ -83,10 +83,10 @@ maafw-cli --json device win32 Game  # JSON 输出，方便脚本解析 hwnd
 ### 2. 连接
 
 ```bash
-maafw-cli connect win32 "记事本" --as notepad         # 按标题子串连接
-maafw-cli connect win32 0x2217ae --as game            # 按 hwnd 连接
-maafw-cli connect win32 0x2217ae --as game --input-method Seize  # tkinter 按钮需要 Seize
-maafw-cli connect adb 127.0.0.1:16384 --as phone
+maafw-cli --on notepad connect win32 "记事本"                        # 按标题子串连接，命名为 notepad
+maafw-cli --on game connect win32 0x2217ae                           # 按 hwnd 连接
+maafw-cli --on game connect win32 0x2217ae --input-method Seize      # tkinter 按钮需要 Seize
+maafw-cli --on phone connect adb 127.0.0.1:16384
 ```
 
 ### 3. 感知（OCR / 识别）
