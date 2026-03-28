@@ -59,10 +59,10 @@ maafw-cli device adb 127      # 只显示地址含 "127" 的设备
 |------|------|------|
 | `--screenshot-size` | 720 | 截图短边分辨率 |
 
-会话名通过全局 `--on NAME` 指定，省略则默认用设备地址。
+会话名通过全局 `--on NAME` 指定，省略则默认为 `default`。
 
 ```bash
-maafw-cli connect adb 127.0.0.1:16384                        # 会话名 = 设备地址
+maafw-cli connect adb 127.0.0.1:16384                        # 会话名 = default
 maafw-cli --on phone connect adb 127.0.0.1:16384              # 会话名 = phone
 ```
 
@@ -75,7 +75,7 @@ maafw-cli --on phone connect adb 127.0.0.1:16384              # 会话名 = phon
 | `--screencap-method` | FramePool | 截图方式 |
 | `--input-method` | PostMessage | 输入方式 |
 
-会话名通过全局 `--on NAME` 指定，省略则默认用窗口标题。
+会话名通过全局 `--on NAME` 指定，省略则默认为 `default`。
 
 **截图方式**：
 
