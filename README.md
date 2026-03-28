@@ -15,12 +15,13 @@
 
 MaaFramework 命令行界面。让人、AI、脚本都能直接操作 Android / Win32 设备。
 
-**MaaFW CLI vs [MaaMCP](https://github.com/MAA-AI/MaaMCP)**
+</div>
+
+## MaaFW CLI vs [MaaMCP](https://github.com/MAA-AI/MaaMCP)
 
 **CLI**：现代 coding agent 更适合通过 CLI + skill 的方式驱动设备自动化。相比 MCP，CLI 调用通常只需要一条简洁命令，不必把庞大的工具 schema、持续会话状态或额外协议开销带进模型上下文，因此更省 token，也更容易和代码库分析、测试、脚本、定时任务组合。对于需要高频执行“识别 → 操作 → 校验”的 agent，`maafw-cli` 往往是更直接的选择。
 
 **MCP**：MCP 仍然适合需要持久连接的场景。如果你需要维持持续会话，进行探索性的自动化，自修复测试，动态维护pipeline节点图等，或许使用具有持久状态的MCP是更好地选择。你可以了解更多有关 [MaaMCP](https://github.com/MAA-AI/MaaMCP) 的信息。
-</div>
 
 ## 特性
 
