@@ -34,21 +34,32 @@ def _device_list(ctx: CliContext, *, adb_flag: bool, win32_flag: bool, filter: s
         fmt.success(result)
         return
 
-    if adb_flag and "adb" in result:
-        devices = result["adb"]
-        if not devices:
+    both = adb_flag and win32_flag  # "device all" mode
+
+    adb_devices = result.get("adb", []) if adb_flag else []
+    win32_windows = result.get("win32", []) if win32_flag else []
+
+    # In "all" mode, only fail when both sides are empty
+    if both and not adb_devices and not win32_windows:
+        fmt.error("No devices found.", exit_code=3)
+        return
+
+    # In single-source mode, fail when that source is empty
+    if not both:
+        if adb_flag and not adb_devices:
             fmt.error("No ADB devices found.", exit_code=3)
             return
-        lines = [f"  {d['name']:<30s} {d['address']}" for d in devices]
-        fmt.success(devices, human=f"ADB devices ({len(devices)}):\n" + "\n".join(lines))
-
-    if win32_flag and "win32" in result:
-        windows = result["win32"]
-        if not windows:
+        if win32_flag and not win32_windows:
             fmt.error("No Win32 windows found.", exit_code=3)
             return
-        lines = [f"  {w['hwnd']:<14s} {w['window_name']:<25s} {w['class_name']}" for w in windows]
-        fmt.success(windows, human=f"Win32 windows ({len(windows)}):\n" + "\n".join(lines))
+
+    if adb_devices:
+        lines = [f"  {d['name']:<30s} {d['address']}" for d in adb_devices]
+        fmt.success(adb_devices, human=f"ADB devices ({len(adb_devices)}):\n" + "\n".join(lines))
+
+    if win32_windows:
+        lines = [f"  {w['hwnd']:<14s} {w['window_name']:<25s} {w['class_name']}" for w in win32_windows]
+        fmt.success(win32_windows, human=f"Win32 windows ({len(win32_windows)}):\n" + "\n".join(lines))
 
 
 @device.command("adb")
