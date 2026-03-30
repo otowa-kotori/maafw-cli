@@ -391,6 +391,257 @@ class TestRecoParamsParsing:
         assert result == {"template": "a.png", "roi": "0,0,1,1"}
 
 
+# ── recognition reflection registry ────────────────────────────
+
+
+class TestRecoRegistry:
+    """Test maafw/recognition.py reflection-based registry and build_params."""
+
+    def test_registry_has_all_10_types(self):
+        from maafw_cli.maafw.recognition import _REGISTRY
+        from maa.pipeline import JRecognitionType
+
+        for member in JRecognitionType:
+            assert member.value in _REGISTRY, f"Missing type: {member.value}"
+        assert len(_REGISTRY) == len(JRecognitionType)
+
+    def test_registry_maps_to_correct_classes(self):
+        from maafw_cli.maafw.recognition import _REGISTRY
+        from maa.pipeline import (
+            JDirectHit, JTemplateMatch, JFeatureMatch, JColorMatch, JOCR,
+            JNeuralNetworkClassify, JNeuralNetworkDetect, JAnd, JOr,
+            JCustomRecognition, JRecognitionType,
+        )
+        assert _REGISTRY["DirectHit"] == (JRecognitionType.DirectHit, JDirectHit)
+        assert _REGISTRY["TemplateMatch"] == (JRecognitionType.TemplateMatch, JTemplateMatch)
+        assert _REGISTRY["OCR"] == (JRecognitionType.OCR, JOCR)
+        assert _REGISTRY["And"] == (JRecognitionType.And, JAnd)
+        assert _REGISTRY["Or"] == (JRecognitionType.Or, JOr)
+        assert _REGISTRY["Custom"] == (JRecognitionType.Custom, JCustomRecognition)
+
+    def test_build_template_match_from_kv(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("TemplateMatch", {
+            "template": "btn.png,icon.png",
+            "roi": "0,0,400,300",
+            "threshold": "0.8",
+            "green_mask": "true",
+            "method": "3",
+        })
+        assert obj.template == ["btn.png", "icon.png"]
+        assert obj.roi == (0, 0, 400, 300)
+        assert obj.threshold == [0.8]
+        assert obj.green_mask is True
+        assert obj.method == 3
+
+    def test_build_ocr_from_kv(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("OCR", {
+            "expected": "PLAY,START",
+            "roi": "10,20,100,50",
+            "threshold": "0.5",
+            "only_rec": "yes",
+        })
+        assert obj.expected == ["PLAY", "START"]
+        assert obj.roi == (10, 20, 100, 50)
+        assert obj.threshold == 0.5
+        assert obj.only_rec is True
+
+    def test_build_color_match_from_kv(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("ColorMatch", {
+            "lower": "[[200,0,0]]",
+            "upper": "[[255,100,100]]",
+            "connected": "false",
+        })
+        assert obj.lower == [[200, 0, 0]]
+        assert obj.upper == [[255, 100, 100]]
+        assert obj.connected is False
+
+    def test_build_feature_match_from_kv(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("FeatureMatch", {
+            "template": "icon.png",
+            "ratio": "0.7",
+            "count": "6",
+        })
+        assert obj.template == ["icon.png"]
+        assert obj.ratio == 0.7
+        assert obj.count == 6
+
+    def test_build_direct_hit_defaults(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("DirectHit", {})
+        assert obj.roi == (0, 0, 0, 0)
+
+    def test_build_and_from_raw_json(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("And", {
+            "all_of": [
+                {"recognition": "OCR", "expected": ["PLAY"]},
+                "SomeNodeRef",
+            ],
+        }, from_string=False)
+        assert len(obj.all_of) == 2
+        assert obj.all_of[1] == "SomeNodeRef"
+
+    def test_build_or_from_raw_json(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("Or", {
+            "any_of": ["NodeA", "NodeB"],
+        }, from_string=False)
+        assert obj.any_of == ["NodeA", "NodeB"]
+
+    def test_build_custom_recognition(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("Custom", {
+            "custom_recognition": "MyCustomReco",
+        })
+        assert obj.custom_recognition == "MyCustomReco"
+
+    def test_build_neural_network_classify(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("NeuralNetworkClassify", {"model": "cls.onnx"})
+        assert obj.model == "cls.onnx"
+
+    def test_build_neural_network_detect(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("NeuralNetworkDetect", {"model": "det.onnx"})
+        assert obj.model == "det.onnx"
+
+    def test_required_field_missing(self):
+        from maafw_cli.core.errors import RecognitionError as RE
+        from maafw_cli.maafw.recognition import build_params
+        with pytest.raises(RE, match="requires 'template'"):
+            build_params("TemplateMatch", {})
+
+    def test_unknown_type(self):
+        from maafw_cli.core.errors import RecognitionError as RE
+        from maafw_cli.maafw.recognition import build_params
+        with pytest.raises(RE, match="Unknown recognition type"):
+            build_params("NonExistent", {})
+
+    def test_unknown_fields_ignored(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("OCR", {"unknown_field": "whatever"})
+        assert obj.expected == []
+
+    def test_build_params_from_raw_json(self):
+        from maafw_cli.maafw.recognition import build_params_from_raw
+        import json
+        raw = json.dumps({
+            "recognition": "TemplateMatch",
+            "template": ["btn.png"],
+            "threshold": [0.9],
+            "roi": [10, 20, 100, 50],
+        })
+        reco_type, obj = build_params_from_raw(raw)
+        assert reco_type == "TemplateMatch"
+        assert obj.template == ["btn.png"]
+        assert obj.threshold == [0.9]
+        assert obj.roi == (10, 20, 100, 50)
+
+    def test_build_params_from_raw_ocr(self):
+        from maafw_cli.maafw.recognition import build_params_from_raw
+        import json
+        raw = json.dumps({
+            "recognition": "OCR",
+            "expected": ["PLAY"],
+            "only_rec": True,
+        })
+        reco_type, obj = build_params_from_raw(raw)
+        assert reco_type == "OCR"
+        assert obj.expected == ["PLAY"]
+        assert obj.only_rec is True
+
+    def test_build_params_from_raw_invalid_json(self):
+        from maafw_cli.core.errors import RecognitionError as RE
+        from maafw_cli.maafw.recognition import build_params_from_raw
+        with pytest.raises(RE, match="Invalid JSON"):
+            build_params_from_raw("not json")
+
+    def test_build_params_from_raw_missing_recognition(self):
+        from maafw_cli.core.errors import RecognitionError as RE
+        from maafw_cli.maafw.recognition import build_params_from_raw
+        with pytest.raises(RE, match="recognition"):
+            build_params_from_raw('{"template": ["a.png"]}')
+
+
+class TestCoerce:
+    """Test _coerce type conversion function."""
+
+    def test_int(self):
+        from maafw_cli.maafw.recognition import _coerce
+        assert _coerce("42", int, from_string=True) == 42
+        assert _coerce(42, int) == 42
+
+    def test_float(self):
+        from maafw_cli.maafw.recognition import _coerce
+        assert _coerce("0.7", float, from_string=True) == 0.7
+        assert _coerce(0.7, float) == 0.7
+
+    def test_bool_from_string(self):
+        from maafw_cli.maafw.recognition import _coerce
+        assert _coerce("true", bool, from_string=True) is True
+        assert _coerce("false", bool, from_string=True) is False
+        assert _coerce("1", bool, from_string=True) is True
+        assert _coerce("yes", bool, from_string=True) is True
+        assert _coerce("no", bool, from_string=True) is False
+
+    def test_bool_from_json(self):
+        from maafw_cli.maafw.recognition import _coerce
+        assert _coerce(True, bool) is True
+        assert _coerce(False, bool) is False
+
+    def test_str(self):
+        from maafw_cli.maafw.recognition import _coerce
+        assert _coerce("hello", str) == "hello"
+        assert _coerce(42, str) == "42"
+
+    def test_list_str_from_string(self):
+        from maafw_cli.maafw.recognition import _coerce
+        from typing import List
+        result = _coerce("a,b,c", List[str], from_string=True)
+        assert result == ["a", "b", "c"]
+
+    def test_list_int_from_string(self):
+        from maafw_cli.maafw.recognition import _coerce
+        from typing import List
+        result = _coerce("1,2,3", List[int], from_string=True)
+        assert result == [1, 2, 3]
+
+    def test_list_from_json(self):
+        from maafw_cli.maafw.recognition import _coerce
+        from typing import List
+        result = _coerce(["a", "b"], List[str])
+        assert result == ["a", "b"]
+
+    def test_tuple_from_string(self):
+        from maafw_cli.maafw.recognition import _coerce
+        from typing import Tuple
+        result = _coerce("10,20,30,40", Tuple[int, int, int, int], from_string=True)
+        assert result == (10, 20, 30, 40)
+
+    def test_tuple_from_json_list(self):
+        from maafw_cli.maafw.recognition import _coerce
+        from typing import Tuple
+        result = _coerce([10, 20, 30, 40], Tuple[int, int, int, int])
+        assert result == (10, 20, 30, 40)
+
+    def test_any_passthrough(self):
+        from maafw_cli.maafw.recognition import _coerce
+        from typing import Any
+        value = {"nested": [1, 2]}
+        assert _coerce(value, Any) is value
+
+    def test_list_any_passthrough(self):
+        from maafw_cli.maafw.recognition import _coerce
+        from typing import List, Any
+        value = [{"recognition": "OCR"}, "NodeRef"]
+        result = _coerce(value, List[Any])
+        assert result is value
+
+
 # ── screenshot size option ──────────────────────────────────────
 
 

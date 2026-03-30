@@ -58,12 +58,12 @@ class TestBuildParams:
         assert obj.upper == [[255, 50, 50]]
 
     def test_color_match_missing_lower(self):
-        with pytest.raises(RecognitionError, match="lower.*upper"):
-            build_params("ColorMatch", {"lower": "0,0,0"})
+        with pytest.raises(RecognitionError, match="requires 'lower'"):
+            build_params("ColorMatch", {"upper": "255,255,255"})
 
     def test_color_match_missing_upper(self):
-        with pytest.raises(RecognitionError, match="lower.*upper"):
-            build_params("ColorMatch", {"upper": "255,255,255"})
+        with pytest.raises(RecognitionError, match="requires 'upper'"):
+            build_params("ColorMatch", {"lower": "0,0,0"})
 
     def test_ocr_params(self):
         obj = build_params("OCR", {
