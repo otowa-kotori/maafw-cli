@@ -1,8 +1,8 @@
 """
 asyncio TCP server for the maafw-cli daemon.
 
-Handles JSON-line requests, dispatches to SessionManager, manages
-PID/port files, and implements an idle watchdog.
+Handles JSON-line requests, dispatches to SessionManager, and manages
+PID/port files.
 """
 from __future__ import annotations
 
@@ -46,10 +46,6 @@ def _sanitize_params(params: dict[str, Any]) -> dict[str, Any]:
 
 DEFAULT_PORT = 19799
 PORT_RANGE_END = 19810  # exclusive; try 19799-19809
-IDLE_CHECK_INTERVAL = 30  # seconds
-IDLE_TIMEOUT = 300  # 5 minutes
-
-
 # ── DaemonServer ────────────────────────────────────────────────
 
 
@@ -64,19 +60,14 @@ class DaemonServer:
         *,
         host: str = "127.0.0.1",
         port: int | None = None,
-        idle_timeout: float = IDLE_TIMEOUT,
     ):
         self.host = host
         self.requested_port = port
         self.port: int = 0  # set after bind
-        self.idle_timeout = idle_timeout
-        self.idle_check_interval = min(IDLE_CHECK_INTERVAL, idle_timeout / 2)
         self.session_mgr = SessionManager()
 
         self._server: asyncio.Server | None = None
-        self._watchdog_task: asyncio.Task[None] | None = None
         self._start_time = time.monotonic()
-        self._last_activity = time.monotonic()
         self._shutdown_event = asyncio.Event()
         self._shutdown_reason = "unknown"
         self._active_connections: int = 0
@@ -87,9 +78,6 @@ class DaemonServer:
         """Bind, write PID/port files, and serve forever."""
         self.port = await self._bind()
         self._install_signal_handlers()
-
-        # Start idle watchdog (save reference to prevent silent GC)
-        self._watchdog_task = asyncio.create_task(self._idle_watchdog())
 
         # Write PID/port files AFTER all initialization is complete,
         # so clients don't connect before the server is fully ready.
@@ -167,10 +155,6 @@ class DaemonServer:
             self._server.close()
             await self._server.wait_closed()
 
-        # Cancel watchdog
-        if self._watchdog_task is not None and not self._watchdog_task.done():
-            self._watchdog_task.cancel()
-
         # Wait for active connections to drain (up to 5 seconds)
         drain_deadline = time.monotonic() + 5.0
         while self._active_connections > 0 and time.monotonic() < drain_deadline:
@@ -195,24 +179,6 @@ class DaemonServer:
         self._shutdown_reason = reason
         self._shutdown_event.set()
 
-    # ── idle watchdog ───────────────────────────────────────────
-
-    async def _idle_watchdog(self) -> None:
-        """Periodically check for idle timeout."""
-        while not self._shutdown_event.is_set():
-            await asyncio.sleep(self.idle_check_interval)
-            if self._shutdown_event.is_set():
-                break
-            idle_secs = time.monotonic() - self._last_activity
-            if idle_secs >= self.idle_timeout and self._active_connections == 0:
-                _log.info("Idle timeout (%.0fs), shutting down", idle_secs)
-                self._shutdown_reason = "idle"
-                self._shutdown_event.set()
-                break
-
-    def _touch_activity(self) -> None:
-        self._last_activity = time.monotonic()
-
     # ── client connection handler ───────────────────────────────
 
     async def _handle_client(
@@ -223,7 +189,6 @@ class DaemonServer:
         """Handle a single client connection (may send multiple requests)."""
         peer = writer.get_extra_info("peername")
         self._active_connections += 1
-        self._touch_activity()
 
         try:
             while True:
@@ -239,7 +204,6 @@ class DaemonServer:
                 if not line:
                     break  # EOF
 
-                self._touch_activity()
                 response = await self._process_line(line)
                 if response is not None:
                     writer.write(encode(response))
@@ -248,7 +212,6 @@ class DaemonServer:
             _log.warning("Error handling client %s", peer, exc_info=True)
         finally:
             self._active_connections -= 1
-            self._touch_activity()
             try:
                 writer.close()
                 await writer.wait_closed()

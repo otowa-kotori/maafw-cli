@@ -2,15 +2,12 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
-import time
 
 import pytest
 
 from maafw_cli.daemon.protocol import encode, decode, make_request
 from maafw_cli.daemon.server import DaemonServer, _sanitize_params
-from maafw_cli.core.ipc import pid_file, port_file
 
 # Import services to populate DISPATCH
 import maafw_cli.services.interaction  # noqa: F401
@@ -19,9 +16,9 @@ import maafw_cli.services.interaction  # noqa: F401
 # ── helpers ──────────────────────────────────────────────────────
 
 
-async def _start_server(idle_timeout: float = 300) -> tuple[DaemonServer, int]:
+async def _start_server() -> tuple[DaemonServer, int]:
     """Start a DaemonServer on port 0 (OS-assigned) and return (server, port)."""
-    server = DaemonServer(port=0, idle_timeout=idle_timeout)
+    server = DaemonServer(port=0)
     server.port = await server._bind()
     # Get actual port from the underlying server
     actual_port = server._server.sockets[0].getsockname()[1]
@@ -171,35 +168,6 @@ class TestDaemonServerClientDisconnect:
                 pass
             server._server.close()
             await server._server.wait_closed()
-
-
-class TestDaemonServerIdleWatchdog:
-    async def test_idle_triggers_shutdown(self):
-        # Use a very short idle timeout
-        server, port = await _start_server(idle_timeout=0.2)
-        serve_task = asyncio.create_task(server._server.serve_forever())
-        watchdog_task = asyncio.create_task(server._idle_watchdog())
-
-        # Wait for watchdog to fire
-        try:
-            await asyncio.wait_for(server._shutdown_event.wait(), timeout=5.0)
-        except asyncio.TimeoutError:
-            pytest.fail("Idle watchdog did not trigger shutdown")
-
-        assert server._shutdown_reason == "idle"
-
-        serve_task.cancel()
-        watchdog_task.cancel()
-        try:
-            await serve_task
-        except asyncio.CancelledError:
-            pass
-        try:
-            await watchdog_task
-        except asyncio.CancelledError:
-            pass
-        server._server.close()
-        await server._server.wait_closed()
 
 
 class TestDaemonServerSessionActions:
@@ -396,12 +364,6 @@ class TestLogSanitization:
     def test_no_sensitive_keys(self):
         params = {"x": 1, "y": 2}
         assert _sanitize_params(params) == {"x": 1, "y": 2}
-
-
-class TestWatchdogTaskAttribute:
-    def test_watchdog_task_initially_none(self):
-        server = DaemonServer(port=0, idle_timeout=300)
-        assert server._watchdog_task is None
 
 
 class TestPortRangeExhaustion:

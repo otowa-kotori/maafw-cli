@@ -30,7 +30,7 @@ import maafw_cli.services.interaction  # noqa: F401
 
 async def _make_test_server() -> tuple[DaemonServer, int]:
     """Create a test server on OS-assigned port."""
-    server = DaemonServer(port=0, idle_timeout=300)
+    server = DaemonServer(port=0)
     server.port = await server._bind()
     actual_port = server._server.sockets[0].getsockname()[1]
     server.port = actual_port

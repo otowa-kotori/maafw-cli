@@ -14,7 +14,6 @@ import sys
 def main() -> None:
     parser = argparse.ArgumentParser(description="maafw-cli daemon")
     parser.add_argument("--port", type=int, default=None, help="Override TCP port.")
-    parser.add_argument("--idle-timeout", type=int, default=300, help="Idle timeout in seconds.")
     parser.add_argument("--verbose", action="store_true", help="Also log to stderr.")
     args = parser.parse_args()
 
@@ -33,7 +32,6 @@ def main() -> None:
 
     server = DaemonServer(
         port=args.port,
-        idle_timeout=args.idle_timeout,
     )
 
     try:
