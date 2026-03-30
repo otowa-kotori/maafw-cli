@@ -65,15 +65,35 @@ class Session:
             self.name, type, device,
         )
 
+    def is_connected(self) -> bool:
+        """Check whether the device is still reachable.
+
+        Returns ``True`` if a controller exists and the underlying device
+        connection is alive.  Uses ``controller.connected`` which calls
+        ``MaaControllerConnected`` — lightweight and works for both
+        Win32 and ADB controllers.
+        """
+        if self._controller is None:
+            return False
+        try:
+            return bool(self._controller.connected)
+        except Exception:
+            return False
+
     @property
     def controller(self) -> Controller:
         """Return the controller.
 
-        Raises :class:`DeviceConnectionError` if no controller is available.
+        Raises :class:`DeviceConnectionError` if no controller is available
+        or if the device has disconnected.
         """
         if self._controller is None:
             raise DeviceConnectionError(
                 f"Session '{self.name}' has no device connected."
+            )
+        if not self.is_connected():
+            raise DeviceConnectionError(
+                f"Session '{self.name}' device disconnected."
             )
         return self._controller
 

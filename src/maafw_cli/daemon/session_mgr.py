@@ -121,7 +121,7 @@ class SessionManager:
                 "name": s.name,
                 "type": s.type or None,
                 "device": s.device or None,
-                "connected": s.has_controller,
+                "connected": s.is_connected(),
                 "is_default": s.name == self._default,
             }
             for s in self._sessions.values()

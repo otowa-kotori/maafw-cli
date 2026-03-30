@@ -284,3 +284,57 @@ class TestSessionManagerDestroyInThread:
         _run(mgr.close("test"))
 
         ctrl.destroy.assert_called_once()
+
+
+class TestSessionDisconnectionDetection:
+    """Verify is_connected() and list_sessions() detect device disconnection."""
+
+    def test_is_connected_true(self):
+        """Session with a live controller reports connected."""
+        session = Session(name="test")
+        ctrl = MockController(connected=True)
+        session.attach(ctrl, "win32", "TestWindow")
+        assert session.is_connected() is True
+
+    def test_is_connected_false_when_disconnected(self):
+        """Session with disconnected controller reports not connected."""
+        session = Session(name="test")
+        ctrl = MockController(connected=False)
+        session.attach(ctrl, "win32", "TestWindow")
+        assert session.is_connected() is False
+
+    def test_is_connected_false_when_no_controller(self):
+        """Session without a controller reports not connected."""
+        session = Session(name="test")
+        assert session.is_connected() is False
+
+    def test_controller_property_raises_on_disconnect(self):
+        """Accessing controller when device disconnected raises DeviceConnectionError."""
+        session = Session(name="test")
+        ctrl = MockController(connected=False)
+        session.attach(ctrl, "win32", "TestWindow")
+        with pytest.raises(DeviceConnectionError, match="disconnected"):
+            _ = session.controller
+
+    def test_list_sessions_shows_disconnected(self):
+        """list_sessions() reflects actual device connectivity."""
+        mgr = SessionManager()
+        ctrl_alive = MockController(connected=True)
+        ctrl_dead = MockController(connected=False)
+
+        _run(mgr.add("alive", ctrl_alive, "win32", "Window1"))
+        _run(mgr.add("dead", ctrl_dead, "win32", "Window2"))
+
+        sessions = mgr.list_sessions()
+        by_name = {s["name"]: s for s in sessions}
+        assert by_name["alive"]["connected"] is True
+        assert by_name["dead"]["connected"] is False
+
+    def test_is_connected_handles_exception(self):
+        """is_connected() returns False if controller.connected throws."""
+        session = Session(name="test")
+        ctrl = MockController()
+        # Simulate controller.connected raising an exception
+        type(ctrl).connected = property(lambda self: (_ for _ in ()).throw(RuntimeError("dead")))
+        session.attach(ctrl, "win32", "TestWindow")
+        assert session.is_connected() is False

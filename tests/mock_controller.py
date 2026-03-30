@@ -40,12 +40,14 @@ class MockController:
         scroll_ok: bool = True,
         key_ok: bool = True,
         type_ok: bool = True,
+        connected: bool = True,
     ):
         self.click_ok = click_ok
         self.swipe_ok = swipe_ok
         self.scroll_ok = scroll_ok
         self.key_ok = key_ok
         self.type_ok = type_ok
+        self.connected = connected
 
         # Call records
         self.clicks: list[tuple] = []
