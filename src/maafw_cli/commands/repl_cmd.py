@@ -27,7 +27,6 @@ class Repl:
     def __init__(self, fmt: OutputFormatter, on_session: str | None = None):
         self.fmt = fmt
         self.on = on_session  # target session name
-        self.observe: bool = False
 
     # ── public API ──────────────────────────────────────────────
 
@@ -64,9 +63,6 @@ class Repl:
         if cmd == "status":
             self._print_status()
             return None
-        if cmd == "observe":
-            self._toggle_observe(args)
-            return None
 
         # Connection commands (special — routed through daemon)
         if cmd == "connect":
@@ -92,10 +88,6 @@ class Repl:
         human_fn = getattr(handler, "human_fmt", None)
         human = human_fn(result) if human_fn else None
         self.fmt.success(result, human=human)
-
-        # observe: auto-OCR after action commands
-        if self.observe and result.get("action"):
-            self._run_observe()
 
         return result
 
@@ -257,7 +249,6 @@ class Repl:
             "scroll <dx> <dy>             Scroll",
             "type <text>                  Input text",
             "key <keycode>                Press key",
-            "observe on|off               Toggle auto-OCR after actions",
             "status                       Show session info",
             "help                         Show this help",
             "quit                         Exit REPL",
@@ -276,35 +267,8 @@ class Repl:
                     connected = "connected" if s.get("connected") else "disconnected"
                     print(f"  {s['name']}{default}: {s.get('type', '?')} | {s.get('device', '?')} | {connected}")
             print(f"Target session: {self.on or '(default)'}")
-            print(f"Observe: {'on' if self.observe else 'off'}")
         except MaafwError as e:
             print(f"Error: {e}", file=sys.stderr)
-
-    def _toggle_observe(self, args: list[str]) -> None:
-        if not args or args[0] not in ("on", "off"):
-            print("Usage: observe on|off", file=sys.stderr)
-            return
-        self.observe = args[0] == "on"
-        print(f"Observe: {'on' if self.observe else 'off'}")
-
-    def _run_observe(self) -> None:
-        """Run OCR after an action (best-effort)."""
-        try:
-            ocr_result = self._send("ocr", {})
-        except MaafwError:
-            return
-
-        refs = ocr_result.get("results", [])
-        elapsed_ms = ocr_result.get("elapsed_ms", 0)
-        if not refs:
-            return
-
-        if self.fmt.json_mode:
-            self.fmt.success(ocr_result)
-        else:
-            human = OutputFormatter.format_ocr_table(refs, elapsed_ms)
-            self.fmt.success(ocr_result, human=human)
-
 
 @click.command("repl")
 @pass_ctx

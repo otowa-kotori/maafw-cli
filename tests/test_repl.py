@@ -3,9 +3,7 @@ REPL dispatch tests — verify command parsing and daemon routing.
 """
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 from maafw_cli.core.output import OutputFormatter
 from maafw_cli.commands.repl_cmd import Repl
@@ -93,7 +91,7 @@ class TestReplDispatch:
 
     def test_help(self, capsys):
         repl = _make_repl()
-        result = repl.execute_line("help")
+        repl.execute_line("help")
         captured = capsys.readouterr()
         assert "click" in captured.out
         assert "swipe" in captured.out
@@ -105,20 +103,6 @@ class TestReplDispatch:
             repl.execute_line("status")
         captured = capsys.readouterr()
         assert "No active sessions" in captured.out
-
-    def test_observe_toggle(self, capsys):
-        repl = _make_repl()
-        assert repl.observe is False
-        repl.execute_line("observe on")
-        assert repl.observe is True
-        repl.execute_line("observe off")
-        assert repl.observe is False
-
-    def test_observe_bad_arg(self, capsys):
-        repl = _make_repl()
-        repl.execute_line("observe maybe")
-        assert repl.observe is False  # unchanged
-
 
 class TestReplParseErrors:
     """REPL should handle invalid arguments gracefully, not crash."""

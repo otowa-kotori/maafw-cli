@@ -6,7 +6,6 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from maafw_cli.core.errors import MaafwError, ActionError
-from maafw_cli.core.output import OutputFormatter
 from maafw_cli.cli import CliContext
 from maafw_cli.services.registry import service, DISPATCH
 
@@ -108,41 +107,6 @@ class TestCliContextDaemon:
              patch("maafw_cli.core.ipc.DaemonClient", return_value=mock_client):
             result = ctx.run_raw(_do_test_global, x=99)
         assert result == {"x": 99}
-
-
-# ── observe tests ────────────────────────────────────────────────
-
-
-class TestCliContextObserve:
-    def test_observe_daemon_triggers_ocr(self):
-        """--observe in daemon mode sends OCR via IPC."""
-        ctx = CliContext(observe=True)
-        mock_client = MagicMock()
-        # First call: the action, second call: the observe OCR
-        mock_client.send.side_effect = [
-            {"action": "test", "value": "ok"},
-            {"results": [], "elapsed_ms": 50},
-        ]
-
-        with patch("maafw_cli.core.ipc.ensure_daemon", return_value=19799), \
-             patch("maafw_cli.core.ipc.DaemonClient", return_value=mock_client):
-            ctx.run(_do_test_action)
-
-        assert mock_client.send.call_count == 2
-        # Second call should be OCR
-        second_call = mock_client.send.call_args_list[1]
-        assert second_call[0][0] == "ocr"
-
-    def test_observe_not_triggered_without_action(self):
-        """observe should NOT trigger for results without 'action' key."""
-        ctx = CliContext(observe=True)
-        mock_client = MagicMock()
-        mock_client.send.return_value = {"x": 5}
-
-        with patch("maafw_cli.core.ipc.ensure_daemon", return_value=19799), \
-             patch("maafw_cli.core.ipc.DaemonClient", return_value=mock_client):
-            result = ctx.run(_do_test_global, x=5)
-        assert result == {"x": 5}
 
 
 class TestCliContextOnSession:

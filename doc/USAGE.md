@@ -34,7 +34,6 @@ maafw-cli daemon status                          # 查看 daemon 状态
 | `--json` | 输出严格 JSON 到 stdout |
 | `--quiet` | 抑制非错误输出 |
 | `-v` / `--verbose` | 显示 DEBUG 级别日志（含耗时） |
-| `--observe` | 动作命令执行后自动 OCR，输出识别结果 |
 | `--on SESSION` | 指定目标 daemon 会话（默认使用最近连接的） |
 
 ## 命令参考
@@ -340,8 +339,6 @@ maafw-cli repl
 maafw> connect adb 127.0.0.1:16384
 maafw> ocr
 maafw> click e1
-maafw> observe on        # 开启 --observe 模式
-maafw> click e2          # 点击后自动 OCR
 maafw> quit
 ```
 
@@ -352,6 +349,10 @@ maafw> quit
 ### `daemon stop`
 
 停止后台 daemon。
+
+### `daemon restart`
+
+重启后台 daemon（先停止再启动）。
 
 ### `daemon status`
 
@@ -379,17 +380,6 @@ maafw-cli session list
 maafw-cli session default phone
 maafw-cli session close tablet
 ```
-
-## `--observe` 模式
-
-在动作命令（click/swipe/scroll/type/key）执行后自动追加 OCR，一条命令完成"操作+感知"。
-
-```bash
-maafw-cli --observe click e3          # 点击后立即输出 OCR 结果
-maafw-cli --observe --json click e3   # JSON 中含 OCR 结果
-```
-
-REPL 中用 `observe on` / `observe off` 切换。
 
 ## 退出码
 

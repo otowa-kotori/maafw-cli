@@ -111,10 +111,6 @@ class TestCliStructure:
         result = runner.invoke(cli, ["resource", "status", "--help"])
         assert result.exit_code == 0
 
-    def test_global_observe_flag(self):
-        result = runner.invoke(cli, ["--observe", "--help"])
-        assert result.exit_code == 0
-
     def test_global_json_flag(self):
         """Ensure --json is accepted as a global option."""
         result = runner.invoke(cli, ["--json", "--help"])

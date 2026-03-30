@@ -46,8 +46,6 @@ $ maafw-cli click e2    # 点击"显示"——无需坐标
 
 - `ocr` 返回可解析文本（默认人类友好，`--json` 机器友好）
 - `screenshot` 是昂贵的备选
-- 动作命令支持 `--observe`（执行后自动 OCR，一条命令完成动作+感知）
-  - observe 默认开启 OCR 感知，具体效果待实测确认
 
 ### 2.3 Unix 可组合性
 
@@ -91,7 +89,6 @@ $ maafw-cli pipeline run workflow.json --on phone --json | process_results.py
 
 - `--json` 可预测可解析
 - Element 减少 AI 坐标幻觉
-- `--observe` 减少 AI 往返
 - 默认输出始终人类可读
 
 ---
@@ -102,7 +99,7 @@ $ maafw-cli pipeline run workflow.json --on phone --json | process_results.py
 |---|---|---|
 | **包定位** | 独立包 `maafw-cli` | 与 maa-mcp 解耦，不同依赖 profile |
 | **CLI 框架** | `click` | 成熟稳定，子命令优雅，CliRunner 测试友好，自定义参数类型灵活（Element 解析需要） |
-| **会话架构** | 按需守护进程 | 首次 CLI 调用自动启动 daemon，空闲超时退出。跨平台 IPC 方案需专项调研 |
+| **会话架构** | 按需守护进程 | 首次 CLI 调用自动启动 daemon，手动停止。跨平台 IPC 方案需专项调研 |
 | **serve 功能** | 不做 | 不保留 MCP 兼容，专注 CLI |
 | **自动连接** | 不做 | 用户必须显式 connect |
 | **Python 版本** | 3.10+ | 与 MaaFramework Python 绑定一致 |
@@ -236,14 +233,12 @@ JSON 模式：
 └─────────────────┘        │     ├─ Resource            │
                            │     └─ ElementStore        │
                            └──────────────────────────┘
-                                   │ 空闲超时自动退出
 ```
 
 **生命周期**：
 1. `maafw-cli connect ...` → 检测 daemon 是否运行 → 未运行则自动启动
 2. CLI 命令通过 IPC 发送请求到 daemon
-3. daemon 空闲 N 分钟后自动退出
-4. `maafw-cli daemon stop` 手动停止
+3. `maafw-cli daemon stop` 手动停止
 
 ### 6.1 IPC 方案：localhost TCP
 
@@ -302,11 +297,6 @@ def ensure_daemon():
 - Windows: `ctypes.windll.kernel32.OpenProcess()` 或 `psutil.pid_exists()`（如果有 psutil 依赖）
 - 备选：直接尝试 TCP 连接，失败即视为不存活
 
-**空闲超时**：
-- daemon 内记录 `last_activity` 时间戳
-- asyncio 定时任务每 30s 检查，超过 5 分钟无活动自动退出
-- 退出前清理 PID 文件和端口文件
-
 **崩溃恢复**：
 
 | 故障 | 检测方式 | 恢复 |
@@ -326,7 +316,7 @@ def ensure_daemon():
 | 组件 | 行数 |
 |---|---|
 | Thin client IPC 层（ensure_daemon, send_command） | ~100 |
-| Daemon 核心（asyncio server, 命令路由, 空闲计时） | ~200 |
+| Daemon 核心（asyncio server, 命令路由） | ~200 |
 | PID/端口管理 + 崩溃恢复 | ~60 |
 | 跨平台进程启动 | ~30 |
 | **合计** | **~400 LOC** |
@@ -397,7 +387,6 @@ $ maafw-cli screenshot --output test.png
 
 - ~~`dblclick`,~~ `swipe`, `scroll`, `type`, `key` ~~, `shortcut`~~
 - ~~`text:` 目标寻址（自动 OCR + 查找 + 点击）~~
-- `--observe` 标志（动作后自动 OCR）
 - `reco` 命令（MaaFW 原生感知接口：TemplateMatch / FeatureMatch / ColorMatch / OCR）
 - `resource load-image` 命令（加载图片模板到 Resource）
 - `device` 命令支持名字过滤（`device win32 chrome`）

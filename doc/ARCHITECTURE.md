@@ -33,7 +33,6 @@ ocr / click / ... ──→ DaemonClient.send() ──→ daemon.execute(action,
 - `connect` 自动启动 daemon，创建命名会话（`--on name` 或默认用设备地址）
 - 每个 Session 拥有独立的 controller、Resource、ElementStore 和 asyncio Lock
 - Controller 在 daemon 进程中持久存在，零重连开销
-- Idle watchdog：5 分钟无活动自动退出
 - PID/port 文件：`~data_dir/daemon.pid`、`~data_dir/daemon.port`
 - 日志：`~data_dir/daemon.log`（RotatingFileHandler）
 
@@ -70,7 +69,7 @@ maafw-cli/
 │   │   ├── recognition.py         # reco (TemplateMatch/FeatureMatch/ColorMatch/OCR)
 │   │   ├── resource.py            # resource download-ocr, resource status, resource load-image
 │   │   ├── repl_cmd.py            # REPL 模式
-│   │   ├── daemon_cmd.py          # daemon start/stop/status
+│   │   ├── daemon_cmd.py          # daemon start/stop/restart/status
 │   │   └── session_cmd.py         # session list/default/close
 │   ├── services/
 │   │   ├── connection.py          # do_connect_adb/win32, do_device_list (with filter)
@@ -92,7 +91,7 @@ maafw-cli/
 │   ├── daemon/
 │   │   ├── __main__.py            # python -m maafw_cli.daemon 入口（auto-import services）
 │   │   ├── protocol.py            # JSON-line IPC 协议
-│   │   ├── server.py              # asyncio TCP server + idle watchdog
+│   │   ├── server.py              # asyncio TCP server
 │   │   ├── session_mgr.py         # SessionManager（管理 Session 实例 + 执行路由）
 │   │   └── log.py                 # daemon 专用日志（RotatingFileHandler）
 │   └── maafw/

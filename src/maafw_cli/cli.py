@@ -36,12 +36,10 @@ class CliContext:
         json_mode: bool = False,
         quiet: bool = False,
         verbose: bool = False,
-        observe: bool = False,
         on: str | None = None,
     ):
         self.fmt = OutputFormatter(json_mode=json_mode, quiet=quiet)
         self.verbose = verbose
-        self.observe = observe
         self.on = on          # --on <session>: target specific daemon session
 
     def run(self, service_fn: Callable, **kwargs) -> dict:
@@ -112,35 +110,7 @@ class CliContext:
         human = human_fn(result) if human_fn else None
         self.fmt.success(result, human=human)
 
-        # --observe: auto-OCR after action commands (via daemon)
-        if self.observe and result.get("action"):
-            self._run_observe_daemon(client)
-
         return result
-
-    def _run_observe_daemon(self, client) -> None:
-        """Run OCR after an action via daemon IPC."""
-        try:
-            ocr_result = client.send("ocr", {}, session=self.on)
-        except MaafwError:
-            return  # observe is best-effort
-
-        self._display_observe(ocr_result)
-
-    def _display_observe(self, ocr_result: dict) -> None:
-        """Display observe OCR results."""
-        refs = ocr_result.get("results")
-        elapsed_ms = ocr_result.get("elapsed_ms", 0)
-
-        if refs is None:
-            return
-
-        if self.fmt.json_mode:
-            self.fmt.success(ocr_result)
-        elif refs:
-            human = OutputFormatter.format_ocr_table(refs, elapsed_ms)
-            self.fmt.success(ocr_result, human=human)
-
 
 pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
 
@@ -152,17 +122,16 @@ pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
 @click.option("--json", "json_mode", is_flag=True, default=False, help="Output strict JSON to stdout.")
 @click.option("--quiet", is_flag=True, default=False, help="Suppress non-error output.")
 @click.option("--verbose", "-v", is_flag=True, default=False, help="Show detailed timing and debug info.")
-@click.option("--observe", is_flag=True, default=False, help="Auto-OCR after action commands.")
 @click.option("--on", "on_session", default=None, help="Target a named daemon session.")
 @click.pass_context
 def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool,
-        observe: bool, on_session: str | None) -> None:
+        on_session: str | None) -> None:
     """maafw-cli - MaaFramework command-line interface."""
     ctx.ensure_object(dict)
     setup_logging(verbose=verbose, quiet=quiet)
     ctx.obj = CliContext(
         json_mode=json_mode, quiet=quiet, verbose=verbose,
-        observe=observe, on=on_session,
+        on=on_session,
     )
 
 
