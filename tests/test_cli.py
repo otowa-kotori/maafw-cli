@@ -180,6 +180,34 @@ class TestCliStructure:
         result = runner.invoke(cli, ["connect", "win32", "--help"])
         assert result.exit_code == 0
 
+    # ── GlobalOptionGroup: global options at any position ─────
+
+    def test_on_after_subcommand(self):
+        """--on should work after the subcommand name."""
+        result = runner.invoke(cli, ["connect", "adb", "--help", "--on", "phone"])
+        assert result.exit_code == 0
+
+    def test_on_after_nested_subcommand(self):
+        """--on should work after a nested subcommand like 'connect adb'."""
+        result = runner.invoke(cli, ["connect", "win32", "--help", "--on", "game"])
+        assert result.exit_code == 0
+
+    def test_json_after_subcommand(self):
+        """--json should work after the subcommand name."""
+        result = runner.invoke(cli, ["ocr", "--help", "--json"])
+        assert result.exit_code == 0
+
+    def test_multiple_globals_after_subcommand(self):
+        """Multiple global options after the subcommand."""
+        result = runner.invoke(cli, ["click", "--help", "--on", "x", "--json"])
+        assert result.exit_code == 0
+
+    def test_global_mixed_with_subcommand_options(self):
+        """--on mixed with subcommand-specific options."""
+        result = runner.invoke(cli, ["connect", "adb", "--help", "--on", "phone"])
+        assert result.exit_code == 0
+        assert "DEVICE" in result.output
+
 
 class TestOutputFormatter:
     """Test the output formatter directly."""

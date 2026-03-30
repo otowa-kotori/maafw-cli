@@ -18,6 +18,48 @@ from maafw_cli.core.output import OutputFormatter
 _log = logging.getLogger("maafw_cli.cli")
 
 
+# ── GlobalOptionGroup ─────────────────────────────────────────
+
+
+class GlobalOptionGroup(click.Group):
+    """Allow global options (``--on``, ``--json``, etc.) at any position in argv.
+
+    Standard Click requires group-level options before the sub-command name.
+    This subclass extracts known global options from *anywhere* in the
+    argument list and moves them to the front before Click parses.
+
+    The ``--`` separator is respected: options after it are never extracted.
+    """
+
+    GLOBAL_FLAGS: frozenset[str] = frozenset({"--json", "--quiet", "-v", "--verbose"})
+    GLOBAL_WITH_VALUE: frozenset[str] = frozenset({"--on"})
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        remaining: list[str] = []
+        global_args: list[str] = []
+        i = 0
+        while i < len(args):
+            arg = args[i]
+            if arg == "--":
+                remaining.extend(args[i:])
+                break
+            elif arg in self.GLOBAL_FLAGS:
+                global_args.append(arg)
+                i += 1
+            elif arg in self.GLOBAL_WITH_VALUE:
+                if i + 1 < len(args):
+                    global_args.extend([arg, args[i + 1]])
+                    i += 2
+                else:
+                    # missing value — let Click report the error
+                    global_args.append(arg)
+                    i += 1
+            else:
+                remaining.append(arg)
+                i += 1
+        return super().parse_args(ctx, global_args + remaining)
+
+
 # ── action name reverse-lookup ─────────────────────────────────
 
 def _get_action_name(fn: Callable) -> str | None:
@@ -117,7 +159,7 @@ pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
 
 # ── root group ──────────────────────────────────────────────────
 
-@click.group()
+@click.group(cls=GlobalOptionGroup)
 @click.version_option(version=__version__, prog_name="maafw-cli")
 @click.option("--json", "json_mode", is_flag=True, default=False, help="Output strict JSON to stdout.")
 @click.option("--quiet", is_flag=True, default=False, help="Suppress non-error output.")
