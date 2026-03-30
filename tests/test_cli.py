@@ -132,6 +132,7 @@ class TestCliStructure:
         assert result.exit_code == 0
         assert "start" in result.output
         assert "stop" in result.output
+        assert "restart" in result.output
         assert "status" in result.output
 
     def test_daemon_start_help(self):
@@ -144,6 +145,10 @@ class TestCliStructure:
 
     def test_daemon_status_help(self):
         result = runner.invoke(cli, ["daemon", "status", "--help"])
+        assert result.exit_code == 0
+
+    def test_daemon_restart_help(self):
+        result = runner.invoke(cli, ["daemon", "restart", "--help"])
         assert result.exit_code == 0
 
     def test_session_help(self):
