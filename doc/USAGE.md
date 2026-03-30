@@ -56,13 +56,15 @@ maafw-cli device adb 127      # 只显示地址含 "127" 的设备
 
 | 选项 | 默认 | 说明 |
 |------|------|------|
-| `--screenshot-size` | 720 | 截图短边分辨率 |
+| `--size` | `short:720` | 截图分辨率：`short:<px>`（短边缩放）、`long:<px>`（长边缩放）、`raw`（原尺寸） |
 
 会话名通过全局 `--on NAME` 指定，省略则默认为 `default`。
 
 ```bash
 maafw-cli connect adb 127.0.0.1:16384                        # 会话名 = default
 maafw-cli --on phone connect adb 127.0.0.1:16384              # 会话名 = phone
+maafw-cli connect adb 127.0.0.1:16384 --size long:1920        # 长边缩放到 1920
+maafw-cli connect adb 127.0.0.1:16384 --size raw              # 原尺寸
 ```
 
 ### `connect win32 <WINDOW>`
@@ -71,6 +73,7 @@ maafw-cli --on phone connect adb 127.0.0.1:16384              # 会话名 = phon
 
 | 选项 | 默认 | 说明 |
 |------|------|------|
+| `--size` | `raw` | 截图分辨率：`raw`（原尺寸）、`short:<px>`（短边缩放）、`long:<px>`（长边缩放） |
 | `--screencap-method` | FramePool | 截图方式 |
 | `--input-method` | PostMessage | 输入方式 |
 

@@ -46,7 +46,7 @@ class TestCliStructure:
         result = runner.invoke(cli, ["connect", "adb", "--help"])
         assert result.exit_code == 0
         assert "DEVICE" in result.output
-        assert "--screenshot-size" in result.output
+        assert "--size" in result.output
 
     def test_connect_win32_help(self):
         result = runner.invoke(cli, ["connect", "win32", "--help"])

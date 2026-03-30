@@ -55,7 +55,7 @@ def do_device_list(*, adb: bool = True, win32: bool = False, filter: str | None 
 
 def _connect_adb_inner(
     device: str,
-    screenshot_size: int = 720,
+    size: str = "short:720",
     screencap_method: str | None = None,
     input_method: str | None = None,
 ) -> tuple[dict[str, Any], Any]:
@@ -91,7 +91,7 @@ def _connect_adb_inner(
 
     controller = _connect(
         match,
-        screenshot_short_side=screenshot_size,
+        size=size,
         screencap_methods=sc_val,
         input_methods=in_val,
     )
@@ -138,6 +138,7 @@ def _connect_win32_inner(
     window: str,
     screencap_method: str = "FramePool,PrintWindow",
     input_method: str = "PostMessage",
+    size: str = "raw",
 ) -> tuple[dict[str, Any], Any]:
     """Connect to a Win32 window.
 
@@ -178,7 +179,7 @@ def _connect_win32_inner(
     sc_val = _parse_method_flags(screencap_method, MaaWin32ScreencapMethodEnum, "screencap_method")
     in_val = _parse_method_flags(input_method, MaaWin32InputMethodEnum, "input_method")
 
-    controller = _connect(matched, screencap_method=sc_val, input_method=in_val)
+    controller = _connect(matched, screencap_method=sc_val, input_method=in_val, size=size)
     if controller is None:
         raise DeviceConnectionError(
             f"Failed to connect to '{matched.window_name}' ({hex(matched.hwnd)})."
@@ -204,7 +205,7 @@ def _connect_win32_inner(
 )
 def do_connect_adb(
     device: str,
-    screenshot_size: int = 720,
+    size: str = "short:720",
     screencap_method: str | None = None,
     input_method: str | None = None,
     session_name: str = "default",
@@ -216,7 +217,7 @@ def do_connect_adb(
     registered in DISPATCH for action-name lookup.
     """
     result, _controller = _connect_adb_inner(
-        device, screenshot_size, screencap_method, input_method,
+        device, size, screencap_method, input_method,
     )
     result["session"] = session_name
     return result
@@ -231,6 +232,7 @@ def do_connect_win32(
     window: str,
     screencap_method: str = "FramePool,PrintWindow",
     input_method: str = "PostMessage",
+    size: str = "raw",
     session_name: str = "default",
 ) -> dict:
     """Connect to a Win32 window (direct-call fallback for DISPATCH table).
@@ -238,6 +240,6 @@ def do_connect_win32(
     In daemon mode, the server handles session creation directly via
     ``_connect_win32_inner``.
     """
-    result, _controller = _connect_win32_inner(window, screencap_method, input_method)
+    result, _controller = _connect_win32_inner(window, screencap_method, input_method, size=size)
     result["session"] = session_name
     return result

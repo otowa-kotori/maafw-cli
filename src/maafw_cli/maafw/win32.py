@@ -13,6 +13,7 @@ from maa.controller import Win32Controller
 from maa.define import MaaWin32ScreencapMethodEnum, MaaWin32InputMethodEnum
 
 from maafw_cli.core.log import Timer
+from maafw_cli.core.screenshot import apply_size_option
 
 _log = logging.getLogger("maafw_cli.win32")
 
@@ -45,8 +46,12 @@ def connect_win32(
     window: Win32WindowInfo,
     screencap_method: int = MaaWin32ScreencapMethodEnum.FramePool,
     input_method: int = MaaWin32InputMethodEnum.PostMessage,
+    size: str = "raw",
 ) -> Win32Controller | None:
     """Create and connect a Win32Controller for *window*.
+
+    *size* controls screenshot resolution: ``"raw"`` (default, no scaling),
+    ``"short:720"``, or ``"long:1920"``.
 
     Returns the connected controller, or ``None`` on failure.
     """
@@ -56,6 +61,7 @@ def connect_win32(
         input_method,      # key input
         input_method,      # touch input (same as key for simplicity)
     )
+    apply_size_option(ctrl, size)
     with Timer("Win32 connection", log=_log):
         if not ctrl.post_connection().wait().succeeded:
             if hasattr(ctrl, "destroy"):

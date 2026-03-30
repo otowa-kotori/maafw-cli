@@ -96,8 +96,8 @@ def connect():
 
 @connect.command("adb")
 @click.argument("device")
-@click.option("--screenshot-size", type=click.IntRange(min=1), default=720,
-              help="Screenshot short-side resolution (default 720).")
+@click.option("--size", type=str, default="short:720", show_default=True,
+              help="Screenshot resolution: 'short:<px>' (short-side), 'long:<px>' (long-side), or 'raw' (no scaling).")
 @click.option("--screencap-method", type=str, default=None,
               help="ADB screenshot method (comma-separated for fallback, e.g. Default). "
                    "Uses device-reported default when omitted.")
@@ -105,7 +105,7 @@ def connect():
               help="ADB input method (comma-separated for fallback, e.g. Default). "
                    "Uses device-reported default when omitted.")
 @pass_ctx
-def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
+def connect_adb(ctx: CliContext, device: str, size: str,
                 screencap_method: str | None, input_method: str | None) -> None:
     """Connect to an ADB device by name or address.
 
@@ -116,7 +116,7 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
     ctx.run(
         do_connect_adb,
         device=device,
-        screenshot_size=screenshot_size,
+        size=size,
         screencap_method=screencap_method,
         input_method=input_method,
         session_name=name,
@@ -125,6 +125,8 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
 
 @connect.command("win32")
 @click.argument("window")
+@click.option("--size", type=str, default="raw", show_default=True,
+              help="Screenshot resolution: 'raw' (no scaling), 'short:<px>' (short-side), or 'long:<px>' (long-side).")
 @click.option("--screencap-method", type=str,
               default="FramePool", show_default=True,
               help="Win32 screenshot method (comma-separated for fallback, e.g. FramePool,PrintWindow).")
@@ -132,7 +134,7 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
               default="PostMessage", show_default=True,
               help="Win32 input method (comma-separated for fallback, e.g. PostMessage,Seize).")
 @pass_ctx
-def connect_win32_cmd(ctx: CliContext, window: str,
+def connect_win32_cmd(ctx: CliContext, window: str, size: str,
                       screencap_method: str, input_method: str) -> None:
     """Connect to a Win32 window by title or hwnd (0x...).
 
@@ -146,5 +148,6 @@ def connect_win32_cmd(ctx: CliContext, window: str,
         window=window,
         screencap_method=screencap_method,
         input_method=input_method,
+        size=size,
         session_name=name,
     )

@@ -299,7 +299,7 @@ class DaemonServer:
         from maafw_cli.services.connection import _connect_adb_inner
 
         device = params.get("device", "")
-        screenshot_size = params.get("screenshot_size", 720)
+        size = params.get("size", "short:720")
         screencap_method = params.get("screencap_method")
         input_method = params.get("input_method")
         session_name = (
@@ -309,7 +309,7 @@ class DaemonServer:
         )
 
         result, controller = await asyncio.to_thread(
-            _connect_adb_inner, device, screenshot_size, screencap_method, input_method,
+            _connect_adb_inner, device, size, screencap_method, input_method,
         )
         session = await self.session_mgr.ensure(session_name)
         async with session.lock:
@@ -327,6 +327,7 @@ class DaemonServer:
         window = params.get("window", "")
         screencap_method = params.get("screencap_method", "FramePool,PrintWindow")
         input_method = params.get("input_method", "PostMessage")
+        size = params.get("size", "raw")
         session_name = (
             request.get("session")
             or params.get("session_name")
@@ -334,7 +335,7 @@ class DaemonServer:
         )
 
         result, controller = await asyncio.to_thread(
-            _connect_win32_inner, window, screencap_method, input_method,
+            _connect_win32_inner, window, screencap_method, input_method, size,
         )
         session = await self.session_mgr.ensure(session_name)
         async with session.lock:

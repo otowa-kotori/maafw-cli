@@ -13,6 +13,7 @@ from maa.toolkit import Toolkit
 from maa.controller import AdbController
 
 from maafw_cli.core.log import Timer
+from maafw_cli.core.screenshot import apply_size_option
 
 _log = logging.getLogger("maafw_cli.adb")
 
@@ -47,11 +48,14 @@ def find_adb_devices() -> list[AdbDeviceInfo]:
 
 def connect_adb(
     device: AdbDeviceInfo,
-    screenshot_short_side: int = 720,
+    size: str = "short:720",
     screencap_methods: int | None = None,
     input_methods: int | None = None,
 ) -> AdbController | None:
     """Create and connect an AdbController for *device*.
+
+    *size* controls screenshot resolution: ``"short:720"`` (default),
+    ``"long:1920"``, or ``"raw"`` (no scaling).
 
     *screencap_methods* and *input_methods* override the values
     discovered by ``find_adb_devices``.  Pass ``None`` to use the
@@ -66,7 +70,7 @@ def connect_adb(
         input_methods if input_methods is not None else device.input_methods,
         device.config,
     )
-    ctrl.set_screenshot_target_short_side(screenshot_short_side)
+    apply_size_option(ctrl, size)
     with Timer("ADB connection", log=_log):
         if not ctrl.post_connection().wait().succeeded:
             if hasattr(ctrl, "destroy"):

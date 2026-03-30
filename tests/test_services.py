@@ -325,6 +325,7 @@ class TestControllerDestroyOnFailure:
         mock_ctrl = MagicMock()
         mock_ctrl.post_connection.return_value.wait.return_value.succeeded = False
         mock_ctrl.destroy = MagicMock()
+        mock_ctrl.set_screenshot_target_short_side = MagicMock()
 
         with patch("maafw_cli.maafw.adb.AdbController", return_value=mock_ctrl):
             result = connect_adb(device)
@@ -341,6 +342,7 @@ class TestControllerDestroyOnFailure:
         mock_ctrl = MagicMock()
         mock_ctrl.post_connection.return_value.wait.return_value.succeeded = False
         mock_ctrl.destroy = MagicMock()
+        mock_ctrl.set_screenshot_use_raw_size = MagicMock()
 
         with patch("maafw_cli.maafw.win32.Win32Controller", return_value=mock_ctrl):
             result = connect_win32(window)
@@ -387,3 +389,68 @@ class TestRecoParamsParsing:
         from maafw_cli.services.recognition import _parse_kv_params
         result = _parse_kv_params("template=a.png garbage roi=0,0,1,1")
         assert result == {"template": "a.png", "roi": "0,0,1,1"}
+
+
+# ── screenshot size option ──────────────────────────────────────
+
+
+class TestSizeOption:
+    """Test core/screenshot.py parse_size_option and apply_size_option."""
+
+    def test_parse_short(self):
+        from maafw_cli.core.screenshot import parse_size_option
+        assert parse_size_option("short:720") == ("short", 720)
+
+    def test_parse_long(self):
+        from maafw_cli.core.screenshot import parse_size_option
+        assert parse_size_option("long:1920") == ("long", 1920)
+
+    def test_parse_raw(self):
+        from maafw_cli.core.screenshot import parse_size_option
+        assert parse_size_option("raw") == ("raw", None)
+
+    def test_parse_raw_case_insensitive(self):
+        from maafw_cli.core.screenshot import parse_size_option
+        assert parse_size_option("RAW") == ("raw", None)
+
+    def test_parse_short_case_insensitive(self):
+        from maafw_cli.core.screenshot import parse_size_option
+        assert parse_size_option("Short:1080") == ("short", 1080)
+
+    def test_parse_invalid_format(self):
+        from maafw_cli.core.screenshot import parse_size_option
+        with pytest.raises(ValueError, match="Invalid --size format"):
+            parse_size_option("invalid")
+
+    def test_parse_invalid_value(self):
+        from maafw_cli.core.screenshot import parse_size_option
+        with pytest.raises(ValueError, match="expected an integer"):
+            parse_size_option("short:abc")
+
+    def test_parse_zero_value(self):
+        from maafw_cli.core.screenshot import parse_size_option
+        with pytest.raises(ValueError, match="positive"):
+            parse_size_option("short:0")
+
+    def test_parse_negative_value(self):
+        from maafw_cli.core.screenshot import parse_size_option
+        with pytest.raises(ValueError, match="positive"):
+            parse_size_option("long:-100")
+
+    def test_apply_short(self):
+        from maafw_cli.core.screenshot import apply_size_option
+        ctrl = MagicMock()
+        apply_size_option(ctrl, "short:720")
+        ctrl.set_screenshot_target_short_side.assert_called_once_with(720)
+
+    def test_apply_long(self):
+        from maafw_cli.core.screenshot import apply_size_option
+        ctrl = MagicMock()
+        apply_size_option(ctrl, "long:1920")
+        ctrl.set_screenshot_target_long_side.assert_called_once_with(1920)
+
+    def test_apply_raw(self):
+        from maafw_cli.core.screenshot import apply_size_option
+        ctrl = MagicMock()
+        apply_size_option(ctrl, "raw")
+        ctrl.set_screenshot_use_raw_size.assert_called_once_with(True)

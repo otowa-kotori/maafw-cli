@@ -120,8 +120,8 @@ maafw-cli
 │   └── all [FILTER]                 ✅
 │
 ├── connect                          # 连接
-│   ├── adb <device>                 ✅ [--screenshot-size]
-│   └── win32 <window>               ✅ [--screencap-method] [--input-method]
+│   ├── adb <device>                 ✅ [--size]
+│   └── win32 <window>               ✅ [--size] [--screencap-method] [--input-method]
 │
 ├── ocr                              ✅ [--roi] [--text-only]
 ├── reco <type> [params...]          ✅ [--raw] (TemplateMatch/FeatureMatch/ColorMatch/OCR)
