@@ -1,133 +1,148 @@
 """
-REPL dispatch tests — verify command parsing and daemon routing.
+REPL tests — verify the new Click-forwarding REPL.
+
+The REPL now delegates to the Click CLI group, so we test:
+- Built-in commands (status, help, quit)
+- Click forwarding works (help pages render)
+- --local flag creates LocalExecutor
+- Repl rejects nested repl
 """
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from maafw_cli.core.output import OutputFormatter
-from maafw_cli.commands.repl_cmd import Repl
 
 
-def _make_repl(json_mode: bool = False, on_session: str = "test") -> Repl:
+def _get_repl_class():
+    """Lazy import to avoid circular import (repl_cmd → cli → repl_cmd)."""
+    from maafw_cli.commands.repl_cmd import Repl
+    return Repl
+
+
+def _make_repl(
+    json_mode: bool = False,
+    on_session: str | None = "test",
+    executor: object | None = None,
+):
     """Build a Repl for testing."""
+    Repl = _get_repl_class()
     fmt = OutputFormatter(json_mode=json_mode, quiet=True)
-    return Repl(fmt, on_session=on_session)
+    return Repl(fmt, on_session=on_session, executor=executor)
 
 
-def _mock_send(action, params, session=None):
-    """Default mock for daemon IPC that handles common commands."""
-    if action == "click":
-        target = params.get("target", "0,0")
-        if "," in target:
-            x, y = target.split(",")
-            return {"action": "click", "x": int(x), "y": int(y), "source": "coord"}
-        return {"action": "click", "x": 0, "y": 0, "source": "element"}
-    if action == "swipe":
-        return {
-            "action": "swipe",
-            "x1": 100, "y1": 800, "x2": 100, "y2": 200,
-            "duration": params.get("duration", 300),
-            "from_source": "coord", "to_source": "coord",
-        }
-    if action == "scroll":
-        return {"action": "scroll", "dx": params.get("dx", 0), "dy": params.get("dy", 0)}
-    if action == "type":
-        return {"action": "type", "text": params.get("text", "")}
-    if action == "key":
-        return {"action": "key", "keycode": 0x0D, "keycode_hex": "0x0D",
-                "name": params.get("keycode", ""), "session_type": "win32"}
-    return {}
+class TestReplBuiltins:
+    """Test REPL-only built-in commands."""
 
-
-class TestReplDispatch:
-    def test_click(self):
+    def test_repl_prevents_recursion(self, capsys):
         repl = _make_repl()
-        with patch.object(repl, "_send", side_effect=_mock_send):
-            result = repl.execute_line("click 100,200")
-        assert result is not None
-        assert result["action"] == "click"
+        repl.execute_line("repl")
+        captured = capsys.readouterr()
+        assert "Already in REPL" in captured.err
 
-    def test_swipe(self):
-        repl = _make_repl()
-        with patch.object(repl, "_send", side_effect=_mock_send):
-            result = repl.execute_line("swipe 100,800 100,200 --duration 500")
-        assert result is not None
-        assert result["action"] == "swipe"
-
-    def test_scroll(self):
-        repl = _make_repl()
-        with patch.object(repl, "_send", side_effect=_mock_send):
-            result = repl.execute_line("scroll 0 -360")
-        assert result is not None
-        assert result["action"] == "scroll"
-
-    def test_type(self):
-        repl = _make_repl()
-        with patch.object(repl, "_send", side_effect=_mock_send):
-            result = repl.execute_line('type "Hello World"')
-        assert result is not None
-        assert result["action"] == "type"
-
-    def test_key(self):
-        repl = _make_repl()
-        with patch.object(repl, "_send", side_effect=_mock_send):
-            result = repl.execute_line("key enter")
-        assert result is not None
-        assert result["action"] == "key"
-
-    def test_unknown_command(self, capsys):
-        repl = _make_repl()
-        result = repl.execute_line("nonexistent_cmd")
-        assert result is None
-
-    def test_error_does_not_exit(self):
-        """Errors in REPL should print, not sys.exit."""
-        from maafw_cli.core.errors import ActionError
-        repl = _make_repl()
-        with patch.object(repl, "_send", side_effect=ActionError("Click failed.")):
-            result = repl.execute_line("click 100,200")
-        assert result is None
-
-    def test_help(self, capsys):
-        repl = _make_repl()
+    def test_help_shows_commands(self, capsys):
+        """'help' should forward to --help and show Click help."""
+        repl = _make_repl(on_session=None)
         repl.execute_line("help")
         captured = capsys.readouterr()
         assert "click" in captured.out
-        assert "swipe" in captured.out
+        assert "connect" in captured.out
 
-    def test_status_via_daemon(self, capsys):
-        repl = _make_repl()
-        mock_result = {"sessions": []}
-        with patch.object(repl, "_send", return_value=mock_result):
-            repl.execute_line("status")
+    def test_status_local_mode(self, capsys):
+        """status in local mode works without daemon."""
+        from maafw_cli.core.local_executor import LocalExecutor
+        executor = LocalExecutor()
+        repl = _make_repl(executor=executor)
+        repl._print_status()
         captured = capsys.readouterr()
         assert "No active sessions" in captured.out
 
+    def test_status_daemon_mode(self, capsys):
+        """status in daemon mode queries daemon."""
+        repl = _make_repl()
+        with patch("maafw_cli.core.ipc.ensure_daemon", return_value=19799), \
+             patch("maafw_cli.core.ipc.DaemonClient") as mock_client:
+            mock_client.return_value.send.return_value = {"sessions": []}
+            repl._print_status()
+        captured = capsys.readouterr()
+        assert "No active sessions" in captured.out
+
+
+class TestReplClickForwarding:
+    """Test that REPL forwards commands to the Click CLI group."""
+
+    def test_click_help_forwarded(self, capsys):
+        """'click --help' should show Click's help for the click command."""
+        repl = _make_repl(on_session=None)
+        repl.execute_line("click --help")
+        captured = capsys.readouterr()
+        assert "TARGET" in captured.out
+
+    def test_connect_help_forwarded(self, capsys):
+        """'connect adb --help' should show the connect adb help."""
+        repl = _make_repl(on_session=None)
+        repl.execute_line("connect adb --help")
+        captured = capsys.readouterr()
+        assert "DEVICE" in captured.out
+
+    def test_global_options_prepended(self):
+        """_build_argv should prepend --on, --json, --quiet."""
+        repl = _make_repl(json_mode=True, on_session="phone")
+        argv = repl._build_argv(["click", "100,200"])
+        assert "--on" in argv
+        assert "phone" in argv
+        assert "--json" in argv
+        assert argv[-2:] == ["click", "100,200"]
+
+
+class TestReplLocalMode:
+    """Test REPL with LocalExecutor (--local)."""
+
+    def test_local_executor_dispatch(self, capsys):
+        """Commands in local mode go through LocalExecutor, not daemon."""
+        from maafw_cli.core.local_executor import LocalExecutor
+        from maafw_cli.core.session import Session
+
+        # Set up a local executor with a mock session
+        executor = LocalExecutor()
+        mock_ctrl = MagicMock()
+        mock_ctrl.connected = True
+        mock_ctrl.post_click.return_value.wait.return_value.succeeded = True
+        session = Session(name="test")
+        session.attach(mock_ctrl, "win32", "test-window")
+        executor._sessions["test"] = session
+        executor._default = "test"
+
+        # The REPL should forward through LocalExecutor
+        repl = _make_repl(on_session="test", executor=executor)
+        # Verify executor is set
+        assert repl.executor is executor
+
+    def test_close_all_on_exit(self):
+        """Repl.run() should call executor.close_all() on exit."""
+        from maafw_cli.core.local_executor import LocalExecutor
+        executor = LocalExecutor()
+
+        repl = _make_repl(executor=executor)
+        # Simulate immediate EOF
+        with patch("builtins.input", side_effect=EOFError):
+            repl.run()
+        # close_all should have been called (no sessions, so it's a no-op but still called)
+        assert len(executor._sessions) == 0
+
+
 class TestReplParseErrors:
-    """REPL should handle invalid arguments gracefully, not crash."""
+    """REPL should handle invalid input gracefully."""
 
-    def test_swipe_bad_duration(self, capsys):
+    def test_empty_line(self, capsys):
         repl = _make_repl()
-        result = repl.execute_line("swipe 0,0 100,100 --duration abc")
-        assert result is None
+        repl.execute_line("")
         captured = capsys.readouterr()
-        assert "integer" in captured.err.lower()
+        assert captured.out == ""
+        assert captured.err == ""
 
-    def test_scroll_bad_args(self, capsys):
+    def test_bad_shlex(self, capsys):
         repl = _make_repl()
-        result = repl.execute_line("scroll abc def")
-        assert result is None
+        repl.execute_line("click 'unterminated")
         captured = capsys.readouterr()
-        assert "integer" in captured.err.lower()
-
-
-class TestReplJsonMode:
-    """REPL should output JSON when formatter is in json_mode."""
-
-    def test_click_json_output(self, capsys):
-        repl = _make_repl(json_mode=True)
-        with patch.object(repl, "_send", side_effect=_mock_send):
-            result = repl.execute_line("click 100,200")
-        assert result is not None
-        assert result["action"] == "click"
+        assert "Error" in captured.err

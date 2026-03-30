@@ -96,6 +96,7 @@ class TestCliStructure:
     def test_repl_help(self):
         result = runner.invoke(cli, ["repl", "--help"])
         assert result.exit_code == 0
+        assert "--local" in result.output
 
     def test_resource_help(self):
         result = runner.invoke(cli, ["resource", "--help"])

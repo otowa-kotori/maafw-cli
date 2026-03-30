@@ -454,3 +454,95 @@ class TestSizeOption:
         ctrl = MagicMock()
         apply_size_option(ctrl, "raw")
         ctrl.set_screenshot_use_raw_size.assert_called_once_with(True)
+
+
+# ── LocalExecutor ─────────────────────────────────────────────
+
+
+class TestLocalExecutor:
+    """Test in-process service execution without daemon."""
+
+    def _make_executor(self):
+        from maafw_cli.core.local_executor import LocalExecutor
+        return LocalExecutor()
+
+    def test_session_list_empty(self):
+        ex = self._make_executor()
+        result = ex.execute("session_list", {})
+        assert result == {"sessions": []}
+
+    def test_ping(self):
+        ex = self._make_executor()
+        result = ex.execute("ping", {})
+        assert result["pong"] is True
+        assert result["mode"] == "local"
+
+    def test_shutdown_noop(self):
+        ex = self._make_executor()
+        result = ex.execute("shutdown", {})
+        assert "local" in result["message"].lower()
+
+    def test_click_via_dispatch(self):
+        """Regular service dispatch through LocalExecutor."""
+        from maafw_cli.core.local_executor import LocalExecutor
+
+        ex = LocalExecutor()
+        # Create a session manually and attach a mock controller
+        mock = MockController()
+        session = Session(name="test")
+        session.attach(mock, "win32", "test-device")
+        ex._sessions["test"] = session
+        ex._default = "test"
+
+        result = ex.execute("click", {"target": "100,200"})
+        assert result["action"] == "click"
+        assert result["x"] == 100
+        assert result["y"] == 200
+        assert mock.clicks == [(100, 200)]
+
+    def test_no_session_service(self):
+        """Session-less services work without any session."""
+        ex = self._make_executor()
+        # device_list is needs_session=False; will call init_toolkit()
+        # which may fail without MaaFW installed, so we mock it
+        with patch("maafw_cli.services.connection.init_toolkit"), \
+             patch("maafw_cli.maafw.adb.find_adb_devices", return_value=[]):
+            result = ex.execute("device_list", {"adb": True, "win32": False})
+        assert result == {"adb": []}
+
+    def test_session_default(self):
+        ex = self._make_executor()
+        # Create two sessions
+        ex._sessions["a"] = Session(name="a")
+        ex._sessions["b"] = Session(name="b")
+        ex._default = "a"
+
+        result = ex.execute("session_default", {"name": "b"})
+        assert result == {"default": "b"}
+        assert ex._default == "b"
+
+    def test_session_close(self):
+        ex = self._make_executor()
+        session = Session(name="temp")
+        ex._sessions["temp"] = session
+        ex._default = "temp"
+
+        result = ex.execute("session_close", {"name": "temp"})
+        assert result == {"closed": "temp"}
+        assert "temp" not in ex._sessions
+
+    def test_close_all(self):
+        ex = self._make_executor()
+        mock = MockController()
+        session = Session(name="test")
+        session.attach(mock, "win32", "test")
+        ex._sessions["test"] = session
+        ex._default = "test"
+
+        ex.close_all()
+        assert len(ex._sessions) == 0
+
+    def test_unknown_action(self):
+        ex = self._make_executor()
+        with pytest.raises(ValueError, match="Unknown action"):
+            ex.execute("nonexistent_action", {})

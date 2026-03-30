@@ -70,7 +70,11 @@ def _get_action_name(fn: Callable) -> str | None:
 # ── shared context ──────────────────────────────────────────────
 
 class CliContext:
-    """Carries global state through Click's context."""
+    """Carries global state through Click's context.
+
+    When *executor* is set (a :class:`LocalExecutor`), all service calls
+    are dispatched in-process without daemon IPC.  This powers ``repl --local``.
+    """
 
     def __init__(
         self,
@@ -79,22 +83,44 @@ class CliContext:
         quiet: bool = False,
         verbose: bool = False,
         on: str | None = None,
+        executor: object | None = None,
     ):
         self.fmt = OutputFormatter(json_mode=json_mode, quiet=quiet)
         self.verbose = verbose
         self.on = on          # --on <session>: target specific daemon session
+        self.executor = executor  # None = daemon IPC, LocalExecutor = in-process
 
     def run(self, service_fn: Callable, **kwargs) -> dict:
-        """Call a service function via daemon IPC.
+        """Call a service function via daemon IPC or local executor.
 
         Automatically handles ``needs_session`` — services that don't need
         a session (e.g. ``device_list``) are still routed through the daemon.
         """
+        if self.executor is not None:
+            return self._run_local(service_fn, **kwargs)
+
         needs_session = getattr(service_fn, "needs_session", True)
 
         if not needs_session:
             return self._run_no_session(service_fn, **kwargs)
         return self._run_via_daemon(service_fn, **kwargs)
+
+    def _run_local(self, service_fn: Callable, **kwargs) -> dict:
+        """Local path: dispatch via in-process executor."""
+        action = _get_action_name(service_fn)
+        if action is None:
+            raise RuntimeError(f"Service function {service_fn} not in DISPATCH table")
+
+        try:
+            result = self.executor.execute(action, kwargs, session=self.on)
+        except MaafwError as e:
+            self.fmt.error(str(e), exit_code=e.exit_code)
+            return {}
+
+        human_fn = getattr(service_fn, "human_fmt", None)
+        human = human_fn(result) if human_fn else None
+        self.fmt.success(result, human=human)
+        return result
 
     def _run_no_session(self, service_fn: Callable, **kwargs) -> dict:
         """Execute a service that doesn't require a session (via daemon IPC)."""
@@ -122,11 +148,14 @@ class CliContext:
         Used by commands that need custom display logic (e.g. OCR text-only).
         Raises :class:`MaafwError` on failure.
         """
-        from maafw_cli.core.ipc import DaemonClient, ensure_daemon
-
         action = _get_action_name(service_fn)
         if action is None:
             raise RuntimeError(f"Service function {service_fn} not in DISPATCH table")
+
+        if self.executor is not None:
+            return self.executor.execute(action, kwargs, session=self.on)
+
+        from maafw_cli.core.ipc import DaemonClient, ensure_daemon
         port = ensure_daemon()
         client = DaemonClient(port)
         return client.send(action, kwargs, session=self.on)
@@ -169,11 +198,16 @@ pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
 def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool,
         on_session: str | None) -> None:
     """maafw-cli - MaaFramework command-line interface."""
+    # Preserve executor if injected by REPL --local
+    existing = ctx.obj if isinstance(ctx.obj, CliContext) else None
+    executor = existing.executor if existing else None
+
     ctx.ensure_object(dict)
     setup_logging(verbose=verbose, quiet=quiet)
     ctx.obj = CliContext(
         json_mode=json_mode, quiet=quiet, verbose=verbose,
         on=on_session,
+        executor=executor,
     )
 
 
