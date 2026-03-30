@@ -125,7 +125,7 @@ def connect_adb(ctx: CliContext, device: str, size: str,
 
 @connect.command("win32")
 @click.argument("window")
-@click.option("--size", type=str, default="raw", show_default=True,
+@click.option("--size", type=str, default="short:720", show_default=True,
               help="Screenshot resolution: 'raw' (no scaling), 'short:<px>' (short-side), or 'long:<px>' (long-side).")
 @click.option("--screencap-method", type=str,
               default="FramePool", show_default=True,
