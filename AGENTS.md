@@ -54,7 +54,7 @@ def click_cmd(ctx: CliContext, target: str) -> None:
 
 ### 输出
 
-stdout 放数据，stderr 放日志。`--json` 严格 JSON，`--quiet` 抑制非错误输出，`--observe` 动作后追加 OCR。
+stdout 放数据，stderr 放日志。`--json` 严格 JSON，`--quiet` 抑制非错误输出。
 
 ## 常用命令
 
@@ -126,7 +126,6 @@ maafw-cli --on game pipeline run ./pipeline/ EntryNode # 运行 pipeline
 |------|------|
 | `--json` | 输出严格 JSON |
 | `--on SESSION` | 指定目标会话 |
-| `--observe` | 动作后自动 OCR |
 | `--quiet` | 抑制非错误输出 |
 | `-v` | DEBUG 日志 |
 
