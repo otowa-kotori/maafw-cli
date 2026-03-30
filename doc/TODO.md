@@ -2,7 +2,7 @@
 
 ## 已完成 ✅
 
-- [x] `--observe` 标志——动作后自动 OCR 返回结果（daemon + direct 模式均支持）
+- [x] ~~`--observe` 标志~~（已移除：v0.1.1 后删除，改用显式 `ocr` 命令）
 - [x] `ocr --roi` 实际过滤
 - [x] `swipe`, `scroll`, `type`, `key` 等交互命令
 - [x] `resource download-ocr` 命令

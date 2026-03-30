@@ -86,6 +86,8 @@ maafw-cli/
 │   │   ├── session.py             # Session 类（统一会话状态：controller + Resource + ElementStore）
 │   │   ├── element.py             # Element 系统（纯内存）
 │   │   ├── target.py              # 目标解析 (e3 / 452,387)
+│   │   ├── screenshot.py          # --size 解析（short:720 / long:1920 / raw）+ 缩放逻辑
+│   │   ├── local_executor.py      # LocalExecutor：进程内同步执行 service（repl --local）
 │   │   ├── output.py              # OutputFormatter (human/json/quiet) + format_ocr_table/format_reco_table
 │   │   └── log.py                 # 日志 + Timer
 │   ├── daemon/
@@ -109,7 +111,7 @@ maafw-cli/
     ├── mock_reco_window.py        # tkinter mock 窗口（感知测试，含 fixture 图标）
     ├── fixtures/                  # 测试图片（icon_plus, icon_lenna 等）
     ├── test_cli.py                # CLI 结构 + help + keymap
-    ├── test_cli_context.py        # CliContext 路由 + observe
+    ├── test_cli_context.py        # CliContext 路由
     ├── test_services.py           # Service 层业务逻辑 + @service 装饰器
     ├── test_recognition.py        # 感知层 build_params + recognize pipeline
     ├── test_output.py             # OutputFormatter + format_ocr_table + format_reco_table

@@ -36,6 +36,8 @@ maafw-cli daemon status                          # 查看 daemon 状态
 | `-v` / `--verbose` | 显示 DEBUG 级别日志（含耗时） |
 | `--on SESSION` | 指定目标 daemon 会话（默认使用最近连接的） |
 
+> **提示**：全局选项可以放在命令前后任意位置，例如 `maafw-cli ocr --on game` 等价于 `maafw-cli --on game ocr`。
+
 ## 命令参考
 
 ### `device`
@@ -73,7 +75,7 @@ maafw-cli connect adb 127.0.0.1:16384 --size raw              # 原尺寸
 
 | 选项 | 默认 | 说明 |
 |------|------|------|
-| `--size` | `raw` | 截图分辨率：`raw`（原尺寸）、`short:<px>`（短边缩放）、`long:<px>`（长边缩放） |
+| `--size` | `short:720` | 截图分辨率：`short:<px>`（短边缩放）、`long:<px>`（长边缩放）、`raw`（原尺寸） |
 | `--screencap-method` | FramePool | 截图方式 |
 | `--input-method` | PostMessage | 输入方式 |
 
@@ -335,13 +337,19 @@ Pipeline JSON 格式示例：
 
 ### `repl`
 
-启动交互式 REPL。连接一次，后续操作复用 controller，零重连开销。
+启动交互式 REPL。连接一次，后续操作复用 controller，零重连开销。REPL 内可使用所有 CLI 命令。
+
+| 选项 | 说明 |
+|------|------|
+| `--local` | 在进程内直接执行，不经过 daemon IPC（适合调试或单设备场景） |
 
 ```bash
-maafw-cli repl
+maafw-cli repl                            # 默认通过 daemon
+maafw-cli repl --local                    # 进程内执行，无需 daemon
 maafw> connect adb 127.0.0.1:16384
 maafw> ocr
 maafw> click e1
+maafw> screenshot
 maafw> quit
 ```
 
