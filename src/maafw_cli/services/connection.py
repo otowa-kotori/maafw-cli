@@ -56,6 +56,8 @@ def do_device_list(*, adb: bool = True, win32: bool = False, filter: str | None 
 def _connect_adb_inner(
     device: str,
     screenshot_size: int = 720,
+    screencap_method: str | None = None,
+    input_method: str | None = None,
 ) -> tuple[dict[str, Any], Any]:
     """Connect to an ADB device.
 
@@ -78,7 +80,21 @@ def _connect_adb_inner(
             f"Device '{device}' not found. Available: {[d.name for d in devices]}"
         )
 
-    controller = _connect(match, screenshot_short_side=screenshot_size)
+    from maa.define import MaaAdbScreencapMethodEnum, MaaAdbInputMethodEnum
+
+    sc_val = None
+    if screencap_method is not None:
+        sc_val = _parse_method_flags(screencap_method, MaaAdbScreencapMethodEnum, "screencap_method")
+    in_val = None
+    if input_method is not None:
+        in_val = _parse_method_flags(input_method, MaaAdbInputMethodEnum, "input_method")
+
+    controller = _connect(
+        match,
+        screenshot_short_side=screenshot_size,
+        screencap_methods=sc_val,
+        input_methods=in_val,
+    )
     if controller is None:
         raise DeviceConnectionError(f"Failed to connect to '{device}'.")
 
@@ -186,14 +202,22 @@ def _connect_win32_inner(
     needs_session=False,
     human=lambda r: f"Connected to {r.get('device', '?')} ({r.get('address', '?')}) as '{r.get('session', 'default')}'",
 )
-def do_connect_adb(device: str, screenshot_size: int = 720, session_name: str = "default") -> dict:
+def do_connect_adb(
+    device: str,
+    screenshot_size: int = 720,
+    screencap_method: str | None = None,
+    input_method: str | None = None,
+    session_name: str = "default",
+) -> dict:
     """Connect to an ADB device (direct-call fallback for DISPATCH table).
 
     In daemon mode, the server handles session creation directly via
     ``_connect_adb_inner``.  This wrapper exists only so the service is
     registered in DISPATCH for action-name lookup.
     """
-    result, _controller = _connect_adb_inner(device, screenshot_size)
+    result, _controller = _connect_adb_inner(
+        device, screenshot_size, screencap_method, input_method,
+    )
     result["session"] = session_name
     return result
 

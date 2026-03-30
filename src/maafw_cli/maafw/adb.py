@@ -45,16 +45,25 @@ def find_adb_devices() -> list[AdbDeviceInfo]:
     ]
 
 
-def connect_adb(device: AdbDeviceInfo, screenshot_short_side: int = 720) -> AdbController | None:
+def connect_adb(
+    device: AdbDeviceInfo,
+    screenshot_short_side: int = 720,
+    screencap_methods: int | None = None,
+    input_methods: int | None = None,
+) -> AdbController | None:
     """Create and connect an AdbController for *device*.
+
+    *screencap_methods* and *input_methods* override the values
+    discovered by ``find_adb_devices``.  Pass ``None`` to use the
+    device's own defaults.
 
     Returns the connected controller, or ``None`` on failure.
     """
     ctrl = AdbController(
         device.adb_path,
         device.address,
-        device.screencap_methods,
-        device.input_methods,
+        screencap_methods if screencap_methods is not None else device.screencap_methods,
+        input_methods if input_methods is not None else device.input_methods,
         device.config,
     )
     ctrl.set_screenshot_target_short_side(screenshot_short_side)

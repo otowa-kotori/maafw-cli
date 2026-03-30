@@ -98,8 +98,15 @@ def connect():
 @click.argument("device")
 @click.option("--screenshot-size", type=click.IntRange(min=1), default=720,
               help="Screenshot short-side resolution (default 720).")
+@click.option("--screencap-method", type=str, default=None,
+              help="ADB screenshot method (comma-separated for fallback, e.g. Default). "
+                   "Uses device-reported default when omitted.")
+@click.option("--input-method", type=str, default=None,
+              help="ADB input method (comma-separated for fallback, e.g. Default). "
+                   "Uses device-reported default when omitted.")
 @pass_ctx
-def connect_adb(ctx: CliContext, device: str, screenshot_size: int) -> None:
+def connect_adb(ctx: CliContext, device: str, screenshot_size: int,
+                screencap_method: str | None, input_method: str | None) -> None:
     """Connect to an ADB device by name or address.
 
     DEVICE is the device name as shown by ``device adb``.
@@ -110,6 +117,8 @@ def connect_adb(ctx: CliContext, device: str, screenshot_size: int) -> None:
         do_connect_adb,
         device=device,
         screenshot_size=screenshot_size,
+        screencap_method=screencap_method,
+        input_method=input_method,
         session_name=name,
     )
 

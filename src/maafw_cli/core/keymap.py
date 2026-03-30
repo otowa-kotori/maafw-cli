@@ -42,19 +42,6 @@ AK_MAP: dict[str, int] = {
     "printscreen": 120, "pause": 121,
 }
 
-# ── Win32 screencap / input method names ─────────────────────────
-
-SCREENCAP_METHODS = [
-    "GDI", "FramePool", "DXGI_DesktopDup",
-    "DXGI_DesktopDup_Window", "PrintWindow", "ScreenDC",
-]
-
-INPUT_METHODS = [
-    "Seize", "SendMessage", "PostMessage",
-    "SendMessageWithCursorPos", "PostMessageWithCursorPos",
-    "SendMessageWithWindowPos", "PostMessageWithWindowPos",
-]
-
 
 # ── resolver ─────────────────────────────────────────────────────
 
