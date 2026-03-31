@@ -219,6 +219,41 @@ class TestCliStructure:
         assert "DEVICE" in result.output
 
 
+class TestCompletion:
+    """Test the completion sub-command."""
+
+    def test_completion_help(self):
+        result = runner.invoke(cli, ["completion", "--help"])
+        assert result.exit_code == 0
+        assert "bash" in result.output
+
+    def test_completion_bash(self):
+        result = runner.invoke(cli, ["completion", "bash"])
+        assert result.exit_code == 0
+        assert "COMPREPLY" in result.output or "complete" in result.output
+
+    def test_completion_zsh(self):
+        result = runner.invoke(cli, ["completion", "zsh"])
+        assert result.exit_code == 0
+        assert "compdef" in result.output
+
+    def test_completion_fish(self):
+        result = runner.invoke(cli, ["completion", "fish"])
+        assert result.exit_code == 0
+        assert "complete" in result.output
+
+    def test_completion_auto_detect(self):
+        """Auto-detect shell from $SHELL env var."""
+        result = runner.invoke(cli, ["completion"], env={"SHELL": "/bin/bash"})
+        assert result.exit_code == 0
+        assert "COMPREPLY" in result.output or "complete" in result.output
+
+    def test_completion_auto_detect_missing(self):
+        """Should error when $SHELL is not set and no argument given."""
+        result = runner.invoke(cli, ["completion"], env={"SHELL": ""})
+        assert result.exit_code != 0
+
+
 class TestOutputFormatter:
     """Test the output formatter directly."""
 
