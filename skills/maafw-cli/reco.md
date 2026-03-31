@@ -53,3 +53,5 @@ Full parameter lists: [node-params.md](node-params.md)
 
 Results produce Element refs (`e1`, `e2`, ...) just like OCR — use `click e1` to act on them.
 Refs reset on every reco call.
+
+Each `reco` call also auto-saves a screenshot; the path is printed at the end of the output (or in the `"screenshot"` JSON field).

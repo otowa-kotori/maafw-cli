@@ -14,10 +14,10 @@ You have `maafw-cli` to control Android and Win32 devices.
 ## Workflow
 
 ```
-screenshot (perceive) -> decide approach -> act -> screenshot (verify)
+perceive (ocr / reco / screenshot) -> decide approach -> act -> perceive (verify)
 ```
 
-Always screenshot first to perceive the screen, then decide whether to use OCR, reco, or coordinates.
+Always perceive the screen first, then decide whether to use OCR, reco, or coordinates.
 
 ## First-time setup
 
@@ -39,14 +39,16 @@ If "No active session" -> connect first. Single-device use doesn't need `--on`.
 
 ## Perceive
 
-- **`screenshot`** — save screenshot to file, then show it to the user or view it yourself to understand the screen (general-purpose)
-- **`ocr`** — extract text and get Element refs (`e1`, `e2`...); preferred when operating on text
-- **`reco`** — template/feature/color matching; see [reco.md](reco.md)
+- **`ocr`** — extract text, get Element refs (`e1`, `e2`...), **and auto-save a screenshot**; preferred when operating on text
+- **`reco`** — template/feature/color matching, also auto-saves a screenshot; see [reco.md](reco.md)
+- **`screenshot`** — save screenshot to file only (use when you just need the image, not recognition)
+
+`ocr` and `reco` both print the screenshot path at the end of their output (human mode) or include it as `"screenshot"` in JSON mode. Use this to view the captured screen.
 
 ```bash
-maafw-cli screenshot                       # save screenshot
-maafw-cli ocr                              # full-screen OCR
-maafw-cli ocr --roi 0,0,400,300            # OCR a region
+maafw-cli ocr                              # full-screen OCR + screenshot
+maafw-cli ocr --roi 0,0,400,300            # OCR a region + screenshot
+maafw-cli screenshot                       # screenshot only (no recognition)
 ```
 
 Reco or OCR returns refs like `e1`, `e2`, `e3` — use them for clicks. **Refs reset on every OCR/reco call.**
@@ -66,10 +68,10 @@ maafw-cli screenshot              # save to current directory
 
 ## Rules
 
-1. **Screenshot first** — screenshot to perceive the screen before acting; never guess coordinates
-2. **OCR for text** — when operating on text elements, use `ocr` to get Element refs, then `click e3`
+1. **Perceive first** — use `ocr`, `reco`, or `screenshot` to see the screen before acting; never guess coordinates
+2. **OCR for text** — when operating on text elements, use `ocr` to get Element refs, then `click e3` (also gives you a screenshot for free)
 3. **Refs are ephemeral** — each OCR/reco call resets refs; run it right before acting
-4. **Verify** — screenshot after actions to confirm effect
+4. **Verify** — perceive again after actions to confirm effect
 5. **Show the user what you see** — summarize what's on screen when you perceive it
 
 ## More
