@@ -63,4 +63,8 @@ def reco_cmd(ctx: CliContext, reco_type: str | None, params: tuple[str, ...], ra
     else:
         session_label = result.get("session", "default")
         human = OutputFormatter.format_reco_table(refs, elapsed_ms, resolved_type, session_label, color=fmt.color)
+        screenshot = result.get("screenshot")
+        if screenshot:
+            label = click.style(f"Screenshot: {screenshot}", dim=True) if fmt.color else f"Screenshot: {screenshot}"
+            human += f"\n{label}"
         fmt.success(result, human=human)

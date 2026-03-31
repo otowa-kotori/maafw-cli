@@ -46,6 +46,10 @@ def ocr(ctx: CliContext, roi: str | None, text_only: bool) -> None:
     else:
         session_label = result.get("session", "default")
         human = OutputFormatter.format_ocr_table(refs, elapsed_ms, session_label, color=fmt.color)
+        screenshot = result.get("screenshot")
+        if screenshot:
+            label = click.style(f"Screenshot: {screenshot}", dim=True) if fmt.color else f"Screenshot: {screenshot}"
+            human += f"\n{label}"
         fmt.success(result, human=human)
 
 
