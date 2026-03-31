@@ -12,13 +12,16 @@ import json
 import sys
 from typing import Any, NoReturn
 
+import click
+
 
 class OutputFormatter:
     """Formats command output based on the selected mode."""
 
-    def __init__(self, *, json_mode: bool = False, quiet: bool = False):
+    def __init__(self, *, json_mode: bool = False, quiet: bool = False, color: bool = True):
         self.json_mode = json_mode
         self.quiet = quiet
+        self.color = color and not json_mode  # json mode never colorizes
 
     # ── public API ──────────────────────────────────────────────
 
@@ -48,7 +51,8 @@ class OutputFormatter:
         if self.json_mode:
             self._print_json({"error": message})
         elif not self.quiet:
-            self._print_text(f"Error: {message}", file=sys.stderr)
+            prefix = click.style("Error:", fg="red", bold=True) if self.color else "Error:"
+            self._print_text(f"{prefix} {message}", file=sys.stderr)
 
     def error(self, message: str, *, exit_code: int = 1) -> NoReturn:
         """Print an error to stderr and exit.
@@ -95,24 +99,42 @@ class OutputFormatter:
             target.write("\n")
             target.flush()
 
+    # ── color helper ────────────────────────────────────────────
+
+    @staticmethod
+    def _styled(text: str, color: bool, **kw: Any) -> str:
+        """Apply ``click.style`` only when *color* is enabled."""
+        return click.style(text, **kw) if color else text
+
     # ── OCR formatting ───────────────────────────────────────────
 
     @staticmethod
-    def format_ocr_table(refs: list[dict], elapsed_ms: int, session_label: str = "default") -> str:
+    def format_ocr_table(
+        refs: list[dict],
+        elapsed_ms: int,
+        session_label: str = "default",
+        *,
+        color: bool = False,
+    ) -> str:
         """Format OCR results as a human-readable table.
 
         Used by ``ocr`` command and ``--observe`` mode.
         """
+        _s = OutputFormatter._styled
+
         lines: list[str] = []
-        lines.append(f"Screen OCR \u2014 {session_label}")
-        lines.append("\u2500" * 60)
+        lines.append(f"Screen OCR \u2014 {_s(session_label, color, fg='cyan', bold=True)}")
+        lines.append(_s("\u2500" * 60, color, dim=True))
         for r in refs:
             box = r["box"]
             box_str = f"[{box[0]:>4},{box[1]:>4},{box[2]:>4},{box[3]:>4}]"
             score_str = f"{r['score'] * 100:.0f}%"
-            lines.append(f" {r['ref']:<4s} {r['text']:<20s} {box_str}  {score_str}")
-        lines.append("\u2500" * 60)
-        lines.append(f"{len(refs)} results | {elapsed_ms}ms")
+            # Pad ref *before* colorizing to keep alignment
+            padded_ref = f"{r['ref']:<4s}"
+            ref_str = _s(padded_ref, color, fg="yellow")
+            lines.append(f" {ref_str} {r['text']:<20s} {box_str}  {score_str}")
+        lines.append(_s("\u2500" * 60, color, dim=True))
+        lines.append(_s(f"{len(refs)} results | {elapsed_ms}ms", color, dim=True))
         return "\n".join(lines)
 
     # ── recognition formatting ────────────────────────────────────
@@ -123,6 +145,8 @@ class OutputFormatter:
         elapsed_ms: int,
         reco_type: str,
         session_label: str = "default",
+        *,
+        color: bool = False,
     ) -> str:
         """Format recognition results as a human-readable table.
 
@@ -131,9 +155,11 @@ class OutputFormatter:
         - For results with ``text`` field: shows text + score%
         - Otherwise: shows score%
         """
+        _s = OutputFormatter._styled
+
         lines: list[str] = []
-        lines.append(f"Recognition: {reco_type} \u2014 {session_label}")
-        lines.append("\u2500" * 64)
+        lines.append(f"Recognition: {reco_type} \u2014 {_s(session_label, color, fg='cyan', bold=True)}")
+        lines.append(_s("\u2500" * 64, color, dim=True))
         for r in refs:
             box = r["box"]
             box_str = f"[{box[0]:>4},{box[1]:>4},{box[2]:>4},{box[3]:>4}]"
@@ -145,19 +171,23 @@ class OutputFormatter:
             else:
                 metric_str = f"{r['score'] * 100:.0f}%"
 
-            lines.append(f" {r['ref']:<4s} {text:<16s} {box_str}  {metric_str}")
-        lines.append("\u2500" * 64)
-        lines.append(f"{len(refs)} results | {elapsed_ms}ms")
+            padded_ref = f"{r['ref']:<4s}"
+            ref_str = _s(padded_ref, color, fg="yellow")
+            lines.append(f" {ref_str} {text:<16s} {box_str}  {metric_str}")
+        lines.append(_s("\u2500" * 64, color, dim=True))
+        lines.append(_s(f"{len(refs)} results | {elapsed_ms}ms", color, dim=True))
         return "\n".join(lines)
 
     # ── pipeline formatting ───────────────────────────────────────
 
     @staticmethod
-    def format_pipeline_table(result: dict, verbose: bool = False) -> str:
+    def format_pipeline_table(result: dict, verbose: bool = False, *, color: bool = False) -> str:
         """Format pipeline run results as a human-readable string.
 
         *verbose* toggles between a compact summary and a full node trace.
         """
+        _s = OutputFormatter._styled
+
         entry = result.get("entry", "?")
         session = result.get("session", "default")
         status = result.get("status", "unknown")
@@ -166,14 +196,15 @@ class OutputFormatter:
         nodes = result.get("nodes", [])
 
         lines: list[str] = []
-        lines.append(f"Pipeline: {entry} \u2014 {session}")
+        lines.append(f"Pipeline: {entry} \u2014 {_s(session, color, fg='cyan', bold=True)}")
 
         if verbose and nodes:
-            lines.append("\u2500" * 48)
+            lines.append(_s("\u2500" * 48, color, dim=True))
             for i, nd in enumerate(nodes, 1):
                 name = nd.get("name", "?")
                 completed = nd.get("completed", False)
-                mark = "\u2713" if completed else "\u2717"
+                mark_raw = "\u2713" if completed else "\u2717"
+                mark = _s(mark_raw, color, fg="green" if completed else "red")
 
                 # Recognition summary
                 reco = nd.get("recognition", {})
@@ -195,7 +226,8 @@ class OutputFormatter:
                 if action_type:
                     parts.append(f"\u2192 {action_type}")
                 lines.append(" ".join(parts))
-            lines.append("\u2500" * 48)
+            lines.append(_s("\u2500" * 48, color, dim=True))
 
-        lines.append(f"Status: {status} | {node_count} nodes | {elapsed}ms")
+        status_colored = _s(status, color, fg="green" if status == "completed" else "red")
+        lines.append(f"Status: {status_colored} | {node_count} nodes | {elapsed}ms")
         return "\n".join(lines)

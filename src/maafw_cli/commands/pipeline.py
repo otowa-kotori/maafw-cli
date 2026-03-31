@@ -47,10 +47,10 @@ def pipeline_run(ctx: CliContext, path: str, entry: str | None, override: str | 
     if fmt.json_mode:
         fmt.success(result)
     elif ctx.verbose:
-        human = OutputFormatter.format_pipeline_table(result, verbose=True)
+        human = OutputFormatter.format_pipeline_table(result, verbose=True, color=fmt.color)
         fmt.success(result, human=human)
     else:
-        human = OutputFormatter.format_pipeline_table(result, verbose=False)
+        human = OutputFormatter.format_pipeline_table(result, verbose=False, color=fmt.color)
         fmt.success(result, human=human)
 
 

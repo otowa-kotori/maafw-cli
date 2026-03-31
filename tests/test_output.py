@@ -46,7 +46,7 @@ class TestFormatOcrTable:
 
 class TestPrintError:
     def test_print_error_stderr(self):
-        fmt = OutputFormatter()
+        fmt = OutputFormatter(color=False)
         buf = io.BytesIO()
         mock_stderr = type("FakeStderr", (), {"buffer": buf})()
         with patch.object(sys, "stderr", mock_stderr):
@@ -114,7 +114,7 @@ class TestOutputNoBuf:
         assert "OK 成功" in sio.getvalue()
 
     def test_print_error_no_buffer(self):
-        fmt = OutputFormatter()
+        fmt = OutputFormatter(color=False)
         sio = io.StringIO()
         with patch.object(sys, "stderr", sio):
             fmt.print_error("bad thing")
@@ -162,3 +162,48 @@ class TestFormatRecoTable:
         assert "e1" in result
         assert "e2" in result
         assert "2 results" in result
+
+
+class TestColorOutput:
+    """Test that color=True produces ANSI escape sequences."""
+
+    _OCR_REFS = [
+        {"ref": "e1", "text": "Hello", "box": [10, 20, 100, 30], "score": 0.95},
+    ]
+    _RECO_REFS = [
+        {"ref": "e1", "text": None, "box": [10, 20, 100, 30], "score": 0.95},
+    ]
+
+    def test_ocr_table_color(self):
+        result = OutputFormatter.format_ocr_table(self._OCR_REFS, 100, color=True)
+        assert "\x1b[" in result
+
+    def test_reco_table_color(self):
+        result = OutputFormatter.format_reco_table(self._RECO_REFS, 100, "TemplateMatch", color=True)
+        assert "\x1b[" in result
+
+    def test_pipeline_table_color(self):
+        data = {
+            "entry": "Start", "session": "game", "status": "completed",
+            "node_count": 1, "elapsed_ms": 50, "nodes": [],
+        }
+        result = OutputFormatter.format_pipeline_table(data, color=True)
+        assert "\x1b[" in result
+
+    def test_error_color(self):
+        fmt = OutputFormatter(color=True)
+        buf = io.BytesIO()
+        mock_stderr = type("FakeStderr", (), {"buffer": buf})()
+        with patch.object(sys, "stderr", mock_stderr):
+            fmt.print_error("boom")
+        output = buf.getvalue().decode("utf-8")
+        assert "\x1b[" in output
+        assert "boom" in output
+
+    def test_no_color_in_json_mode(self):
+        fmt = OutputFormatter(json_mode=True, color=True)
+        assert fmt.color is False
+
+    def test_no_color_when_disabled(self):
+        result = OutputFormatter.format_ocr_table(self._OCR_REFS, 100, color=False)
+        assert "\x1b[" not in result

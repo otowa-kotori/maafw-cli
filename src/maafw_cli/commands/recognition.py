@@ -62,5 +62,5 @@ def reco_cmd(ctx: CliContext, reco_type: str | None, params: tuple[str, ...], ra
         fmt.success(result)
     else:
         session_label = result.get("session", "default")
-        human = OutputFormatter.format_reco_table(refs, elapsed_ms, resolved_type, session_label)
+        human = OutputFormatter.format_reco_table(refs, elapsed_ms, resolved_type, session_label, color=fmt.color)
         fmt.success(result, human=human)

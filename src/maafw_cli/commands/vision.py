@@ -45,7 +45,7 @@ def ocr(ctx: CliContext, roi: str | None, text_only: bool) -> None:
         fmt.success(result, human=text)
     else:
         session_label = result.get("session", "default")
-        human = OutputFormatter.format_ocr_table(refs, elapsed_ms, session_label)
+        human = OutputFormatter.format_ocr_table(refs, elapsed_ms, session_label, color=fmt.color)
         fmt.success(result, human=human)
 
 
