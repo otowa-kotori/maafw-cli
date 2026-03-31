@@ -161,7 +161,7 @@ class TestEnsureDaemon:
         (tmp_path / "daemon.port").write_text("19800")
 
         # Mock _start_daemon_process to write new PID/port files
-        def fake_start():
+        def fake_start(*, verbose=False):
             (tmp_path / "daemon.pid").write_text(str(os.getpid()))
             (tmp_path / "daemon.port").write_text("19801")
 
@@ -176,7 +176,7 @@ class TestEnsureDaemon:
         monkeypatch.setattr("maafw_cli.core.ipc._data_dir", lambda: tmp_path)
 
         # _start_daemon_process does nothing — files never appear
-        monkeypatch.setattr("maafw_cli.core.ipc._start_daemon_process", lambda: None)
+        monkeypatch.setattr("maafw_cli.core.ipc._start_daemon_process", lambda *, verbose=False: None)
         monkeypatch.setattr("maafw_cli.core.ipc._DAEMON_START_TIMEOUT", 0.3)
         monkeypatch.setattr("maafw_cli.core.ipc._DAEMON_POLL_INTERVAL", 0.05)
 
@@ -202,6 +202,20 @@ class TestStartDaemonProcess:
             _start_daemon_process()
             cmd = mock_popen.call_args[0][0]
             assert cmd[0] == str(fake_pythonw)
+
+    def test_verbose_flag_passed(self, tmp_path):
+        """_start_daemon_process(verbose=True) should append --verbose to cmd."""
+        with patch("maafw_cli.core.ipc.subprocess.Popen") as mock_popen:
+            _start_daemon_process(verbose=True)
+            cmd = mock_popen.call_args[0][0]
+            assert "--verbose" in cmd
+
+    def test_no_verbose_flag_by_default(self, tmp_path):
+        """_start_daemon_process() should NOT include --verbose by default."""
+        with patch("maafw_cli.core.ipc.subprocess.Popen") as mock_popen:
+            _start_daemon_process()
+            cmd = mock_popen.call_args[0][0]
+            assert "--verbose" not in cmd
 
 
 # ── Version check tests ──────────────────────────────────────

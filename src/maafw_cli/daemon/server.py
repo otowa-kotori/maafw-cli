@@ -119,12 +119,16 @@ class DaemonServer:
         ) from last_exc
 
     def _write_pid_port_files(self) -> None:
-        """Write daemon.pid and daemon.port files."""
+        """Write daemon.pid and daemon.port files under an exclusive file lock."""
+        from maafw_cli.core.filelock import FileLock
+
         data_dir = _data_dir()
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        pid_file().write_text(str(os.getpid()), encoding="utf-8")
-        port_file().write_text(str(self.port), encoding="utf-8")
+        lock_path = data_dir / "daemon.lock"
+        with FileLock(lock_path):
+            pid_file().write_text(str(os.getpid()), encoding="utf-8")
+            port_file().write_text(str(self.port), encoding="utf-8")
         _log.debug("PID/port files written: pid=%d port=%d", os.getpid(), self.port)
 
     def _install_signal_handlers(self) -> None:

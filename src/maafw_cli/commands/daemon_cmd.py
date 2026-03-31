@@ -23,7 +23,7 @@ def daemon_start(ctx: CliContext, verbose: bool) -> None:
 
     fmt = ctx.fmt
     try:
-        port = ensure_daemon(check_version=False)
+        port = ensure_daemon(check_version=False, verbose=verbose)
         fmt.success({"status": "running", "port": port}, human=f"Daemon running on port {port}")
     except Exception as e:
         fmt.error(str(e), exit_code=3)
@@ -77,7 +77,7 @@ def daemon_restart(ctx: CliContext, verbose: bool) -> None:
 
     # Start
     try:
-        new_port = ensure_daemon(check_version=False)
+        new_port = ensure_daemon(check_version=False, verbose=verbose)
         fmt.success(
             {"status": "restarted", "port": new_port},
             human=f"Daemon restarted on port {new_port}",

@@ -118,9 +118,15 @@ def _cleanup_stale_files() -> None:
             pass
 
 
-def _start_daemon_process() -> None:
-    """Launch the daemon as a detached subprocess."""
+def _start_daemon_process(*, verbose: bool = False) -> None:
+    """Launch the daemon as a detached subprocess.
+
+    When *verbose* is True, passes ``--verbose`` to the daemon process
+    so it also logs to stderr.
+    """
     cmd = [sys.executable, "-m", "maafw_cli.daemon"]
+    if verbose:
+        cmd.append("--verbose")
 
     if sys.platform == "win32":
         # CREATE_NO_WINDOW prevents any console/window from appearing.
@@ -152,7 +158,7 @@ def _start_daemon_process() -> None:
         )
 
 
-def ensure_daemon(*, check_version: bool = True) -> int:
+def ensure_daemon(*, check_version: bool = True, verbose: bool = False) -> int:
     """Ensure the daemon is running and return its port.
 
     Starts a new daemon if needed. Raises :class:`DeviceConnectionError`
@@ -161,6 +167,9 @@ def ensure_daemon(*, check_version: bool = True) -> int:
     When *check_version* is True (default), pings the daemon and verifies
     its version matches the CLI. Raises :class:`VersionMismatchError` on
     mismatch.
+
+    When *verbose* is True, the daemon process is started with
+    ``--verbose`` so it also logs to stderr.
     """
     t0 = time.perf_counter()
 
@@ -178,9 +187,26 @@ def ensure_daemon(*, check_version: bool = True) -> int:
         _log.debug("Stale daemon files (pid=%s, port=%s), cleaning up", pid, port)
         _cleanup_stale_files()
 
-    # Case 2: start new daemon
-    _log.info("Starting daemon...")
-    _start_daemon_process()
+    # Case 2: start new daemon — use file lock to prevent concurrent starts
+    from maafw_cli.core.filelock import FileLock, FileLockError
+
+    lock_path = _data_dir() / "daemon.lock"
+    try:
+        with FileLock(lock_path):
+            # Double-check inside the lock — another process may have started
+            # the daemon between our initial check and acquiring the lock.
+            pid, port = _read_daemon_info()
+            if pid is not None and port is not None:
+                if _is_process_alive(pid) and _is_daemon_reachable(port):
+                    if check_version:
+                        _check_daemon_version(port)
+                    return port
+                _cleanup_stale_files()
+
+            _log.info("Starting daemon...")
+            _start_daemon_process(verbose=verbose)
+    except FileLockError:
+        _log.debug("Another process is starting the daemon, waiting...")
 
     # Wait for daemon to become ready (files appear + port reachable)
     deadline = time.perf_counter() + _DAEMON_START_TIMEOUT
