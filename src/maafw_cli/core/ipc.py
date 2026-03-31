@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from maafw_cli.core.errors import DeviceConnectionError
+from maafw_cli.core.errors import DeviceConnectionError, VersionMismatchError
 from maafw_cli.paths import get_data_dir as _data_dir
 from maafw_cli.daemon.protocol import decode, encode, make_request
 
@@ -152,11 +152,15 @@ def _start_daemon_process() -> None:
         )
 
 
-def ensure_daemon() -> int:
+def ensure_daemon(*, check_version: bool = True) -> int:
     """Ensure the daemon is running and return its port.
 
     Starts a new daemon if needed. Raises :class:`DeviceConnectionError`
     if the daemon cannot be started within the timeout.
+
+    When *check_version* is True (default), pings the daemon and verifies
+    its version matches the CLI. Raises :class:`VersionMismatchError` on
+    mismatch.
     """
     t0 = time.perf_counter()
 
@@ -167,6 +171,8 @@ def ensure_daemon() -> int:
         if _is_process_alive(pid) and _is_daemon_reachable(port):
             elapsed = int((time.perf_counter() - t0) * 1000)
             _log.debug("ensure_daemon: %dms (already running, pid=%d port=%d)", elapsed, pid, port)
+            if check_version:
+                _check_daemon_version(port)
             return port
         # Stale files
         _log.debug("Stale daemon files (pid=%s, port=%s), cleaning up", pid, port)
@@ -189,6 +195,23 @@ def ensure_daemon() -> int:
     raise DeviceConnectionError(
         f"Failed to start daemon within timeout. Check {log_path} for details."
     )
+
+
+def _check_daemon_version(port: int) -> None:
+    """Ping the daemon and verify its version matches the CLI."""
+    from maafw_cli import __version__ as cli_version
+
+    try:
+        client = DaemonClient(port)
+        data = client.send("ping")
+    except Exception:
+        # If ping fails, don't block — let the real request fail naturally
+        _log.debug("Version check ping failed, skipping")
+        return
+
+    daemon_version = data.get("version")
+    if daemon_version != cli_version:
+        raise VersionMismatchError(cli_version, daemon_version)
 
 
 # ── DaemonClient ────────────────────────────────────────────────
@@ -235,17 +258,28 @@ class DaemonClient:
         return response.get("data", {})
 
     def _sync_send(self, request: dict) -> dict:
-        """Connect, send request, read response — pure synchronous socket."""
+        """Connect, send request, read response — pure synchronous socket.
+
+        Skips server-side heartbeat messages and waits for the real response.
+        Socket timeout is 60s (heartbeats arrive every 15s, so 60s without
+        any data means the daemon is dead).
+        """
         sock = socket.create_connection((self.host, self.port), timeout=5.0)
         try:
-            sock.settimeout(300.0)  # pipeline runs can take minutes
+            sock.settimeout(60.0)  # heartbeat every 15s; 60s = 4× margin
             sock.sendall(encode(request))
             reader = sock.makefile("rb")
             try:
-                line = reader.readline()
-                if not line:
-                    raise DeviceConnectionError("Daemon closed connection unexpectedly")
-                return decode(line)
+                while True:
+                    line = reader.readline()
+                    if not line:
+                        raise DeviceConnectionError(
+                            "Daemon closed connection unexpectedly"
+                        )
+                    msg = decode(line)
+                    if msg.get("heartbeat"):
+                        continue  # skip heartbeat, keep waiting
+                    return msg
             finally:
                 reader.close()
         finally:

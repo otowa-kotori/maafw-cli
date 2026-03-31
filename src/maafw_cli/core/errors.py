@@ -34,3 +34,18 @@ class DeviceConnectionError(MaafwError):
 
     def __init__(self, message: str):
         super().__init__(message, exit_code=3)
+
+
+class VersionMismatchError(MaafwError):
+    """CLI and daemon version mismatch (exit code 4)."""
+
+    def __init__(self, cli_version: str, daemon_version: str | None):
+        daemon_ver = daemon_version or "unknown (old daemon)"
+        super().__init__(
+            f"Version mismatch: CLI is {cli_version}, "
+            f"daemon is {daemon_ver}. "
+            f"Run `maafw-cli daemon restart` to fix.",
+            exit_code=4,
+        )
+        self.cli_version = cli_version
+        self.daemon_version = daemon_version

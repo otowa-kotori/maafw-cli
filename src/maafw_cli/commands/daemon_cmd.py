@@ -23,7 +23,7 @@ def daemon_start(ctx: CliContext, verbose: bool) -> None:
 
     fmt = ctx.fmt
     try:
-        port = ensure_daemon()
+        port = ensure_daemon(check_version=False)
         fmt.success({"status": "running", "port": port}, human=f"Daemon running on port {port}")
     except Exception as e:
         fmt.error(str(e), exit_code=3)
@@ -77,7 +77,7 @@ def daemon_restart(ctx: CliContext, verbose: bool) -> None:
 
     # Start
     try:
-        new_port = ensure_daemon()
+        new_port = ensure_daemon(check_version=False)
         fmt.success(
             {"status": "restarted", "port": new_port},
             human=f"Daemon restarted on port {new_port}",
@@ -104,11 +104,13 @@ def daemon_status(ctx: CliContext) -> None:
         data = client.send("ping")
         uptime = data.get("uptime_seconds", 0)
         sessions = data.get("sessions", [])
+        version = data.get("version", "unknown")
         fmt.success(
-            {"status": "running", "pid": pid, "port": port, "uptime": uptime, "sessions": sessions},
+            {"status": "running", "pid": pid, "port": port, "uptime": uptime,
+             "sessions": sessions, "version": version},
             human=(
                 f"Daemon running — PID {pid}, port {port}, "
-                f"uptime {uptime}s, {len(sessions)} session(s)"
+                f"version {version}, uptime {uptime}s, {len(sessions)} session(s)"
             ),
         )
     except Exception as e:

@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from maafw_cli.core.errors import MaafwError
+from maafw_cli.core.errors import MaafwError, VersionMismatchError
 from maafw_cli.core.ipc import (
     DaemonClient,
     _cleanup_stale_files,
@@ -202,3 +202,139 @@ class TestStartDaemonProcess:
             _start_daemon_process()
             cmd = mock_popen.call_args[0][0]
             assert cmd[0] == str(fake_pythonw)
+
+
+# ── Version check tests ──────────────────────────────────────
+
+
+class TestVersionCheck:
+    async def test_version_match_passes(self, tmp_path, monkeypatch):
+        """ensure_daemon with check_version=True should pass when versions match."""
+        server, port = await _make_test_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+
+        monkeypatch.setattr("maafw_cli.core.ipc._data_dir", lambda: tmp_path)
+        monkeypatch.setattr("maafw_cli.core.ipc._is_daemon_reachable", lambda p: True)
+        (tmp_path / "daemon.pid").write_text(str(os.getpid()))
+        (tmp_path / "daemon.port").write_text(str(port))
+
+        try:
+            # Versions match — should not raise
+            result_port = await asyncio.to_thread(ensure_daemon, check_version=True)
+            assert result_port == port
+        finally:
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()
+
+    async def test_version_mismatch_raises(self, tmp_path, monkeypatch):
+        """ensure_daemon should raise VersionMismatchError when versions differ."""
+        server, port = await _make_test_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+
+        monkeypatch.setattr("maafw_cli.core.ipc._data_dir", lambda: tmp_path)
+        monkeypatch.setattr("maafw_cli.core.ipc._is_daemon_reachable", lambda p: True)
+        (tmp_path / "daemon.pid").write_text(str(os.getpid()))
+        (tmp_path / "daemon.port").write_text(str(port))
+
+        # Fake CLI version to differ from daemon
+        monkeypatch.setattr("maafw_cli.core.ipc.VersionMismatchError", VersionMismatchError)
+        import maafw_cli.core.ipc as ipc_mod
+
+        original_check = ipc_mod._check_daemon_version
+
+        def fake_check(p):
+            """Simulate mismatch by patching __version__ during the check."""
+            with patch("maafw_cli.__version__", "99.99.99"):
+                original_check(p)
+
+        monkeypatch.setattr("maafw_cli.core.ipc._check_daemon_version", fake_check)
+
+        try:
+            with pytest.raises(VersionMismatchError):
+                await asyncio.to_thread(ensure_daemon, check_version=True)
+        finally:
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()
+
+    async def test_check_version_false_skips(self, tmp_path, monkeypatch):
+        """ensure_daemon(check_version=False) should not check version."""
+        monkeypatch.setattr("maafw_cli.core.ipc._data_dir", lambda: tmp_path)
+        monkeypatch.setattr("maafw_cli.core.ipc._is_daemon_reachable", lambda p: True)
+        (tmp_path / "daemon.pid").write_text(str(os.getpid()))
+        (tmp_path / "daemon.port").write_text("19800")
+
+        # Should return immediately without version check
+        result_port = ensure_daemon(check_version=False)
+        assert result_port == 19800
+
+    def test_version_mismatch_error_message(self):
+        """VersionMismatchError should include both versions and fix instruction."""
+        err = VersionMismatchError("1.0.0", "0.9.0")
+        assert "1.0.0" in str(err)
+        assert "0.9.0" in str(err)
+        assert "daemon restart" in str(err)
+        assert err.exit_code == 4
+
+    def test_version_mismatch_error_unknown_daemon(self):
+        """VersionMismatchError with None daemon version."""
+        err = VersionMismatchError("1.0.0", None)
+        assert "unknown" in str(err)
+
+
+# ── Client heartbeat skip tests ──────────────────────────────
+
+
+class TestClientHeartbeatSkip:
+    async def test_client_skips_heartbeat_lines(self):
+        """DaemonClient._sync_send should skip heartbeat lines and return real response."""
+        async def heartbeat_handler(reader, writer):
+            line = await reader.readline()
+            # Send 2 heartbeats then the real response
+            for i in range(2):
+                writer.write(encode({"heartbeat": True, "elapsed": i * 15}))
+                await writer.drain()
+            # Send real response
+            request = decode(line)
+            resp = {"ok": True, "id": request.get("id", "?"), "data": {"pong": True}}
+            writer.write(encode(resp))
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+
+        test_server = await asyncio.start_server(heartbeat_handler, "127.0.0.1", 0)
+        port = test_server.sockets[0].getsockname()[1]
+
+        try:
+            client = DaemonClient(port)
+            result = await asyncio.to_thread(client.send, "ping")
+            assert result["pong"] is True
+        finally:
+            test_server.close()
+            await test_server.wait_closed()
+
+    async def test_client_handles_no_heartbeat(self):
+        """DaemonClient works normally when server sends no heartbeats."""
+        server, port = await _make_test_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+        try:
+            client = DaemonClient(port)
+            result = await asyncio.to_thread(client.send, "ping")
+            assert result["pong"] is True
+        finally:
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()

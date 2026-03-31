@@ -11,7 +11,7 @@ from typing import Callable
 import click
 
 from maafw_cli import __version__
-from maafw_cli.core.errors import MaafwError
+from maafw_cli.core.errors import MaafwError, VersionMismatchError
 from maafw_cli.core.log import setup_logging
 from maafw_cli.core.output import OutputFormatter
 
@@ -58,6 +58,13 @@ class GlobalOptionGroup(click.Group):
                 remaining.append(arg)
                 i += 1
         return super().parse_args(ctx, global_args + remaining)
+
+    def invoke(self, ctx: click.Context) -> None:
+        try:
+            return super().invoke(ctx)
+        except VersionMismatchError as e:
+            click.echo(f"Error: {e}", err=True)
+            ctx.exit(e.exit_code)
 
 
 # ── action name reverse-lookup ─────────────────────────────────

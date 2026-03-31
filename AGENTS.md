@@ -60,10 +60,13 @@ stdout 放数据，stderr 放日志。`--json` 严格 JSON，`--quiet` 抑制非
 
 ```bash
 uv sync                          # 安装依赖
-uv run pytest -v                 # 跑单元测试（默认跳过集成测试）
+uv run pytest -v                 # 跑单元测试（默认跳过 manual + integration）
 uv run ruff check src/           # lint
 uv run maafw-cli --help          # 运行 CLI
 ```
+
+> **注意**：`pyproject.toml` 中 `addopts = "-m 'not manual and not integration'"`。
+> 直接用 `uv run pytest -v` 即可，**不要**手动加 `-m "not integration"`，否则会覆盖默认 marker 过滤，导致 `test_adb_manual.py` 等 manual 测试被意外执行。
 
 ## CLI 快速开始
 

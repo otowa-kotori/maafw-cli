@@ -13,6 +13,7 @@ import signal
 import time
 from typing import Any
 
+from maafw_cli import __version__ as _daemon_version
 from maafw_cli.core.errors import MaafwError
 from maafw_cli.core.ipc import pid_file, port_file
 from maafw_cli.paths import get_data_dir as _data_dir
@@ -46,6 +47,7 @@ def _sanitize_params(params: dict[str, Any]) -> dict[str, Any]:
 
 DEFAULT_PORT = 19799
 PORT_RANGE_END = 19810  # exclusive; try 19799-19809
+HEARTBEAT_INTERVAL = 15  # seconds between heartbeat messages
 # ── DaemonServer ────────────────────────────────────────────────
 
 
@@ -204,7 +206,7 @@ class DaemonServer:
                 if not line:
                     break  # EOF
 
-                response = await self._process_line(line)
+                response = await self._process_with_heartbeat(line, writer)
                 if response is not None:
                     writer.write(encode(response))
                     await writer.drain()
@@ -217,6 +219,28 @@ class DaemonServer:
                 await writer.wait_closed()
             except Exception:
                 pass
+
+    async def _process_with_heartbeat(
+        self, line: bytes, writer: asyncio.StreamWriter,
+    ) -> dict[str, Any] | None:
+        """Run _process_line with periodic heartbeat messages to keep the connection alive."""
+        task = asyncio.create_task(self._process_line(line))
+        t0 = time.monotonic()
+        while True:
+            try:
+                return await asyncio.wait_for(
+                    asyncio.shield(task), timeout=HEARTBEAT_INTERVAL,
+                )
+            except asyncio.TimeoutError:
+                elapsed = int(time.monotonic() - t0)
+                _log.debug("Sending heartbeat (elapsed=%ds)", elapsed)
+                try:
+                    writer.write(encode({"heartbeat": True, "elapsed": elapsed}))
+                    await writer.drain()
+                except (ConnectionError, OSError):
+                    _log.warning("Client disconnected during heartbeat, cancelling task")
+                    task.cancel()
+                    return None
 
     async def _process_line(self, line: bytes) -> dict[str, Any] | None:
         """Parse one JSON-line and dispatch."""
@@ -287,6 +311,7 @@ class DaemonServer:
         uptime = int(time.monotonic() - self._start_time)
         return {
             "pong": True,
+            "version": _daemon_version,
             "uptime_seconds": uptime,
             "sessions": self.session_mgr.session_names,
             "pid": os.getpid(),

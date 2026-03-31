@@ -61,6 +61,25 @@ class TestDaemonServerPing:
             server._server.close()
             await server._server.wait_closed()
 
+    async def test_ping_includes_version(self):
+        from maafw_cli import __version__
+
+        server, port = await _start_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+        try:
+            req = make_request("ping")
+            resp = await _send_recv(port, req)
+            assert resp["ok"] is True
+            assert resp["data"]["version"] == __version__
+        finally:
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()
+
 
 class TestDaemonServerErrors:
     async def test_unknown_action(self):
@@ -389,3 +408,144 @@ class TestPortRangeExhaustion:
             for srv in occupied:
                 srv.close()
                 await srv.wait_closed()
+
+
+class TestHeartbeat:
+    """Tests for server-side heartbeat during long-running requests."""
+
+    async def test_heartbeat_sent_on_slow_request(self):
+        """Server sends heartbeat messages when a request takes longer than HEARTBEAT_INTERVAL."""
+        import maafw_cli.daemon.server as srv_mod
+
+        server, port = await _start_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+
+        # Patch HEARTBEAT_INTERVAL to a very short value for fast test
+        original_interval = srv_mod.HEARTBEAT_INTERVAL
+        srv_mod.HEARTBEAT_INTERVAL = 0.2
+
+        # Inject a slow action into the dispatch table
+        original_dispatch = server._dispatch
+
+        async def slow_dispatch(action, params, session_name, request):
+            if action == "slow_test":
+                await asyncio.sleep(0.7)  # >3× heartbeat interval
+                return {"done": True}
+            return await original_dispatch(action, params, session_name, request)
+
+        server._dispatch = slow_dispatch
+
+        try:
+            reader, writer = await asyncio.open_connection("127.0.0.1", port)
+            req = make_request("slow_test")
+            writer.write(encode(req))
+            await writer.drain()
+
+            # Collect all lines until we get the real response
+            heartbeats = []
+            final_resp = None
+            while True:
+                line = await asyncio.wait_for(reader.readline(), timeout=5.0)
+                msg = decode(line)
+                if msg.get("heartbeat"):
+                    heartbeats.append(msg)
+                else:
+                    final_resp = msg
+                    break
+
+            assert len(heartbeats) >= 2, f"Expected ≥2 heartbeats, got {len(heartbeats)}"
+            assert all("elapsed" in hb for hb in heartbeats)
+            assert final_resp["ok"] is True
+            assert final_resp["data"]["done"] is True
+
+            writer.close()
+            await writer.wait_closed()
+        finally:
+            srv_mod.HEARTBEAT_INTERVAL = original_interval
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()
+
+    async def test_no_heartbeat_for_fast_request(self):
+        """Fast requests should complete without any heartbeat messages."""
+        server, port = await _start_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+        try:
+            reader, writer = await asyncio.open_connection("127.0.0.1", port)
+            req = make_request("ping")
+            writer.write(encode(req))
+            await writer.drain()
+
+            line = await asyncio.wait_for(reader.readline(), timeout=5.0)
+            resp = decode(line)
+            # Should be the real response, not a heartbeat
+            assert "heartbeat" not in resp
+            assert resp["ok"] is True
+            assert resp["data"]["pong"] is True
+
+            writer.close()
+            await writer.wait_closed()
+        finally:
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()
+
+    async def test_heartbeat_cancelled_on_client_disconnect(self):
+        """When client disconnects, heartbeat write fails and task is cancelled."""
+        import maafw_cli.daemon.server as srv_mod
+
+        server, port = await _start_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+
+        original_interval = srv_mod.HEARTBEAT_INTERVAL
+        srv_mod.HEARTBEAT_INTERVAL = 0.1
+
+        slow_task_cancelled = asyncio.Event()
+        original_dispatch = server._dispatch
+
+        async def slow_dispatch(action, params, session_name, request):
+            if action == "slow_disconnect_test":
+                try:
+                    await asyncio.sleep(10)
+                except asyncio.CancelledError:
+                    slow_task_cancelled.set()
+                    raise
+                return {"done": True}
+            return await original_dispatch(action, params, session_name, request)
+
+        server._dispatch = slow_dispatch
+
+        try:
+            reader, writer = await asyncio.open_connection("127.0.0.1", port)
+            req = make_request("slow_disconnect_test")
+            writer.write(encode(req))
+            await writer.drain()
+
+            # Wait a bit for the request to start processing, then disconnect
+            await asyncio.sleep(0.15)
+            writer.close()
+            await writer.wait_closed()
+
+            # Give server time to detect the disconnect and cancel
+            await asyncio.sleep(0.5)
+
+            # Server should still be alive — verify with a ping
+            resp = await _send_recv(port, make_request("ping"))
+            assert resp["ok"] is True
+        finally:
+            srv_mod.HEARTBEAT_INTERVAL = original_interval
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()
