@@ -107,6 +107,61 @@ class TestDownloadAndExtract:
         for f in OCR_REQUIRED_FILES:
             assert (ocr_dir / f).exists()
 
+    def test_mirror_url_param(self, tmp_path, monkeypatch):
+        """Explicit url= parameter should override both default and env var."""
+        from maafw_cli.download import download_and_extract_ocr, OCR_REQUIRED_FILES
+
+        ocr_dir = tmp_path / "ocr"
+        model_dir = tmp_path / "model"
+        monkeypatch.setattr("maafw_cli.download.get_model_dir", lambda: model_dir)
+
+        # Set env var to a different URL — should be ignored when url= is given
+        monkeypatch.setenv("MAAFW_OCR_MIRROR", "https://env-mirror.example.com/ocr.zip")
+
+        test_zip = tmp_path / "test.zip"
+        files = {f: b"fake model data" for f in OCR_REQUIRED_FILES}
+        _make_test_zip(test_zip, files)
+
+        mock_response = MagicMock()
+        mock_response.headers = {"Content-Length": str(test_zip.stat().st_size)}
+        mock_response.read.side_effect = [test_zip.read_bytes(), b""]
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = lambda s, *a: None
+
+        with patch("maafw_cli.download.urlopen", return_value=mock_response) as mock_urlopen:
+            result = download_and_extract_ocr(ocr_dir, url="https://custom-mirror.example.com/ocr.zip")
+
+        assert result is True
+        # Verify the custom URL was used, not the env var or default
+        called_request = mock_urlopen.call_args[0][0]
+        assert called_request.full_url == "https://custom-mirror.example.com/ocr.zip"
+
+    def test_env_var_mirror(self, tmp_path, monkeypatch):
+        """MAAFW_OCR_MIRROR env var should be used when url= is not given."""
+        from maafw_cli.download import download_and_extract_ocr, OCR_REQUIRED_FILES
+
+        ocr_dir = tmp_path / "ocr"
+        model_dir = tmp_path / "model"
+        monkeypatch.setattr("maafw_cli.download.get_model_dir", lambda: model_dir)
+        monkeypatch.setenv("MAAFW_OCR_MIRROR", "https://env-mirror.example.com/ocr.zip")
+
+        test_zip = tmp_path / "test.zip"
+        files = {f: b"fake model data" for f in OCR_REQUIRED_FILES}
+        _make_test_zip(test_zip, files)
+
+        mock_response = MagicMock()
+        mock_response.headers = {"Content-Length": str(test_zip.stat().st_size)}
+        mock_response.read.side_effect = [test_zip.read_bytes(), b""]
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = lambda s, *a: None
+
+        with patch("maafw_cli.download.urlopen", return_value=mock_response) as mock_urlopen:
+            result = download_and_extract_ocr(ocr_dir)
+
+        assert result is True
+        called_request = mock_urlopen.call_args[0][0]
+        assert called_request.full_url == "https://env-mirror.example.com/ocr.zip"
+
     def test_network_error(self, tmp_path, monkeypatch):
         from urllib.error import URLError
         from maafw_cli.download import download_and_extract_ocr

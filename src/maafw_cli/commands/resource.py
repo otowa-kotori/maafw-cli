@@ -19,12 +19,13 @@ def resource():
 
 
 @resource.command("download-ocr")
+@click.option("--mirror", default=None, help="Override download URL (or set MAAFW_OCR_MIRROR env var).")
 @pass_ctx
-def download_ocr(ctx: CliContext) -> None:
+def download_ocr(ctx: CliContext, mirror: str | None) -> None:
     """Download the OCR model (ppocr_v5 zh_cn)."""
     fmt = ctx.fmt
     try:
-        result = do_download_ocr()
+        result = do_download_ocr(mirror=mirror)
     except MaafwError as e:
         fmt.error(str(e), exit_code=e.exit_code)
         return

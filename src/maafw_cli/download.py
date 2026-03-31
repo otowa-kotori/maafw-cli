@@ -5,6 +5,7 @@ Ported from maa_mcp.download to remove the maa_mcp dependency.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import zipfile
 from datetime import datetime
@@ -31,9 +32,12 @@ def check_ocr_files_exist(ocr_dir: Path | None = None) -> bool:
     return all((ocr_dir / f).exists() for f in OCR_REQUIRED_FILES)
 
 
-def download_and_extract_ocr(ocr_dir: Path | None = None) -> bool:
+def download_and_extract_ocr(ocr_dir: Path | None = None, *, url: str | None = None) -> bool:
     if ocr_dir is None:
         ocr_dir = get_ocr_dir()
+
+    if url is None:
+        url = os.environ.get("MAAFW_OCR_MIRROR", OCR_DOWNLOAD_URL)
 
     ocr_dir.mkdir(parents=True, exist_ok=True)
     model_dir = get_model_dir()
@@ -43,9 +47,9 @@ def download_and_extract_ocr(ocr_dir: Path | None = None) -> bool:
 
     try:
         _log(log_file, "Starting OCR resource download")
-        _log(log_file, f"URL: {OCR_DOWNLOAD_URL}")
+        _log(log_file, f"URL: {url}")
 
-        request = Request(OCR_DOWNLOAD_URL, headers={"User-Agent": f"maafw-cli/{__version__}"})
+        request = Request(url, headers={"User-Agent": f"maafw-cli/{__version__}"})
 
         with urlopen(request, timeout=300) as response:
             total_size = response.headers.get("Content-Length")

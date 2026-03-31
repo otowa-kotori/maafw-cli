@@ -10,8 +10,12 @@ from maafw_cli.services.registry import service
 
 
 @service(name="resource_download_ocr", needs_session=False, human=lambda r: f"OCR model ready at {r['path']}")
-def do_download_ocr() -> dict:
-    """Download OCR model if not already present."""
+def do_download_ocr(*, mirror: str | None = None) -> dict:
+    """Download OCR model if not already present.
+
+    When *mirror* is given, it overrides both the default URL and the
+    ``MAAFW_OCR_MIRROR`` environment variable.
+    """
     from maafw_cli.download import check_ocr_files_exist, download_and_extract_ocr
     from maafw_cli.paths import get_ocr_dir
 
@@ -21,7 +25,7 @@ def do_download_ocr() -> dict:
         return {"downloaded": False, "already_exists": True, "path": str(ocr_dir)}
 
     logger.info("Downloading OCR model...")
-    ok = download_and_extract_ocr(ocr_dir)
+    ok = download_and_extract_ocr(ocr_dir, url=mirror)
     if not ok:
         raise ActionError("OCR model download failed. Check network and retry.")
 
