@@ -180,7 +180,7 @@ class TestRecognize:
 
         session, patches = self._mock_recognition_pipeline(all_results=fake_results)
         with patches["screencap"], patches["ocr_check"]:
-            reco_type, results = recognize(
+            reco_type, results, _ = recognize(
                 session, "TemplateMatch", {"template": "btn.png"}
             )
         assert reco_type == "TemplateMatch"
@@ -193,7 +193,7 @@ class TestRecognize:
 
         session, patches = self._mock_recognition_pipeline(all_results=fake_results)
         with patches["screencap"], patches["ocr_check"]:
-            reco_type, results = recognize(
+            reco_type, results, _ = recognize(
                 session, "ColorMatch", {"lower": "200,0,0", "upper": "255,50,50"}
             )
         assert reco_type == "ColorMatch"
@@ -206,7 +206,7 @@ class TestRecognize:
 
         session, patches = self._mock_recognition_pipeline(all_results=fake_results, ocr_exists=True)
         with patches["screencap"], patches["ocr_check"]:
-            reco_type, results = recognize(session, "OCR", {})
+            reco_type, results, _ = recognize(session, "OCR", {})
         assert reco_type == "OCR"
         assert results[0].text == "设置"
 
@@ -216,7 +216,7 @@ class TestRecognize:
 
         session, patches = self._mock_recognition_pipeline(all_results=fake_results)
         with patches["screencap"], patches["ocr_check"]:
-            reco_type, results = recognize(
+            reco_type, results, _ = recognize(
                 session, reco_type="",
                 raw='{"recognition":"TemplateMatch","template":["b.png"]}'
             )

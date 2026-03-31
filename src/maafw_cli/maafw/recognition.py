@@ -9,6 +9,7 @@ import json
 import logging
 import typing
 from dataclasses import MISSING, fields as dc_fields
+from pathlib import Path
 from typing import Any
 
 from maa.pipeline import JRecognitionType
@@ -18,7 +19,7 @@ from maafw_cli.core.errors import RecognitionError
 from maafw_cli.core.log import Timer
 from maafw_cli.core.session import Session
 from maafw_cli.download import check_ocr_files_exist
-from maafw_cli.maafw.vision import screencap
+from maafw_cli.maafw.vision import screencap, _save_screenshot
 
 _log = logging.getLogger("maafw_cli.recognition")
 
@@ -275,7 +276,7 @@ def recognize(
     reco_type: str,
     params: dict[str, str] | None = None,
     raw: str | None = None,
-) -> tuple[str, list]:
+) -> tuple[str, list, Path | None]:
     """Run a recognition operation on the current screen.
 
     Parameters
@@ -293,9 +294,10 @@ def recognize(
 
     Returns
     -------
-    tuple[str, list]
-        ``(resolved_reco_type, results)`` where results is a list of
-        recognition result objects (BoxAndScoreResult, BoxAndCountResult, or OCRResult).
+    tuple[str, list, Path | None]
+        ``(resolved_reco_type, results, screenshot_path)`` where results is a list of
+        recognition result objects and *screenshot_path* is the path to the saved
+        screenshot (or ``None`` if saving failed).
 
     Raises
     ------
@@ -326,6 +328,9 @@ def recognize(
         if image is None:
             raise RecognitionError("Screenshot failed — cannot run recognition without an image.")
 
+        # Save screenshot to disk
+        screenshot_path = _save_screenshot(image, prefix="reco")
+
         with Timer(f"{resolved_type} inference", log=_log):
             info: TaskDetail | None = (
                 tasker.post_recognition(reco_enum, params_obj, image).wait().get()
@@ -337,4 +342,4 @@ def recognize(
             _log.warning("%s returned empty nodes list", resolved_type)
             raise RecognitionError(f"{resolved_type} recognition returned empty nodes.")
 
-        return resolved_type, info.nodes[0].recognition.all_results  # type: ignore[return-value]
+        return resolved_type, info.nodes[0].recognition.all_results, screenshot_path  # type: ignore[return-value]

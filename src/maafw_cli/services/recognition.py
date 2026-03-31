@@ -52,7 +52,7 @@ def do_reco(
     parsed_params = _parse_kv_params(params) if raw is None else None
 
     with Timer("reco service") as t:
-        resolved_type, results = recognize(
+        resolved_type, results, screenshot_path = recognize(
             ctx.session,
             reco_type=reco_type or "",
             params=parsed_params,
@@ -64,9 +64,12 @@ def do_reco(
     store = ctx.get_element_store()
     elements = store.build_from_results(results, resolved_type)
 
-    return {
+    result = {
         "session": ctx.session_name,
         "reco_type": resolved_type,
         "results": [e.to_dict() for e in elements],
         "elapsed_ms": elapsed_ms,
     }
+    if screenshot_path is not None:
+        result["screenshot"] = str(screenshot_path)
+    return result

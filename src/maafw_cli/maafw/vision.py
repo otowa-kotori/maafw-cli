@@ -25,6 +25,29 @@ from maafw_cli.download import check_ocr_files_exist
 _log = logging.getLogger("maafw_cli.vision")
 
 
+def _save_screenshot(image: Any, prefix: str = "screenshot") -> Path | None:
+    """Save an image buffer to the screenshots directory.
+
+    Returns the saved path, or ``None`` on failure.
+    """
+    from datetime import datetime
+    from maafw_cli.paths import get_screenshots_dir
+
+    try:
+        screenshots_dir = get_screenshots_dir()
+        screenshots_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        output = screenshots_dir / f"{prefix}_{ts}.png"
+        if cv2.imwrite(str(output), image):
+            _log.debug("Screenshot saved: %s", output)
+            return output
+        _log.warning("cv2.imwrite failed for %s", output)
+        return None
+    except Exception:
+        _log.warning("Failed to save screenshot", exc_info=True)
+        return None
+
+
 def screencap(controller: Controller) -> Any:
     """Take a screenshot and return the raw image (numpy array).
 
@@ -59,10 +82,13 @@ def screencap_to_file(controller: Controller, output: str | Path | None = None) 
 def ocr(
     session: Session,
     roi: tuple[int, int, int, int] | None = None,
-) -> list[OCRResult]:
+) -> tuple[list[OCRResult], Path | None]:
     """Run OCR, optionally restricted to *roi* ``(x, y, w, h)``.
 
-    Returns a list of ``OCRResult`` (with ``.text``, ``.box``, ``.score``).
+    Returns a tuple of ``(results, screenshot_path)`` where *results*
+    is a list of ``OCRResult`` and *screenshot_path* is the path to the
+    saved screenshot (or ``None`` if saving failed).
+
     Raises :class:`RecognitionError` on failure with a message indicating the cause.
     """
     with Timer("total OCR pipeline", log=_log):
@@ -76,6 +102,9 @@ def ocr(
         image = screencap(session.controller)
         if image is None:
             raise RecognitionError("Screenshot failed — cannot run OCR without an image.")
+
+        # Save screenshot to disk
+        screenshot_path = _save_screenshot(image, prefix="ocr")
 
         ocr_params = JOCR()
         if roi is not None:
@@ -92,4 +121,4 @@ def ocr(
             _log.warning("OCR returned empty nodes list")
             raise RecognitionError("OCR recognition returned empty nodes.")
 
-        return info.nodes[0].recognition.all_results  # type: ignore[return-value]
+        return info.nodes[0].recognition.all_results, screenshot_path  # type: ignore[return-value]

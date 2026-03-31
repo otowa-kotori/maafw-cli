@@ -28,18 +28,21 @@ def do_ocr(ctx: ServiceContext, roi: str | None = None) -> dict:
         from maafw_cli.maafw.vision import ocr as _ocr
 
         roi_tuple = _parse_roi(roi)
-        results = _ocr(ctx.session, roi=roi_tuple)
+        results, screenshot_path = _ocr(ctx.session, roi=roi_tuple)
 
     elapsed_ms = t.elapsed_ms
 
     store = ctx.get_element_store()
     elements = store.build_from_ocr(results)
 
-    return {
+    result = {
         "session": ctx.session_name,
         "results": [e.to_dict() for e in elements],
         "elapsed_ms": elapsed_ms,
     }
+    if screenshot_path is not None:
+        result["screenshot"] = str(screenshot_path)
+    return result
 
 
 @service(human=lambda r: f"Saved: {r['path']}")
