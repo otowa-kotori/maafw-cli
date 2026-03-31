@@ -62,6 +62,26 @@ def _ts() -> str:
 # ── helpers (importable by test modules) ───────────────────────
 
 
+def invoke_on(session_name: str, args: list[str], **kwargs):
+    """Shorthand for ``runner.invoke(cli, args, env={"MAAFW_SESSION": ...})``.
+
+    Uses the ``MAAFW_SESSION`` environment variable instead of ``--on``,
+    so callers don't need to prepend ``["--on", session_name]`` every time.
+
+    Extra *kwargs* are forwarded to ``CliRunner.invoke`` (e.g. ``catch_exceptions``).
+
+    Example::
+
+        # Before:
+        runner.invoke(cli, ["--on", "game", "--json", "reco", "OCR"])
+        # After:
+        invoke_on("game", ["--json", "reco", "OCR"])
+    """
+    env = kwargs.pop("env", None) or {}
+    env["MAAFW_SESSION"] = session_name
+    return runner.invoke(cli, args, env=env, **kwargs)
+
+
 def parse_json_output(output: str):
     """Extract JSON from CliRunner output that may have logger lines mixed in."""
     i = 0
@@ -101,16 +121,14 @@ def ensure_connected(
     key = session_name or win["hwnd"]
     if key in _connected_sessions:
         return
-    cmd = []
-    if session_name:
-        cmd += ["--on", session_name]
-    cmd += ["connect", "win32", win["hwnd"]]
+    cmd = ["connect", "win32", win["hwnd"]]
     if input_method:
         cmd += ["--input-method", input_method]
     if screencap_method:
         cmd += ["--screencap-method", screencap_method]
     print(f"[{_ts()}] Connecting: {' '.join(cmd)}")
-    result = runner.invoke(cli, cmd)
+    env = {"MAAFW_SESSION": session_name} if session_name else None
+    result = runner.invoke(cli, cmd, env=env)
     if result.exit_code != 0:
         raise RuntimeError(
             f"[{_ts()}] Failed to connect (exit {result.exit_code}): "
@@ -223,7 +241,7 @@ def reco_window():
         return
 
     # Load fixture images into daemon's Resource
-    r = runner.invoke(cli, ["--on", "reco", "resource", "load-image", str(_FIXTURES_DIR)])
+    r = invoke_on("reco", ["resource", "load-image", str(_FIXTURES_DIR)])
     if r.exit_code != 0:
         _fixture_errors["reco_window"] = f"resource load-image failed: {r.output}"
 
@@ -257,9 +275,7 @@ def pipeline_window():
         return
 
     # Load pipeline JSON into daemon's Resource
-    r = runner.invoke(cli, [
-        "--on", "pipeline", "pipeline", "load", str(_PIPELINE_FIXTURES_DIR),
-    ])
+    r = invoke_on("pipeline", ["pipeline", "load", str(_PIPELINE_FIXTURES_DIR)])
     if r.exit_code != 0:
         _fixture_errors["pipeline_window"] = f"pipeline load failed: {r.output}"
 
@@ -294,7 +310,7 @@ def game_window():
         return
 
     # Load fixture images (TemplateMatch needs them)
-    r = runner.invoke(cli, ["--on", "game", "resource", "load-image", str(_FIXTURES_DIR)])
+    r = invoke_on("game", ["resource", "load-image", str(_FIXTURES_DIR)])
     if r.exit_code != 0:
         _fixture_errors["game_window"] = f"resource load-image failed: {r.output}"
         yield window
@@ -302,9 +318,7 @@ def game_window():
         return
 
     # Load clicking game pipeline
-    r = runner.invoke(cli, [
-        "--on", "game", "pipeline", "load", str(_PIPELINE_FIXTURES_DIR),
-    ])
+    r = invoke_on("game", ["pipeline", "load", str(_PIPELINE_FIXTURES_DIR)])
     if r.exit_code != 0:
         _fixture_errors["game_window"] = f"pipeline load failed: {r.output}"
 

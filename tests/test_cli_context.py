@@ -126,6 +126,52 @@ class TestCliContextOnSession:
         assert call_kwargs[1].get("session") == "phone" or call_kwargs[0][2] == "phone"
 
 
+class TestOnSessionEnvVar:
+    """MAAFW_SESSION env var should set --on via Click's envvar support."""
+
+    def test_env_var_sets_on_session(self):
+        from click.testing import CliRunner
+        from maafw_cli.cli import cli
+
+        test_runner = CliRunner(charset="utf-8")
+        mock_client = MagicMock()
+        mock_client.send.return_value = {"action": "click", "x": 100, "y": 200}
+
+        with patch("maafw_cli.core.ipc.ensure_daemon", return_value=19799), \
+             patch("maafw_cli.core.ipc.DaemonClient", return_value=mock_client):
+            result = test_runner.invoke(
+                cli,
+                ["click", "100,200"],
+                env={"MAAFW_SESSION": "myphone"},
+                catch_exceptions=False,
+            )
+
+        # Verify session="myphone" was passed
+        call_kwargs = mock_client.send.call_args
+        assert call_kwargs[1].get("session") == "myphone"
+
+    def test_cli_flag_overrides_env_var(self):
+        from click.testing import CliRunner
+        from maafw_cli.cli import cli
+
+        test_runner = CliRunner(charset="utf-8")
+        mock_client = MagicMock()
+        mock_client.send.return_value = {"action": "click", "x": 100, "y": 200}
+
+        with patch("maafw_cli.core.ipc.ensure_daemon", return_value=19799), \
+             patch("maafw_cli.core.ipc.DaemonClient", return_value=mock_client):
+            result = test_runner.invoke(
+                cli,
+                ["--on", "explicit", "click", "100,200"],
+                env={"MAAFW_SESSION": "from_env"},
+                catch_exceptions=False,
+            )
+
+        # --on flag should win over env var
+        call_kwargs = mock_client.send.call_args
+        assert call_kwargs[1].get("session") == "explicit"
+
+
 # ── cleanup test services from DISPATCH ──────────────────────────
 
 def teardown_module():

@@ -177,6 +177,11 @@ class TestCliStructure:
         result = runner.invoke(cli, ["--on", "phone", "--help"])
         assert result.exit_code == 0
 
+    def test_on_from_env_var(self):
+        """MAAFW_SESSION env var should set --on value."""
+        result = runner.invoke(cli, ["--help"], env={"MAAFW_SESSION": "mydev"})
+        assert result.exit_code == 0
+
     def test_connect_adb_has_on_option(self):
         result = runner.invoke(cli, ["connect", "adb", "--help"])
         assert result.exit_code == 0

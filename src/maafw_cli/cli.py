@@ -200,7 +200,7 @@ pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
 @click.option("--json", "json_mode", is_flag=True, default=False, help="Output strict JSON to stdout.")
 @click.option("--quiet", is_flag=True, default=False, help="Suppress non-error output.")
 @click.option("--verbose", "-v", is_flag=True, default=False, help="Show detailed timing and debug info.")
-@click.option("--on", "on_session", default=None, help="Target a named daemon session.")
+@click.option("--on", "on_session", default=None, envvar="MAAFW_SESSION", help="Target a named daemon session (env: MAAFW_SESSION).")
 @click.pass_context
 def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool,
         on_session: str | None) -> None:
