@@ -136,7 +136,7 @@ maafw-cli --on game pipeline run ./pipeline/ EntryNode # 运行 pipeline
 | `--json` | 输出严格 JSON |
 | `--on SESSION` | 指定目标会话（也可通过 `MAAFW_SESSION` 环境变量设置） |
 | `--quiet` | 抑制非错误输出 |
-| `--color` | 启用彩色终端输出（默认关闭） |
+| `--color` / `--no-color` | 彩色输出（默认自动：终端有色，管道无色） |
 | `-v` | DEBUG 日志 |
 
 详细用法见 [USAGE.md](doc/USAGE.md)。

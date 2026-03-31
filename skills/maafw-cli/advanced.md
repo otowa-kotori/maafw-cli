@@ -37,7 +37,7 @@ maafw-cli --json ocr --on game       # mixed positions — also fine
 | `--on SESSION` | Target a named session |
 | `--json` | Strict JSON output |
 | `--quiet` | Suppress non-error output |
-| `--color` | Enable colored terminal output (off by default) |
+| `--color` / `--no-color` | Colored output (default: auto-detect TTY) |
 | `-v` | DEBUG-level logging |
 
 ## Screenshot resolution (`--size`)

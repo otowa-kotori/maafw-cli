@@ -31,7 +31,7 @@ class GlobalOptionGroup(click.Group):
     The ``--`` separator is respected: options after it are never extracted.
     """
 
-    GLOBAL_FLAGS: frozenset[str] = frozenset({"--json", "--quiet", "-v", "--verbose", "--color"})
+    GLOBAL_FLAGS: frozenset[str] = frozenset({"--json", "--quiet", "-v", "--verbose", "--color", "--no-color"})
     GLOBAL_WITH_VALUE: frozenset[str] = frozenset({"--on"})
 
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
@@ -201,15 +201,21 @@ pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
 @click.option("--json", "json_mode", is_flag=True, default=False, help="Output strict JSON to stdout.")
 @click.option("--quiet", is_flag=True, default=False, help="Suppress non-error output.")
 @click.option("--verbose", "-v", is_flag=True, default=False, help="Show detailed timing and debug info.")
-@click.option("--color", is_flag=True, default=False, help="Enable colored terminal output.")
+@click.option("--color/--no-color", default=None, help="Force colored output on/off (default: auto-detect TTY).")
 @click.option("--on", "on_session", default=None, envvar="MAAFW_SESSION", help="Target a named daemon session (env: MAAFW_SESSION).")
 @click.pass_context
 def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool,
-        color: bool, on_session: str | None) -> None:
+        color: bool | None, on_session: str | None) -> None:
     """maafw-cli - MaaFramework command-line interface."""
+    import sys
+
     # Preserve executor if injected by REPL --local
     existing = ctx.obj if isinstance(ctx.obj, CliContext) else None
     executor = existing.executor if existing else None
+
+    # color: explicit flag > auto-detect (TTY = color, pipe/AI = no color)
+    if color is None:
+        color = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
     ctx.ensure_object(dict)
     setup_logging(verbose=verbose, quiet=quiet)

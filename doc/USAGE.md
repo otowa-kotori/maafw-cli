@@ -35,7 +35,7 @@ maafw-cli daemon status                          # 查看 daemon 状态
 | `--quiet` | 抑制非错误输出 |
 | `-v` / `--verbose` | 显示 DEBUG 级别日志（含耗时） |
 | `--on SESSION` | 指定目标 daemon 会话（默认使用最近连接的） |
-| `--color` | 启用彩色终端输出（默认关闭） |
+| `--color` / `--no-color` | 强制开启/关闭彩色输出（默认自动检测：终端有色，管道/脚本无色） |
 
 > **提示**：全局选项可以放在命令前后任意位置，例如 `maafw-cli ocr --on game` 等价于 `maafw-cli --on game ocr`。
 
