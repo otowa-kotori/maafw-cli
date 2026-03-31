@@ -169,6 +169,10 @@ class TestCliStructure:
         assert result.exit_code == 0
         assert "NAME" in result.output
 
+    def test_session_close_all_help(self):
+        result = runner.invoke(cli, ["session", "close-all", "--help"])
+        assert result.exit_code == 0
+
     def test_global_on_flag(self):
         result = runner.invoke(cli, ["--on", "phone", "--help"])
         assert result.exit_code == 0

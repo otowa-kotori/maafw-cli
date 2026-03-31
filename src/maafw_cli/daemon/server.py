@@ -297,6 +297,10 @@ class DaemonServer:
                 raise ValueError("session_close requires a non-empty 'name' parameter")
             await self.session_mgr.close(name)
             return {"closed": name}
+        if action == "session_close_all":
+            names = self.session_mgr.session_names
+            await self.session_mgr.close_all()
+            return {"closed": names}
 
         # ── connect actions (create sessions) ───────────────────
         if action == "connect_adb":

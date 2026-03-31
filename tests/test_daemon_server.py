@@ -225,6 +225,44 @@ class TestDaemonServerSessionActions:
             server._server.close()
             await server._server.wait_closed()
 
+    async def test_session_close_all_empty(self):
+        server, port = await _start_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+        try:
+            resp = await _send_recv(port, make_request("session_close_all"))
+            assert resp["ok"] is True
+            assert resp["data"]["closed"] == []
+        finally:
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()
+
+    async def test_session_close_all_with_sessions(self):
+        server, port = await _start_server()
+        serve_task = asyncio.create_task(server._server.serve_forever())
+        try:
+            # Create sessions via ensure
+            await server.session_mgr.ensure("s1")
+            await server.session_mgr.ensure("s2")
+            assert server.session_mgr.count == 2
+
+            resp = await _send_recv(port, make_request("session_close_all"))
+            assert resp["ok"] is True
+            assert sorted(resp["data"]["closed"]) == ["s1", "s2"]
+            assert server.session_mgr.count == 0
+        finally:
+            serve_task.cancel()
+            try:
+                await serve_task
+            except asyncio.CancelledError:
+                pass
+            server._server.close()
+            await server._server.wait_closed()
+
 
 class TestDaemonServerPidPortFiles:
     async def test_pid_port_files_written(self, tmp_path, monkeypatch):

@@ -74,3 +74,24 @@ def session_close(ctx: CliContext, name: str) -> None:
         fmt.success({"closed": name}, human=f"Session '{name}' closed.")
     except Exception as e:
         fmt.error(str(e), exit_code=1)
+
+
+@session_group.command("close-all")
+@pass_ctx
+def session_close_all(ctx: CliContext) -> None:
+    """Close and destroy all active sessions."""
+    from maafw_cli.core.ipc import DaemonClient, ensure_daemon
+
+    fmt = ctx.fmt
+    try:
+        port = ensure_daemon()
+        client = DaemonClient(port)
+        data = client.send("session_close_all")
+        closed = data.get("closed", [])
+        n = len(closed)
+        fmt.success(
+            {"closed": closed},
+            human=f"Closed {n} session(s)." if n else "No active sessions.",
+        )
+    except Exception as e:
+        fmt.error(str(e), exit_code=1)
