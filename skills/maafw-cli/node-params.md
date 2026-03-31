@@ -15,6 +15,7 @@ Shared by `reco` command and `pipeline` nodes. Full spec:
 | `pre_delay` | uint | 0 | Delay before action ms |
 | `post_delay` | uint | 0 | Delay after action ms |
 | `rate_limit` | uint | 1000 | Min interval between recognition attempts ms |
+| `post_wait_freezes` | uint | 0 | After action, wait until screen freezes for this many ms; 0 = disabled. Default in MaaFW is 0, but combined with `rate_limit` may add implicit delay |
 | `inverse` | bool | false | Match when NOT found |
 | `order_by` | string | `Horizontal` | Result sorting: `Horizontal` / `Vertical` / `Score` / `Area` / `Random` |
 | `index` | int | 0 | Which result to select |

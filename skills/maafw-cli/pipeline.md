@@ -56,3 +56,27 @@ maafw-cli --on game pipeline run ./pipeline/ ClickPlay --override '{"NodeA": {"t
 # JSON output with per-node details
 maafw-cli --on game --json pipeline run ./pipeline/ ClickPlay
 ```
+
+## Performance optimization
+
+MaaFW pipeline nodes have default timing values that add implicit delays:
+
+- `rate_limit` defaults to **1000ms** — the minimum interval between consecutive recognition attempts.
+- `post_wait_freezes` defaults to **0ms** — wait after action until the screen stops changing. Some pipeline examples set this to non-zero values which adds delay.
+
+For latency-sensitive pipelines (e.g. fast-clicking games), set both to `0` on hot-path nodes:
+
+```json
+{
+  "FastClickNode": {
+    "recognition": "TemplateMatch",
+    "template": ["target.png"],
+    "action": "Click",
+    "rate_limit": 0,
+    "post_wait_freezes": 0,
+    "next": ["FastClickNode"]
+  }
+}
+```
+
+This eliminates the default 1000ms recognition interval and any post-action freeze wait.
