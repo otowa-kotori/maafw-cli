@@ -35,8 +35,11 @@ maafw-cli daemon status                          # 查看 daemon 状态
 | `--quiet` | 抑制非错误输出 |
 | `-v` / `--verbose` | 显示 DEBUG 级别日志（含耗时） |
 | `--on SESSION` | 指定目标 daemon 会话（默认使用最近连接的） |
+| `--color` | 启用彩色终端输出（默认关闭） |
 
 > **提示**：全局选项可以放在命令前后任意位置，例如 `maafw-cli ocr --on game` 等价于 `maafw-cli --on game ocr`。
+
+> **环境变量**：`--on` 也可通过 `MAAFW_SESSION` 环境变量设置，CLI 参数优先。例如 `MAAFW_SESSION=phone maafw-cli ocr`。
 
 ## 命令参考
 
@@ -109,6 +112,7 @@ maafw-cli connect adb 127.0.0.1:16384 --size raw              # 原尺寸
 ### `ocr`
 
 对连接的设备/窗口执行全屏 OCR。结果赋予 Element（e1, e2, ...），可供 `click` 使用。
+自动保存截图到 `~/.maafw-cli/screenshots/`，人类模式会在输出末尾显示截图路径，JSON 模式包含 `"screenshot"` 字段。
 
 | 选项 | 说明 |
 |------|------|
@@ -123,6 +127,7 @@ maafw-cli ocr --roi 0,0,400,300       # 只识别左上角区域
 ### `reco <TYPE> [params...]`
 
 通用感知命令，暴露 MaaFramework 原生识别接口。TYPE 为识别类型，params 为 `key=value` 格式参数。
+自动保存截图（同 `ocr`）。
 
 **支持的识别类型**：
 
@@ -355,8 +360,13 @@ maafw-cli action mousemove 100 -50
 
 下载 OCR 模型（ppocr_v5 zh_cn）。如已存在则跳过。
 
+| 选项 | 说明 |
+|------|------|
+| `--mirror URL` | 覆盖下载地址（也可设环境变量 `MAAFW_OCR_MIRROR`，CLI 参数优先） |
+
 ```bash
 maafw-cli resource download-ocr
+maafw-cli resource download-ocr --mirror https://mirror.example.com/ocr.zip
 ```
 
 ### `resource status`
@@ -497,10 +507,25 @@ maafw-cli --json daemon status
 
 关闭并销毁一个会话。
 
+### `session close-all`
+
+关闭并销毁所有活跃会话。
+
 ```bash
 maafw-cli session list
 maafw-cli session default phone
 maafw-cli session close tablet
+maafw-cli session close-all
+```
+
+### `completion [SHELL]`
+
+输出 shell 补全脚本。省略 SHELL 时从 `$SHELL` 环境变量自动检测。
+
+```bash
+eval "$(maafw-cli completion bash)"      # bash
+eval "$(maafw-cli completion zsh)"        # zsh
+maafw-cli completion fish | source        # fish
 ```
 
 ## 退出码
@@ -511,6 +536,7 @@ maafw-cli session close tablet
 | 1 | 操作失败 |
 | 2 | 识别失败 |
 | 3 | 连接错误 |
+| 4 | 版本不匹配（CLI 与 daemon 版本不一致，运行 `maafw-cli daemon restart` 解决） |
 
 ## 数据目录
 

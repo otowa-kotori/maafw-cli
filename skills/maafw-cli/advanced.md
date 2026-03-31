@@ -4,6 +4,8 @@
 
 Use `--on NAME` to name sessions and switch between them. Not needed for single-device use.
 
+You can also set `MAAFW_SESSION=NAME` as an environment variable (CLI `--on` takes precedence).
+
 ```bash
 # Name sessions when connecting
 maafw-cli --on phone connect adb 127.0.0.1:16384
@@ -17,6 +19,7 @@ maafw-cli --on notepad screenshot
 maafw-cli session list               # see all sessions
 maafw-cli session default phone      # set default session
 maafw-cli session close phone        # close a session
+maafw-cli session close-all          # close all sessions
 ```
 
 ## Global options
@@ -34,6 +37,7 @@ maafw-cli --json ocr --on game       # mixed positions — also fine
 | `--on SESSION` | Target a named session |
 | `--json` | Strict JSON output |
 | `--quiet` | Suppress non-error output |
+| `--color` | Enable colored terminal output (off by default) |
 | `-v` | DEBUG-level logging |
 
 ## Screenshot resolution (`--size`)
@@ -67,5 +71,7 @@ All CLI commands are available inside the REPL.
 maafw-cli daemon status            # check daemon status
 maafw-cli daemon start             # start daemon
 maafw-cli daemon stop              # stop daemon
-maafw-cli daemon restart           # restart daemon
+maafw-cli daemon restart           # restart daemon (required after CLI update)
 ```
+
+> If you see exit code 4 (version mismatch), run `maafw-cli daemon restart` to align daemon with CLI.

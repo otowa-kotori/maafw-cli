@@ -8,6 +8,7 @@
 | 1 | Action failed |
 | 2 | Recognition failed (missing OCR model?) |
 | 3 | Connection error |
+| 4 | Version mismatch (CLI ≠ daemon, run `daemon restart`) |
 
 ## Platform notes
 
@@ -50,4 +51,12 @@ Stop and retry (it auto-restarts on next command):
 ```bash
 maafw-cli daemon stop
 maafw-cli daemon status            # check daemon status
+```
+
+### Exit code 4 (version mismatch)
+
+CLI 更新后 daemon 仍在跑旧版本：
+
+```bash
+maafw-cli daemon restart           # 重启 daemon 以匹配新 CLI
 ```

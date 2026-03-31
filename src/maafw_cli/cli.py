@@ -31,7 +31,7 @@ class GlobalOptionGroup(click.Group):
     The ``--`` separator is respected: options after it are never extracted.
     """
 
-    GLOBAL_FLAGS: frozenset[str] = frozenset({"--json", "--quiet", "-v", "--verbose"})
+    GLOBAL_FLAGS: frozenset[str] = frozenset({"--json", "--quiet", "-v", "--verbose", "--color"})
     GLOBAL_WITH_VALUE: frozenset[str] = frozenset({"--on"})
 
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
@@ -89,10 +89,11 @@ class CliContext:
         json_mode: bool = False,
         quiet: bool = False,
         verbose: bool = False,
+        color: bool = False,
         on: str | None = None,
         executor: object | None = None,
     ):
-        self.fmt = OutputFormatter(json_mode=json_mode, quiet=quiet)
+        self.fmt = OutputFormatter(json_mode=json_mode, quiet=quiet, color=color)
         self.verbose = verbose
         self.on = on          # --on <session>: target specific daemon session
         self.executor = executor  # None = daemon IPC, LocalExecutor = in-process
@@ -200,10 +201,11 @@ pass_ctx = click.make_pass_decorator(CliContext, ensure=True)
 @click.option("--json", "json_mode", is_flag=True, default=False, help="Output strict JSON to stdout.")
 @click.option("--quiet", is_flag=True, default=False, help="Suppress non-error output.")
 @click.option("--verbose", "-v", is_flag=True, default=False, help="Show detailed timing and debug info.")
+@click.option("--color", is_flag=True, default=False, help="Enable colored terminal output.")
 @click.option("--on", "on_session", default=None, envvar="MAAFW_SESSION", help="Target a named daemon session (env: MAAFW_SESSION).")
 @click.pass_context
 def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool,
-        on_session: str | None) -> None:
+        color: bool, on_session: str | None) -> None:
     """maafw-cli - MaaFramework command-line interface."""
     # Preserve executor if injected by REPL --local
     existing = ctx.obj if isinstance(ctx.obj, CliContext) else None
@@ -213,6 +215,7 @@ def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool,
     setup_logging(verbose=verbose, quiet=quiet)
     ctx.obj = CliContext(
         json_mode=json_mode, quiet=quiet, verbose=verbose,
+        color=color,
         on=on_session,
         executor=executor,
     )

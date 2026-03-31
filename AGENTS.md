@@ -50,7 +50,7 @@ def click_cmd(ctx: CliContext, target: str) -> None:
 
 ### 错误类型
 
-`ActionError`(1) / `RecognitionError`(2) / `DeviceConnectionError`(3)，括号内为退出码。
+`ActionError`(1) / `RecognitionError`(2) / `DeviceConnectionError`(3) / `VersionMismatchError`(4)，括号内为退出码。
 
 ### 输出
 
@@ -109,7 +109,13 @@ maafw-cli --on game click e1                          # 点击 Element 引用
 maafw-cli --on game click 452,387                     # 点击坐标
 maafw-cli --on game type "hello"                      # 输入文本
 maafw-cli --on game key enter                         # 按键
+maafw-cli --on game action longpress e1               # 长按
+maafw-cli --on game action startapp com.example/.Main # 启动应用
+maafw-cli --on game action shell "ls /sdcard"         # 设备 shell
 ```
+
+> 高频命令 click/swipe/scroll/type/key 同时是一级 alias 和 `action` 子命令。
+> 新增命令（longpress、startapp/stopapp、shell、touch-*、key-down/up、mousemove）在 `action` group 下。
 
 ### 5. 资源 & Pipeline
 
@@ -128,8 +134,9 @@ maafw-cli --on game pipeline run ./pipeline/ EntryNode # 运行 pipeline
 | 选项 | 说明 |
 |------|------|
 | `--json` | 输出严格 JSON |
-| `--on SESSION` | 指定目标会话 |
+| `--on SESSION` | 指定目标会话（也可通过 `MAAFW_SESSION` 环境变量设置） |
 | `--quiet` | 抑制非错误输出 |
+| `--color` | 启用彩色终端输出（默认关闭） |
 | `-v` | DEBUG 日志 |
 
 详细用法见 [USAGE.md](doc/USAGE.md)。

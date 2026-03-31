@@ -18,7 +18,7 @@ import click
 class OutputFormatter:
     """Formats command output based on the selected mode."""
 
-    def __init__(self, *, json_mode: bool = False, quiet: bool = False, color: bool = True):
+    def __init__(self, *, json_mode: bool = False, quiet: bool = False, color: bool = False):
         self.json_mode = json_mode
         self.quiet = quiet
         self.color = color and not json_mode  # json mode never colorizes
