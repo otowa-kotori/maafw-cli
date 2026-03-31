@@ -12,7 +12,12 @@ from maafw_cli.core.errors import ActionError
 from maafw_cli.core.element import ElementStore, Element
 from maafw_cli.core.session import Session
 from maafw_cli.services.context import ServiceContext
-from maafw_cli.services.interaction import do_click, do_swipe, do_scroll, do_type, do_key
+from maafw_cli.services.interaction import (
+    do_click, do_swipe, do_scroll, do_type, do_key,
+    do_longpress, do_startapp, do_stopapp, do_shell,
+    do_touch_down, do_touch_move, do_touch_up,
+    do_key_down, do_key_up, do_mousemove,
+)
 from mock_controller import MockController
 
 
@@ -200,6 +205,255 @@ class TestKeyService:
             do_key(ctx, keycode="enter")
 
 
+# ── longpress ──────────────────────────────────────────────────
+
+
+class TestLongpressService:
+    def test_longpress_coords(self):
+        mock = MockController()
+        ctx = _make_ctx(mock)
+        result = do_longpress(ctx, target="200,300", duration=1500)
+        assert result["action"] == "longpress"
+        assert result["x"] == 200
+        assert result["y"] == 300
+        assert result["duration"] == 1500
+        assert mock.touch_downs == [(200, 300, 0, 1)]
+        assert mock.touch_ups == [0]
+
+    def test_longpress_element(self):
+        mock = MockController()
+        ctx = _make_ctx(mock)
+        from maafw_cli.core.element import Element
+        ctx.session.element_store._elements = [
+            Element(ref="e1", text="Hello", box=[100, 50, 40, 20], score=0.9)
+        ]
+        result = do_longpress(ctx, target="e1")
+        assert result["x"] == 120  # 100 + 40//2
+        assert result["y"] == 60   # 50 + 20//2
+
+    def test_longpress_default_duration(self):
+        mock = MockController()
+        ctx = _make_ctx(mock)
+        result = do_longpress(ctx, target="100,100")
+        assert result["duration"] == 1000
+
+    def test_longpress_fails(self):
+        mock = MockController(touch_ok=False)
+        ctx = _make_ctx(mock)
+        with pytest.raises(ActionError, match="Long press failed"):
+            do_longpress(ctx, target="100,100")
+
+    def test_longpress_negative_duration(self):
+        ctx = _make_ctx()
+        with pytest.raises(ActionError, match="Duration must be positive"):
+            do_longpress(ctx, target="100,100", duration=-1)
+
+
+# ── startapp / stopapp ─────────────────────────────────────────
+
+
+class TestStartappService:
+    def test_startapp(self):
+        mock = MockController()
+        ctx = _make_ctx(mock)
+        result = do_startapp(ctx, intent="com.example/.Main")
+        assert result == {"action": "startapp", "intent": "com.example/.Main"}
+        assert mock.start_apps == ["com.example/.Main"]
+
+    def test_startapp_fails(self):
+        mock = MockController(startapp_ok=False)
+        ctx = _make_ctx(mock)
+        with pytest.raises(ActionError, match="Start app failed"):
+            do_startapp(ctx, intent="com.example/.Main")
+
+
+class TestStopappService:
+    def test_stopapp(self):
+        mock = MockController()
+        ctx = _make_ctx(mock)
+        result = do_stopapp(ctx, intent="com.example")
+        assert result == {"action": "stopapp", "intent": "com.example"}
+        assert mock.stop_apps == ["com.example"]
+
+    def test_stopapp_fails(self):
+        mock = MockController(stopapp_ok=False)
+        ctx = _make_ctx(mock)
+        with pytest.raises(ActionError, match="Stop app failed"):
+            do_stopapp(ctx, intent="com.example")
+
+
+# ── shell ──────────────────────────────────────────────────────
+
+
+class TestShellService:
+    def test_shell(self):
+        mock = MockController(shell_output="hello world\n")
+        ctx = _make_ctx(mock)
+        result = do_shell(ctx, cmd="echo hello world")
+        assert result["action"] == "shell"
+        assert result["output"] == "hello world\n"
+        assert result["cmd"] == "echo hello world"
+        assert result["timeout"] == 20000
+        assert mock.shells == [("echo hello world", 20000)]
+
+    def test_shell_custom_timeout(self):
+        mock = MockController(shell_output="ok")
+        ctx = _make_ctx(mock)
+        result = do_shell(ctx, cmd="ls", timeout=5000)
+        assert result["timeout"] == 5000
+        assert mock.shells == [("ls", 5000)]
+
+    def test_shell_empty_output(self):
+        mock = MockController(shell_output="")
+        ctx = _make_ctx(mock)
+        result = do_shell(ctx, cmd="true")
+        assert result["output"] == ""
+
+
+# ── touch-down / touch-move / touch-up ─────────────────────────
+
+
+class TestTouchDownService:
+    def test_touch_down_coords(self):
+        mock = MockController()
+        ctx = _make_ctx(mock)
+        result = do_touch_down(ctx, target="100,200")
+        assert result["action"] == "touch_down"
+        assert result["x"] == 100
+        assert result["y"] == 200
+        assert result["contact"] == 0
+        assert result["pressure"] == 1
+        assert mock.touch_downs == [(100, 200, 0, 1)]
+
+    def test_touch_down_custom_contact(self):
+        mock = MockController()
+        ctx = _make_ctx(mock)
+        result = do_touch_down(ctx, target="50,60", contact=2, pressure=3)
+        assert result["contact"] == 2
+        assert result["pressure"] == 3
+        assert mock.touch_downs == [(50, 60, 2, 3)]
+
+    def test_touch_down_fails(self):
+        mock = MockController(touch_ok=False)
+        ctx = _make_ctx(mock)
+        with pytest.raises(ActionError, match="Touch down failed"):
+            do_touch_down(ctx, target="100,200")
+
+
+class TestTouchMoveService:
+    def test_touch_move_coords(self):
+        mock = MockController()
+        ctx = _make_ctx(mock)
+        result = do_touch_move(ctx, target="300,400")
+        assert result["action"] == "touch_move"
+        assert result["x"] == 300
+        assert result["y"] == 400
+        assert mock.touch_moves == [(300, 400, 0, 1)]
+
+    def test_touch_move_fails(self):
+        mock = MockController(touch_ok=False)
+        ctx = _make_ctx(mock)
+        with pytest.raises(ActionError, match="Touch move failed"):
+            do_touch_move(ctx, target="100,200")
+
+
+class TestTouchUpService:
+    def test_touch_up(self):
+        mock = MockController()
+        ctx = _make_ctx(mock)
+        result = do_touch_up(ctx)
+        assert result == {"action": "touch_up", "contact": 0}
+        assert mock.touch_ups == [0]
+
+    def test_touch_up_custom_contact(self):
+        mock = MockController()
+        ctx = _make_ctx(mock)
+        result = do_touch_up(ctx, contact=2)
+        assert result == {"action": "touch_up", "contact": 2}
+        assert mock.touch_ups == [2]
+
+    def test_touch_up_fails(self):
+        mock = MockController(touch_ok=False)
+        ctx = _make_ctx(mock)
+        with pytest.raises(ActionError, match="Touch up failed"):
+            do_touch_up(ctx)
+
+
+# ── key-down / key-up ──────────────────────────────────────────
+
+
+class TestKeyDownService:
+    def test_key_down_named(self):
+        mock = MockController()
+        ctx = _make_ctx(mock, session_type="win32")
+        result = do_key_down(ctx, keycode="shift")
+        assert result["action"] == "key_down"
+        assert result["keycode"] == 0x10
+        assert mock.key_downs == [0x10]
+
+    def test_key_down_integer(self):
+        mock = MockController()
+        ctx = _make_ctx(mock, session_type="adb")
+        result = do_key_down(ctx, keycode="66")
+        assert result["keycode"] == 66
+        assert mock.key_downs == [66]
+
+    def test_key_down_unknown(self):
+        ctx = _make_ctx(session_type="win32")
+        with pytest.raises(ActionError, match="Unknown key"):
+            do_key_down(ctx, keycode="nonexistent")
+
+    def test_key_down_fails(self):
+        mock = MockController(key_ok=False)
+        ctx = _make_ctx(mock, session_type="win32")
+        with pytest.raises(ActionError, match="Key down failed"):
+            do_key_down(ctx, keycode="shift")
+
+
+class TestKeyUpService:
+    def test_key_up_named(self):
+        mock = MockController()
+        ctx = _make_ctx(mock, session_type="win32")
+        result = do_key_up(ctx, keycode="shift")
+        assert result["action"] == "key_up"
+        assert result["keycode"] == 0x10
+        assert mock.key_ups == [0x10]
+
+    def test_key_up_unknown(self):
+        ctx = _make_ctx(session_type="adb")
+        with pytest.raises(ActionError, match="Unknown key"):
+            do_key_up(ctx, keycode="nonexistent")
+
+    def test_key_up_fails(self):
+        mock = MockController(key_ok=False)
+        ctx = _make_ctx(mock, session_type="win32")
+        with pytest.raises(ActionError, match="Key up failed"):
+            do_key_up(ctx, keycode="ctrl")
+
+
+# ── mousemove ──────────────────────────────────────────────────
+
+
+class TestMousemoveService:
+    def test_mousemove(self):
+        mock = MockController()
+        ctx = _make_ctx(mock, session_type="win32")
+        result = do_mousemove(ctx, dx=100, dy=-50)
+        assert result == {"action": "mousemove", "dx": 100, "dy": -50}
+        assert mock.relative_moves == [(100, -50)]
+
+    def test_mousemove_rejected_on_adb(self):
+        ctx = _make_ctx(session_type="adb")
+        with pytest.raises(ActionError, match="Win32"):
+            do_mousemove(ctx, dx=10, dy=20)
+
+    def test_mousemove_fails(self):
+        mock = MockController(mousemove_ok=False)
+        ctx = _make_ctx(mock, session_type="win32")
+        with pytest.raises(ActionError, match="Mouse move failed"):
+            do_mousemove(ctx, dx=1, dy=1)
+
+
 # ── ServiceContext ───────────────────────────────────────────────
 
 
@@ -299,6 +553,11 @@ class TestServiceDecorator:
 
     def test_dispatch_table_populated(self):
         from maafw_cli.services.registry import DISPATCH
+        # Import services to populate DISPATCH table
+        import maafw_cli.services.vision  # noqa: F401
+        import maafw_cli.services.recognition  # noqa: F401
+        import maafw_cli.services.connection  # noqa: F401
+        import maafw_cli.services.resource  # noqa: F401
         # Ensure key services are registered
         assert "click" in DISPATCH
         assert "ocr" in DISPATCH
@@ -357,6 +616,7 @@ class TestControllerDestroyOnFailure:
 class TestRecoService:
     def test_reco_registered_in_dispatch(self):
         from maafw_cli.services.registry import DISPATCH
+        import maafw_cli.services.recognition  # noqa: F401
         assert "reco" in DISPATCH
 
     def test_reco_needs_session(self):

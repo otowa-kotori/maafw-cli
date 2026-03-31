@@ -222,7 +222,9 @@ def cli(ctx: click.Context, json_mode: bool, quiet: bool, verbose: bool,
 
 from maafw_cli.commands.connection import device, connect  # noqa: E402
 from maafw_cli.commands.vision import ocr, screenshot  # noqa: E402
-from maafw_cli.commands.interaction import click_cmd, swipe_cmd, scroll_cmd, type_cmd, key_cmd  # noqa: E402
+from maafw_cli.commands.action import (  # noqa: E402
+    action, click_cmd, swipe_cmd, scroll_cmd, type_cmd, key_cmd,
+)
 from maafw_cli.commands.recognition import reco_cmd  # noqa: E402
 from maafw_cli.commands.resource import resource  # noqa: E402
 from maafw_cli.commands.repl_cmd import repl_cmd  # noqa: E402
@@ -236,6 +238,7 @@ cli.add_command(connect)
 cli.add_command(ocr, name="ocr")
 cli.add_command(screenshot, name="screenshot")
 cli.add_command(reco_cmd, name="reco")
+cli.add_command(action)
 cli.add_command(click_cmd, name="click")
 cli.add_command(swipe_cmd, name="swipe")
 cli.add_command(scroll_cmd, name="scroll")

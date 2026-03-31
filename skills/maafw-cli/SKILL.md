@@ -64,6 +64,17 @@ maafw-cli type "hello world"      # type text
 maafw-cli key enter               # key: enter/back/home/esc/f1-f12/tab/space
 maafw-cli scroll 0 -360           # scroll (dx, dy) [Win32/PC only]
 maafw-cli screenshot              # save to current directory
+maafw-cli action longpress e1                      # long-press (default 1000ms)
+maafw-cli action longpress 200,300 --duration 2000 # long-press with custom duration
+maafw-cli action startapp com.example/.Main        # start app (ADB)
+maafw-cli action stopapp com.example               # stop app (ADB)
+maafw-cli action shell "ls /sdcard"                # device shell command
+maafw-cli action touch-down 200,300                # low-level touch down
+maafw-cli action touch-move 400,500                # move touch point
+maafw-cli action touch-up                          # lift touch point
+maafw-cli action key-down shift                    # hold key down
+maafw-cli action key-up shift                      # release key
+maafw-cli action mousemove 100 -50                 # relative mouse move [Win32]
 ```
 
 ## Rules

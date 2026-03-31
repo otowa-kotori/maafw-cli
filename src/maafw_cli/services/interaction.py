@@ -1,5 +1,6 @@
 """
-Interaction services — click, swipe, scroll, type, key.
+Interaction services — click, swipe, scroll, type, key, longpress,
+startapp/stopapp, shell, touch-down/move/up, key-down/up, mousemove.
 """
 from __future__ import annotations
 
@@ -10,6 +11,16 @@ from maafw_cli.maafw.control import (
     scroll,
     input_text,
     press_key,
+    long_press,
+    touch_down,
+    touch_move,
+    touch_up,
+    key_down,
+    key_up,
+    start_app,
+    stop_app,
+    run_shell,
+    relative_move,
 )
 from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.registry import service
@@ -85,3 +96,133 @@ def do_key(ctx: ServiceContext, keycode: str) -> dict:
         "name": keycode,
         "session_type": ctx.session_type,
     }
+
+
+@service(human=lambda r: f"Long-pressed ({r['x']}, {r['y']}) for {r['duration']}ms")
+def do_longpress(ctx: ServiceContext, target: str, duration: int = 1000) -> dict:
+    if duration <= 0:
+        raise ActionError(f"Duration must be positive, got {duration}.")
+    resolved = ctx.resolve_target(target)
+    ok = long_press(ctx.controller, resolved.x, resolved.y, duration)
+    if not ok:
+        raise ActionError("Long press failed.")
+    return {
+        "action": "longpress",
+        "x": resolved.x, "y": resolved.y,
+        "duration": duration,
+        "source": resolved.source,
+    }
+
+
+@service(human=lambda r: f"Started app: {r['intent']}")
+def do_startapp(ctx: ServiceContext, intent: str) -> dict:
+    ok = start_app(ctx.controller, intent)
+    if not ok:
+        raise ActionError("Start app failed.")
+    return {"action": "startapp", "intent": intent}
+
+
+@service(human=lambda r: f"Stopped app: {r['intent']}")
+def do_stopapp(ctx: ServiceContext, intent: str) -> dict:
+    ok = stop_app(ctx.controller, intent)
+    if not ok:
+        raise ActionError("Stop app failed.")
+    return {"action": "stopapp", "intent": intent}
+
+
+@service(human=lambda r: r["output"] if r["output"] else "(no output)")
+def do_shell(ctx: ServiceContext, cmd: str, timeout: int = 20000) -> dict:
+    output = run_shell(ctx.controller, cmd, timeout)
+    return {"action": "shell", "cmd": cmd, "timeout": timeout, "output": output}
+
+
+@service(human=lambda r: f"Touch down ({r['x']}, {r['y']}) contact={r['contact']}")
+def do_touch_down(
+    ctx: ServiceContext, target: str, contact: int = 0, pressure: int = 1
+) -> dict:
+    resolved = ctx.resolve_target(target)
+    ok = touch_down(ctx.controller, resolved.x, resolved.y, contact, pressure)
+    if not ok:
+        raise ActionError("Touch down failed.")
+    return {
+        "action": "touch_down",
+        "x": resolved.x, "y": resolved.y,
+        "contact": contact, "pressure": pressure,
+        "source": resolved.source,
+    }
+
+
+@service(human=lambda r: f"Touch move ({r['x']}, {r['y']}) contact={r['contact']}")
+def do_touch_move(
+    ctx: ServiceContext, target: str, contact: int = 0, pressure: int = 1
+) -> dict:
+    resolved = ctx.resolve_target(target)
+    ok = touch_move(ctx.controller, resolved.x, resolved.y, contact, pressure)
+    if not ok:
+        raise ActionError("Touch move failed.")
+    return {
+        "action": "touch_move",
+        "x": resolved.x, "y": resolved.y,
+        "contact": contact, "pressure": pressure,
+        "source": resolved.source,
+    }
+
+
+@service(human=lambda r: f"Touch up contact={r['contact']}")
+def do_touch_up(ctx: ServiceContext, contact: int = 0) -> dict:
+    ok = touch_up(ctx.controller, contact)
+    if not ok:
+        raise ActionError("Touch up failed.")
+    return {"action": "touch_up", "contact": contact}
+
+
+@service(human=lambda r: f"Key down {r['name']} -> {r['keycode']} [{r['session_type']}]")
+def do_key_down(ctx: ServiceContext, keycode: str) -> dict:
+    code = resolve_keycode(keycode, ctx.session_type)
+    if code is None:
+        platform = "Android" if ctx.session_type == "adb" else "Win32"
+        raise ActionError(
+            f"Unknown key '{keycode}' for {platform}. "
+            f"Use a name (enter, tab, back, f1, ...) or an integer."
+        )
+    ok = key_down(ctx.controller, code)
+    if not ok:
+        raise ActionError("Key down failed.")
+    return {
+        "action": "key_down",
+        "keycode": code,
+        "keycode_hex": f"0x{code:02X}",
+        "name": keycode,
+        "session_type": ctx.session_type,
+    }
+
+
+@service(human=lambda r: f"Key up {r['name']} -> {r['keycode']} [{r['session_type']}]")
+def do_key_up(ctx: ServiceContext, keycode: str) -> dict:
+    code = resolve_keycode(keycode, ctx.session_type)
+    if code is None:
+        platform = "Android" if ctx.session_type == "adb" else "Win32"
+        raise ActionError(
+            f"Unknown key '{keycode}' for {platform}. "
+            f"Use a name (enter, tab, back, f1, ...) or an integer."
+        )
+    ok = key_up(ctx.controller, code)
+    if not ok:
+        raise ActionError("Key up failed.")
+    return {
+        "action": "key_up",
+        "keycode": code,
+        "keycode_hex": f"0x{code:02X}",
+        "name": keycode,
+        "session_type": ctx.session_type,
+    }
+
+
+@service(human=lambda r: f"Mouse moved ({r['dx']}, {r['dy']})")
+def do_mousemove(ctx: ServiceContext, dx: int, dy: int) -> dict:
+    if ctx.session_type != "win32":
+        raise ActionError("Mouse move is only supported on PC/Win32 sessions.")
+    ok = relative_move(ctx.controller, dx, dy)
+    if not ok:
+        raise ActionError("Mouse move failed.")
+    return {"action": "mousemove", "dx": dx, "dy": dy}

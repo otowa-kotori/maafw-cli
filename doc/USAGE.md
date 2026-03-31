@@ -240,6 +240,117 @@ maafw-cli key 66             # 直传整数，不查表
 maafw-cli key 0x0D           # 直传十六进制
 ```
 
+### `action` group
+
+所有操作命令统一在 `action` group 下。高频命令（click/swipe/scroll/type/key）同时保留为一级 alias。
+
+```bash
+maafw-cli action --help              # 查看所有操作子命令
+maafw-cli action click 100,200       # 等价于 maafw-cli click 100,200
+```
+
+#### `action longpress <TARGET>`
+
+长按目标（touch_down + sleep + touch_up）。
+
+| 选项 | 默认 | 说明 |
+|------|------|------|
+| `--duration` | 1000 | 长按持续时间（毫秒） |
+
+```bash
+maafw-cli action longpress e1
+maafw-cli action longpress 200,300 --duration 2000
+```
+
+#### `action startapp <INTENT>`
+
+启动应用（ADB）。INTENT 为 Android intent 或包名。
+
+```bash
+maafw-cli action startapp com.example.app/.MainActivity
+```
+
+#### `action stopapp <INTENT>`
+
+停止应用（ADB）。
+
+```bash
+maafw-cli action stopapp com.example.app
+```
+
+#### `action shell <CMD>`
+
+在设备上执行 shell 命令。
+
+| 选项 | 默认 | 说明 |
+|------|------|------|
+| `--timeout` | 20000 | 命令超时（毫秒） |
+
+```bash
+maafw-cli action shell "ls /sdcard"
+maafw-cli action shell "dumpsys activity" --timeout 30000
+```
+
+#### `action touch-down <TARGET>`
+
+手指按下（低级触控 API）。
+
+| 选项 | 默认 | 说明 |
+|------|------|------|
+| `--contact` | 0 | 触点 ID（多点触控） |
+| `--pressure` | 1 | 按压力度 |
+
+```bash
+maafw-cli action touch-down 200,300
+maafw-cli action touch-down 200,300 --contact 1
+```
+
+#### `action touch-move <TARGET>`
+
+移动已按下的触点。参数同 `touch-down`。
+
+```bash
+maafw-cli action touch-move 400,500
+```
+
+#### `action touch-up`
+
+抬起触点。
+
+| 选项 | 默认 | 说明 |
+|------|------|------|
+| `--contact` | 0 | 触点 ID |
+
+```bash
+maafw-cli action touch-up
+maafw-cli action touch-up --contact 1
+```
+
+#### `action key-down <KEYCODE>`
+
+按下按键不松开。KEYCODE 规则同 `key`。
+
+```bash
+maafw-cli action key-down shift
+maafw-cli action key-down ctrl
+```
+
+#### `action key-up <KEYCODE>`
+
+松开按键。
+
+```bash
+maafw-cli action key-up shift
+```
+
+#### `action mousemove <DX> <DY>`
+
+鼠标相对移动（仅 Win32）。
+
+```bash
+maafw-cli action mousemove 100 -50
+```
+
 ### `resource download-ocr`
 
 下载 OCR 模型（ppocr_v5 zh_cn）。如已存在则跳过。
