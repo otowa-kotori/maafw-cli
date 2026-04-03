@@ -1,0 +1,61 @@
+{
+    "CustomClickStart": {
+        "recognition": "Custom",
+        "custom_recognition": "FindTextCustom",
+        "custom_recognition_param": {"expected": "START"},
+        "action": "Custom",
+        "custom_action": "ClickTargetCustom",
+        "next": ["CustomVerifyLogin"]
+    },
+    "CustomVerifyLogin": {
+        "recognition": "Custom",
+        "custom_recognition": "FindTextCustom",
+        "custom_recognition_param": {"expected": "LOGIN"},
+        "action": "DoNothing",
+        "next": ["FocusUsername_C"]
+    },
+    "FocusUsername_C": {
+        "recognition": "OCR",
+        "expected": "Username",
+        "action": "Click",
+        "target_offset": [200, 0, 0, 0],
+        "next": ["TypeUsername_C"]
+    },
+    "TypeUsername_C": {
+        "recognition": "OCR",
+        "expected": "LOGIN",
+        "action": "Custom",
+        "custom_action": "InputTextCustom",
+        "custom_action_param": {"text": "testuser"},
+        "next": ["FocusPassword_C"]
+    },
+    "FocusPassword_C": {
+        "recognition": "OCR",
+        "expected": "Password",
+        "action": "Click",
+        "target_offset": [200, 0, 0, 0],
+        "next": ["TypePassword_C"]
+    },
+    "TypePassword_C": {
+        "recognition": "OCR",
+        "expected": "LOGIN",
+        "action": "InputText",
+        "input_text": "pass123",
+        "next": ["CustomClickSubmit"]
+    },
+    "CustomClickSubmit": {
+        "recognition": "Custom",
+        "custom_recognition": "FindTextCustom",
+        "custom_recognition_param": {"expected": "SUBMIT"},
+        "action": "Custom",
+        "custom_action": "ClickTargetCustom",
+        "next": ["CustomVerifyHome"]
+    },
+    "CustomVerifyHome": {
+        "recognition": "Custom",
+        "custom_recognition": "FindTextCustom",
+        "custom_recognition_param": {"expected": "HOME"},
+        "action": "DoNothing",
+        "next": []
+    }
+}

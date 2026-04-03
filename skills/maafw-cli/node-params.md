@@ -96,6 +96,15 @@ YOLOv8/v11 object detection.
 
 Always matches — no extra parameters beyond common fields.
 
+### Custom
+
+Delegates to a user-defined Python callback. See [custom.md](custom.md) for the full callback API.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `custom_recognition` | string | required | Registered name of the CustomRecognition |
+| `custom_recognition_param` | any JSON | `{}` | Serialized to JSON string, passed via `argv.custom_recognition_param` |
+
 ---
 
 ## Action types
@@ -146,3 +155,12 @@ Always matches — no extra parameters beyond common fields.
 ### DoNothing / StopTask
 
 No parameters.
+
+### Custom
+
+Delegates to a user-defined Python callback. See [custom.md](custom.md) for the full callback API.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `custom_action` | string | required | Registered name of the CustomAction |
+| `custom_action_param` | any JSON | `{}` | Serialized to JSON string, passed via `argv.custom_action_param` |

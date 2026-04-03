@@ -109,6 +109,43 @@ maafw-cli connect adb 127.0.0.1:16384 --size raw              # 原尺寸
 
 > **选择建议**：纯截图/OCR 用默认即可。需要点击时，先试 PostMessage；若无效试 Seize。UWP 应用必须 Seize。
 
+### `connect playcover <ADDRESS> --uuid UUID`
+
+连接 macOS 上通过 PlayCover 运行的 iOS 应用。
+
+| 选项 | 必填 | 说明 |
+|------|------|------|
+| `--uuid` | ✅ | PlayCover 应用实例的 UUID |
+
+```bash
+maafw-cli connect playcover 192.168.1.100 --uuid abc-def-123
+maafw-cli --on ios connect playcover 192.168.1.100 --uuid abc-def-123
+```
+
+### `connect wlroots <WLR_SOCKET_PATH>`
+
+连接 Linux wlroots 合成器（Sway、Hyprland 等）。
+
+```bash
+maafw-cli connect wlroots /run/user/1000/wayland-0
+maafw-cli --on display connect wlroots /run/user/1000/wayland-1
+```
+
+### `connect dbg <READ_PATH> <WRITE_PATH>`
+
+连接调试控制器，用于离线回放预录制的图片或操作录像。
+
+| 选项 | 默认 | 说明 |
+|------|------|------|
+| `--type` | `carousel_image` | 调试类型：`carousel_image`（轮播图片）或 `replay_recording`（回放录像） |
+| `--config` | (无) | 额外配置，JSON 字符串 |
+
+```bash
+maafw-cli connect dbg ./screenshots/ ./debug_out/
+maafw-cli connect dbg ./recording/ ./out/ --type replay_recording
+maafw-cli --on test connect dbg ./images/ ./out/ --config '{"loop": true}'
+```
+
 ### `ocr`
 
 对连接的设备/窗口执行全屏 OCR。结果赋予 Element（e1, e2, ...），可供 `click` 使用。
@@ -472,6 +509,54 @@ maafw> ocr
 maafw> click e1
 maafw> screenshot
 maafw> quit
+```
+
+### `custom`
+
+管理自定义 Recognition 和 Action——加载用户 Python 脚本，注册到 session 的 Resource。
+
+详细的回调 API、参数说明和脚本编写指南见 [skills/maafw-cli/custom.md](../skills/maafw-cli/custom.md)。
+
+#### `custom load <PATH> [--reload]`
+
+加载 `.py` 脚本，自动发现 `CustomRecognition` / `CustomAction` 子类并注册。
+
+| 选项 | 说明 |
+|------|------|
+| `--reload` | 强制重新导入（即使之前已加载过） |
+
+```bash
+maafw-cli --on game custom load ./my_customs.py
+maafw-cli --on game custom load ./my_customs.py --reload
+```
+
+#### `custom list`
+
+列出当前会话中已注册的自定义 Recognition 和 Action。
+
+```bash
+maafw-cli --on game custom list
+```
+
+#### `custom unload <NAME> [--type recognition|action|both]`
+
+按名字反注册自定义回调。
+
+| 选项 | 默认 | 说明 |
+|------|------|------|
+| `--type` | `both` | 仅反注册 recognition / action / 两者 |
+
+```bash
+maafw-cli --on game custom unload FindRedButton
+maafw-cli --on game custom unload ClickAndWait --type action
+```
+
+#### `custom clear`
+
+清空当前会话所有自定义 Recognition 和 Action。
+
+```bash
+maafw-cli --on game custom clear
 ```
 
 ### `daemon start`

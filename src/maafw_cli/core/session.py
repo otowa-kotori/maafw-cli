@@ -180,3 +180,61 @@ class Session:
         if resource is None:
             return None
         return resource.get_node_data(name)
+
+    # ── custom recognition / action registration ──────────────
+
+    def register_custom_recognition(self, name: str, instance: Any) -> bool:
+        """Register a CustomRecognition instance under *name*."""
+        resource = self.get_resource()
+        if resource is None:
+            return False
+        return resource.register_custom_recognition(name, instance)
+
+    def unregister_custom_recognition(self, name: str) -> bool:
+        """Unregister a CustomRecognition by name."""
+        resource = self.get_resource()
+        if resource is None:
+            return False
+        return resource.unregister_custom_recognition(name)
+
+    def clear_custom_recognition(self) -> bool:
+        """Remove all registered CustomRecognition instances."""
+        resource = self.get_resource()
+        if resource is None:
+            return False
+        return resource.clear_custom_recognition()
+
+    def list_custom_recognition(self) -> list[str]:
+        """Return names of all registered CustomRecognition instances."""
+        resource = self.get_resource()
+        if resource is None:
+            return []
+        return resource.custom_recognition_list
+
+    def register_custom_action(self, name: str, instance: Any) -> bool:
+        """Register a CustomAction instance under *name*."""
+        resource = self.get_resource()
+        if resource is None:
+            return False
+        return resource.register_custom_action(name, instance)
+
+    def unregister_custom_action(self, name: str) -> bool:
+        """Unregister a CustomAction by name."""
+        resource = self.get_resource()
+        if resource is None:
+            return False
+        return resource.unregister_custom_action(name)
+
+    def clear_custom_action(self) -> bool:
+        """Remove all registered CustomAction instances."""
+        resource = self.get_resource()
+        if resource is None:
+            return False
+        return resource.clear_custom_action()
+
+    def list_custom_action(self) -> list[str]:
+        """Return names of all registered CustomAction instances."""
+        resource = self.get_resource()
+        if resource is None:
+            return []
+        return resource.custom_action_list

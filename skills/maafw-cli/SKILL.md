@@ -89,6 +89,7 @@ maafw-cli action mousemove 100 -50                 # relative mouse move [Win32]
 
 - [reco.md](reco.md) — template, feature, color matching & raw JSON mode
 - [pipeline.md](pipeline.md) — multi-node automation pipelines
+- [custom.md](custom.md) — custom recognition & action (user Python callbacks)
 - [node-params.md](node-params.md) — recognition & action parameter reference (shared by reco and pipeline)
 - [advanced.md](advanced.md) — multi-device, REPL, daemon, `--size`, global options
 - [troubleshooting.md](troubleshooting.md) — exit codes, platform notes, common issues

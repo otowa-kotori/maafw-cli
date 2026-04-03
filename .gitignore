@@ -44,3 +44,4 @@ CLAUDE.md
 
 # Investigation / debug logs
 investigations/
+custom_callback_debug.log
