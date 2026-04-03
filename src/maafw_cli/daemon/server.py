@@ -311,6 +311,12 @@ class DaemonServer:
             return await self._handle_connect_adb(params, request)
         if action == "connect_win32":
             return await self._handle_connect_win32(params, request)
+        if action == "connect_playcover":
+            return await self._handle_connect_playcover(params, request)
+        if action == "connect_wlroots":
+            return await self._handle_connect_wlroots(params, request)
+        if action == "connect_dbg":
+            return await self._handle_connect_dbg(params, request)
 
         # ── regular service dispatch ────────────────────────────
         return await self.session_mgr.execute(action, params, session_name)
@@ -347,6 +353,79 @@ class DaemonServer:
         session = await self.session_mgr.ensure(session_name)
         async with session.lock:
             session.attach(controller, "adb", result["device"])
+
+        result["session"] = session_name
+        return result
+
+    async def _handle_connect_playcover(
+        self, params: dict[str, Any], request: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Handle connect_playcover: ensure session exists and attach controller."""
+        from maafw_cli.services.connection import _connect_playcover_inner
+
+        address = params.get("address", "")
+        uuid = params.get("uuid", "")
+        session_name = (
+            request.get("session")
+            or params.get("session_name")
+            or address
+        )
+
+        result, controller = await asyncio.to_thread(
+            _connect_playcover_inner, address, uuid,
+        )
+        session = await self.session_mgr.ensure(session_name)
+        async with session.lock:
+            session.attach(controller, "playcover", address)
+
+        result["session"] = session_name
+        return result
+
+    async def _handle_connect_wlroots(
+        self, params: dict[str, Any], request: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Handle connect_wlroots: ensure session exists and attach controller."""
+        from maafw_cli.services.connection import _connect_wlroots_inner
+
+        wlr_socket_path = params.get("wlr_socket_path", "")
+        session_name = (
+            request.get("session")
+            or params.get("session_name")
+            or wlr_socket_path
+        )
+
+        result, controller = await asyncio.to_thread(
+            _connect_wlroots_inner, wlr_socket_path,
+        )
+        session = await self.session_mgr.ensure(session_name)
+        async with session.lock:
+            session.attach(controller, "wlroots", wlr_socket_path)
+
+        result["session"] = session_name
+        return result
+
+    async def _handle_connect_dbg(
+        self, params: dict[str, Any], request: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Handle connect_dbg: ensure session exists and attach controller."""
+        from maafw_cli.services.connection import _connect_dbg_inner
+
+        read_path = params.get("read_path", "")
+        write_path = params.get("write_path", "")
+        dbg_type = params.get("dbg_type", "carousel_image")
+        config = params.get("config")
+        session_name = (
+            request.get("session")
+            or params.get("session_name")
+            or f"dbg:{read_path}"
+        )
+
+        result, controller = await asyncio.to_thread(
+            _connect_dbg_inner, read_path, write_path, dbg_type, config,
+        )
+        session = await self.session_mgr.ensure(session_name)
+        async with session.lock:
+            session.attach(controller, "dbg", read_path)
 
         result["session"] = session_name
         return result

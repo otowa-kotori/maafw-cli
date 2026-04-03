@@ -586,7 +586,7 @@ class TestControllerDestroyOnFailure:
         mock_ctrl.destroy = MagicMock()
         mock_ctrl.set_screenshot_target_short_side = MagicMock()
 
-        with patch("maafw_cli.maafw.adb.AdbController", return_value=mock_ctrl):
+        with patch("maafw_cli.maafw.controllers.adb.AdbController", return_value=mock_ctrl):
             result = connect_adb(device)
 
         assert result is None
@@ -603,7 +603,7 @@ class TestControllerDestroyOnFailure:
         mock_ctrl.destroy = MagicMock()
         mock_ctrl.set_screenshot_use_raw_size = MagicMock()
 
-        with patch("maafw_cli.maafw.win32.Win32Controller", return_value=mock_ctrl):
+        with patch("maafw_cli.maafw.controllers.win32.Win32Controller", return_value=mock_ctrl):
             result = connect_win32(window)
 
         assert result is None
@@ -1016,7 +1016,7 @@ class TestLocalExecutor:
         ex = self._make_executor()
         # device_list is needs_session=False; will call init_toolkit()
         # which may fail without MaaFW installed, so we mock it
-        with patch("maafw_cli.services.connection.init_toolkit"), \
+        with patch("maafw_cli.services.connection.device.init_toolkit"), \
              patch("maafw_cli.maafw.adb.find_adb_devices", return_value=[]):
             result = ex.execute("device_list", {"adb": True, "win32": False})
         assert result == {"adb": []}

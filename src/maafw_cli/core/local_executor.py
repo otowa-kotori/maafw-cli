@@ -51,6 +51,12 @@ class LocalExecutor:
             return self._handle_connect_adb(params, session)
         if action == "connect_win32":
             return self._handle_connect_win32(params, session)
+        if action == "connect_playcover":
+            return self._handle_connect_playcover(params, session)
+        if action == "connect_wlroots":
+            return self._handle_connect_wlroots(params, session)
+        if action == "connect_dbg":
+            return self._handle_connect_dbg(params, session)
 
         # Built-in actions
         if action == "ping":
@@ -184,6 +190,58 @@ class LocalExecutor:
         result, controller = _connect_win32_inner(window, screencap_method, input_method, size)
         sess = self._get_or_create(name)
         sess.attach(controller, "win32", result["window_name"])
+        self._default = name
+
+        result["session"] = name
+        return result
+
+    def _handle_connect_playcover(
+        self, params: dict[str, Any], session_name: str | None,
+    ) -> dict[str, Any]:
+        from maafw_cli.services.connection import _connect_playcover_inner
+
+        address = params.get("address", "")
+        uuid = params.get("uuid", "")
+        name = session_name or params.get("session_name") or address
+
+        result, controller = _connect_playcover_inner(address, uuid)
+        sess = self._get_or_create(name)
+        sess.attach(controller, "playcover", address)
+        self._default = name
+
+        result["session"] = name
+        return result
+
+    def _handle_connect_wlroots(
+        self, params: dict[str, Any], session_name: str | None,
+    ) -> dict[str, Any]:
+        from maafw_cli.services.connection import _connect_wlroots_inner
+
+        wlr_socket_path = params.get("wlr_socket_path", "")
+        name = session_name or params.get("session_name") or wlr_socket_path
+
+        result, controller = _connect_wlroots_inner(wlr_socket_path)
+        sess = self._get_or_create(name)
+        sess.attach(controller, "wlroots", wlr_socket_path)
+        self._default = name
+
+        result["session"] = name
+        return result
+
+    def _handle_connect_dbg(
+        self, params: dict[str, Any], session_name: str | None,
+    ) -> dict[str, Any]:
+        from maafw_cli.services.connection import _connect_dbg_inner
+
+        read_path = params.get("read_path", "")
+        write_path = params.get("write_path", "")
+        dbg_type = params.get("dbg_type", "carousel_image")
+        config = params.get("config")
+        name = session_name or params.get("session_name") or f"dbg:{read_path}"
+
+        result, controller = _connect_dbg_inner(read_path, write_path, dbg_type, config)
+        sess = self._get_or_create(name)
+        sess.attach(controller, "dbg", read_path)
         self._default = name
 
         result["session"] = name

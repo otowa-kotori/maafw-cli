@@ -9,7 +9,10 @@ import click
 
 from maafw_cli.cli import pass_ctx, CliContext
 from maafw_cli.core.errors import MaafwError
-from maafw_cli.services.connection import do_connect_adb, do_connect_win32, do_device_list
+from maafw_cli.services.connection import (
+    do_connect_adb, do_connect_win32, do_device_list,
+    do_connect_playcover, do_connect_wlroots, do_connect_dbg,
+)
 
 
 # ── device ───────────────────────────────────────────────────────
@@ -149,5 +152,70 @@ def connect_win32_cmd(ctx: CliContext, window: str, size: str,
         screencap_method=screencap_method,
         input_method=input_method,
         size=size,
+        session_name=name,
+    )
+
+
+@connect.command("playcover")
+@click.argument("address")
+@click.option("--uuid", required=True,
+              help="UUID of the PlayCover application instance.")
+@pass_ctx
+def connect_playcover_cmd(ctx: CliContext, address: str, uuid: str) -> None:
+    """Connect to a PlayCover iOS application (macOS).
+
+    ADDRESS is the PlayCover relay address.
+    Use global ``--on NAME`` to assign a session name (default: 'default').
+    """
+    name = ctx.on or "default"
+    ctx.run(
+        do_connect_playcover,
+        address=address,
+        uuid=uuid,
+        session_name=name,
+    )
+
+
+@connect.command("wlroots")
+@click.argument("wlr_socket_path")
+@pass_ctx
+def connect_wlroots_cmd(ctx: CliContext, wlr_socket_path: str) -> None:
+    """Connect to a wlroots Wayland compositor (Linux).
+
+    WLR_SOCKET_PATH is the path to the wlroots Wayland socket.
+    Use global ``--on NAME`` to assign a session name (default: 'default').
+    """
+    name = ctx.on or "default"
+    ctx.run(
+        do_connect_wlroots,
+        wlr_socket_path=wlr_socket_path,
+        session_name=name,
+    )
+
+
+@connect.command("dbg")
+@click.argument("read_path")
+@click.argument("write_path")
+@click.option("--type", "dbg_type", type=str,
+              default="carousel_image", show_default=True,
+              help="Debug type: carousel_image or replay_recording.")
+@click.option("--config", type=str, default=None,
+              help="Extra config as JSON string.")
+@pass_ctx
+def connect_dbg_cmd(ctx: CliContext, read_path: str, write_path: str,
+                    dbg_type: str, config: str | None) -> None:
+    """Connect a debug controller for offline replay.
+
+    READ_PATH is the directory with images/recordings to replay.
+    WRITE_PATH is the directory for debug output.
+    Use global ``--on NAME`` to assign a session name (default: 'default').
+    """
+    name = ctx.on or "default"
+    ctx.run(
+        do_connect_dbg,
+        read_path=read_path,
+        write_path=write_path,
+        dbg_type=dbg_type,
+        config=config,
         session_name=name,
     )
