@@ -45,7 +45,7 @@ jobs:
         if: steps.unit_tests.outcome == 'success'
         id: integration_tests
         continue-on-error: true
-        run: uv run pytest tests/integration/ -m integration -v -s --junitxml=integration-test-report.xml
+        run: uv run pytest tests/integration/ -m integration --junitxml=integration-test-report.xml
 
       - name: Stop daemon after integration tests
         if: always() && steps.unit_tests.outcome == 'success'
