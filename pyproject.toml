@@ -36,7 +36,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "maafw>=5.2.6",
+    "maafw>=5.10.0",
     "click>=8.0.0",
     "opencv-python>=4.0.0",
     "platformdirs>=4.0.0",

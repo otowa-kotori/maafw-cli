@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  unit-tests:
+  tests:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,12 +32,71 @@ jobs:
           done
 
       - name: Run unit tests
+        id: unit_tests
+        continue-on-error: true
         run: uv run pytest --junitxml=test-report.xml
+
+      - name: Stop leftover daemon
+        if: always()
+        continue-on-error: true
+        run: uv run maafw-cli daemon stop
+
+      - name: Run integration tests (report only)
+        if: steps.unit_tests.outcome == 'success'
+        id: integration_tests
+        continue-on-error: true
+        run: uv run pytest tests/integration/ -m integration -v -s --junitxml=integration-test-report.xml
+
+      - name: Stop daemon after integration tests
+        if: always() && steps.unit_tests.outcome == 'success'
+        continue-on-error: true
+        run: uv run maafw-cli daemon stop
 
       - name: Collect daemon log
         if: always()
         shell: bash
         run: cp "$LOCALAPPDATA/MaaXYZ/maafw-cli/daemon.log" daemon.log 2>/dev/null || true
+
+      - name: Summarize test result
+        if: always()
+        shell: pwsh
+        run: |
+          function Get-AttrInt($node, $name) {
+            $value = $node.GetAttribute($name)
+            if ([string]::IsNullOrWhiteSpace($value)) {
+              return 0
+            }
+            return [int]$value
+          }
+
+          function Add-JUnitSummary($title, $path, $outcome, $reportOnly) {
+            "## $title" >> $env:GITHUB_STEP_SUMMARY
+            "- Outcome: **$outcome**" >> $env:GITHUB_STEP_SUMMARY
+
+            if (Test-Path $path) {
+              [xml]$xml = Get-Content $path -Raw
+              $root = $xml.DocumentElement
+              $tests = Get-AttrInt $root "tests"
+              $failures = Get-AttrInt $root "failures"
+              $errors = Get-AttrInt $root "errors"
+              $skipped = Get-AttrInt $root "skipped"
+              "- Totals: tests=$tests, failures=$failures, errors=$errors, skipped=$skipped" >> $env:GITHUB_STEP_SUMMARY
+            } else {
+              "- No JUnit report was produced." >> $env:GITHUB_STEP_SUMMARY
+            }
+
+            if ($reportOnly) {
+              if ($outcome -eq "skipped") {
+                "- Skipped because unit tests did not succeed." >> $env:GITHUB_STEP_SUMMARY
+              } elseif ($outcome -ne "success") {
+                "- This run is report-only and will not fail CI." >> $env:GITHUB_STEP_SUMMARY
+              }
+            }
+          }
+
+          Add-JUnitSummary "Unit tests" "test-report.xml" "${{ steps.unit_tests.outcome }}" $false
+          Add-JUnitSummary "Integration tests" "integration-test-report.xml" "${{ steps.integration_tests.outcome }}" $true
+          '- Artifact: `test-logs`' >> $env:GITHUB_STEP_SUMMARY
 
       - name: Upload test artifacts
         if: always()
@@ -46,5 +105,13 @@ jobs:
           name: test-logs
           path: |
             test-report.xml
+            integration-test-report.xml
             daemon.log
           if-no-files-found: ignore
+
+      - name: Fail workflow if unit tests failed
+        if: always() && steps.unit_tests.outcome != 'success'
+        shell: pwsh
+        run: |
+          Write-Error "Unit tests failed. See uploaded artifacts and workflow summary for details."
+          exit 1

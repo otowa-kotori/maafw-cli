@@ -172,8 +172,9 @@ uv run pytest tests/integration/test_clicking_game.py -m integration -v -s
 
 ## CI
 
-- CI 只跑单元测试（`-m "not integration"`），集成测试需要桌面环境无法在 CI 运行
-- CI 产出 `test-report.xml` 和 `daemon.log` 作为 artifact 上传
+- CI 会严格跑单元测试（`uv run pytest --junitxml=test-report.xml`）
+- CI 会在**单元测试通过后**额外跑一次 **非阻塞** 的集成测试（`uv run pytest tests/integration/ -m integration -v -s --junitxml=integration-test-report.xml`），用于收集结果和回归信号，不会导致 workflow 失败
+- CI 上传 `test-report.xml`、`integration-test-report.xml`、`daemon.log` 等 artifact，并在 workflow summary 汇总单元测试与集成测试结果
 - 拉取到本地：`gh run download <RUN_ID> --dir .local/artifacts`
 - `.local/` 已在 `.gitignore` 中，不会提交
 
