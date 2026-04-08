@@ -131,21 +131,6 @@ maafw-cli connect wlroots /run/user/1000/wayland-0
 maafw-cli --on display connect wlroots /run/user/1000/wayland-1
 ```
 
-### `connect dbg <READ_PATH> <WRITE_PATH>`
-
-连接调试控制器，用于离线回放预录制的图片或操作录像。
-
-| 选项 | 默认 | 说明 |
-|------|------|------|
-| `--type` | `carousel_image` | 调试类型：`carousel_image`（轮播图片）或 `replay_recording`（回放录像） |
-| `--config` | (无) | 额外配置，JSON 字符串 |
-
-```bash
-maafw-cli connect dbg ./screenshots/ ./debug_out/
-maafw-cli connect dbg ./recording/ ./out/ --type replay_recording
-maafw-cli --on test connect dbg ./images/ ./out/ --config '{"loop": true}'
-```
-
 ### `ocr`
 
 对连接的设备/窗口执行全屏 OCR。结果赋予 Element（e1, e2, ...），可供 `click` 使用。

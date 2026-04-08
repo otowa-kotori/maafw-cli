@@ -9,12 +9,10 @@ from maafw_cli.maafw.controllers.adb import AdbDeviceInfo, find_adb_devices, con
 from maafw_cli.maafw.controllers.win32 import Win32WindowInfo, find_win32_windows, connect_win32
 from maafw_cli.maafw.controllers.playcover import connect_playcover
 from maafw_cli.maafw.controllers.wlroots import connect_wlroots
-from maafw_cli.maafw.controllers.dbg import connect_dbg
 
 __all__ = [
     "AdbDeviceInfo", "find_adb_devices", "connect_adb",
     "Win32WindowInfo", "find_win32_windows", "connect_win32",
     "connect_playcover",
     "connect_wlroots",
-    "connect_dbg",
 ]

@@ -315,8 +315,6 @@ class DaemonServer:
             return await self._handle_connect_playcover(params, request)
         if action == "connect_wlroots":
             return await self._handle_connect_wlroots(params, request)
-        if action == "connect_dbg":
-            return await self._handle_connect_dbg(params, request)
 
         # ── regular service dispatch ────────────────────────────
         return await self.session_mgr.execute(action, params, session_name)
@@ -404,31 +402,7 @@ class DaemonServer:
         result["session"] = session_name
         return result
 
-    async def _handle_connect_dbg(
-        self, params: dict[str, Any], request: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Handle connect_dbg: ensure session exists and attach controller."""
-        from maafw_cli.services.connection import _connect_dbg_inner
 
-        read_path = params.get("read_path", "")
-        write_path = params.get("write_path", "")
-        dbg_type = params.get("dbg_type", "carousel_image")
-        config = params.get("config")
-        session_name = (
-            request.get("session")
-            or params.get("session_name")
-            or f"dbg:{read_path}"
-        )
-
-        result, controller = await asyncio.to_thread(
-            _connect_dbg_inner, read_path, write_path, dbg_type, config,
-        )
-        session = await self.session_mgr.ensure(session_name)
-        async with session.lock:
-            session.attach(controller, "dbg", read_path)
-
-        result["session"] = session_name
-        return result
 
     async def _handle_connect_win32(
         self, params: dict[str, Any], request: dict[str, Any],
