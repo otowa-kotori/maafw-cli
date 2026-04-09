@@ -38,11 +38,10 @@ def reco_cmd(ctx: CliContext, reco_type: str | None, params: tuple[str, ...], ra
         fmt.error("Recognition type is required. Use: reco <type> [params...] or reco --raw '{...}'")
         return
 
-    # Join variadic params into a single space-separated string
-    params_str = " ".join(params) if params else None
+    params_list = list(params) if params else None
 
     try:
-        result = ctx.run_raw(do_reco, reco_type=reco_type, params=params_str, raw=raw)
+        result = ctx.run_raw(do_reco, reco_type=reco_type, params=params_list, raw=raw)
     except MaafwError as e:
         fmt.error(str(e), exit_code=e.exit_code)
         return

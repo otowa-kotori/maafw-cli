@@ -6,15 +6,19 @@ from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.registry import service
 
 
-def _parse_kv_params(params: str | None) -> dict[str, str]:
-    """Parse ``"key1=val1 key2=val2"`` into a dict.
+def _parse_kv_params(params: str | list[str] | tuple[str, ...] | None) -> dict[str, str]:
+    """Parse ``key=value`` tokens into a dict.
 
+    Accepts either a legacy space-separated string or the original CLI token
+    list/tuple, preserving embedded spaces inside a single argument.
     Returns an empty dict when *params* is ``None`` or empty.
     """
     if not params:
         return {}
+
+    tokens = params.split() if isinstance(params, str) else params
     result: dict[str, str] = {}
-    for token in params.split():
+    for token in tokens:
         if "=" not in token:
             continue
         key, _, value = token.partition("=")
@@ -29,7 +33,7 @@ def _parse_kv_params(params: str | None) -> dict[str, str]:
 def do_reco(
     ctx: ServiceContext,
     reco_type: str | None = None,
-    params: str | None = None,
+    params: str | list[str] | tuple[str, ...] | None = None,
     raw: str | None = None,
 ) -> dict:
     """Run a recognition operation and return element references.
@@ -40,8 +44,9 @@ def do_reco(
         Recognition type (``"TemplateMatch"``, ``"FeatureMatch"``,
         ``"ColorMatch"``, ``"OCR"``). Ignored when *raw* is provided.
     params:
-        Space-separated ``key=value`` pairs (e.g.
-        ``"template=button.png roi=0,0,400,200 threshold=0.8"``).
+        ``key=value`` 参数。既支持旧的空格分隔字符串（例如
+        ``"template=button.png roi=0,0,400,200 threshold=0.8"``），
+        也支持命令层直接传下来的参数 token 列表，以保留单个参数中的空格。
     raw:
         Raw JSON string (e.g.
         ``'{"recognition":"TemplateMatch","template":["b.png"]}'``).

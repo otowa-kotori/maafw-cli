@@ -759,7 +759,20 @@ class TestRecoRegistry:
         })
         assert obj.custom_recognition == "MyCustomReco"
 
+    def test_build_custom_recognition_with_json_param(self):
+        from maafw_cli.maafw.recognition import build_params
+        obj = build_params("Custom", {
+            "custom_recognition": "MyCustomReco",
+            "custom_recognition_param": '{"expected":"START","threshold":0.8}',
+        })
+        assert obj.custom_recognition == "MyCustomReco"
+        assert obj.custom_recognition_param == {
+            "expected": "START",
+            "threshold": 0.8,
+        }
+
     def test_build_neural_network_classify(self):
+
         from maafw_cli.maafw.recognition import build_params
         obj = build_params("NeuralNetworkClassify", {"model": "cls.onnx"})
         assert obj.model == "cls.onnx"

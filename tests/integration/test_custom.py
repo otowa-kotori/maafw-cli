@@ -139,7 +139,42 @@ class TestCustomLoad:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Test Group 2: Pipeline execution with Custom nodes
+# Test Group 2: direct reco Custom command
+# ═══════════════════════════════════════════════════════════════════
+
+
+class TestCustomRecoCommand:
+    """Direct ``reco Custom`` command should support custom params."""
+
+    def test_reco_custom_with_kv_json_param(self, custom_window):
+        r = invoke_on("custom", [
+            "--json", "reco", "Custom",
+            "custom_recognition=FindTextCustom",
+            'custom_recognition_param={"expected": "START"}',
+        ])
+        safe_print(r.output)
+        assert r.exit_code == 0
+        data = parse_json_output(r.output)
+        assert data["reco_type"] == "Custom"
+        assert len(data["results"]) >= 1
+        assert "ref" in data["results"][0]
+        assert "box" in data["results"][0]
+
+    def test_reco_custom_with_raw_json_param(self, custom_window):
+        r = invoke_on("custom", [
+            "--json", "reco",
+            "--raw",
+            '{"recognition":"Custom","custom_recognition":"FindTextCustom","custom_recognition_param":{"expected":"START"}}',
+        ])
+        safe_print(r.output)
+        assert r.exit_code == 0
+        data = parse_json_output(r.output)
+        assert data["reco_type"] == "Custom"
+        assert len(data["results"]) >= 1
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Test Group 3: Pipeline execution with Custom nodes
 # ═══════════════════════════════════════════════════════════════════
 
 

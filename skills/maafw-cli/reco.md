@@ -44,6 +44,37 @@ Pass a full JSON recognition spec directly:
 maafw-cli reco --raw '{"recognition":"TemplateMatch","template":["button.png"]}'
 ```
 
+## CLI parameter passing
+
+Use one of these two forms:
+
+```bash
+maafw-cli reco <Type> key=value key=value ...
+maafw-cli reco --raw '{"recognition":"Type", ...}'
+```
+
+Rules:
+
+- Each `key=value` must be a **separate shell argument**.
+- If a value itself contains spaces or JSON, quote the **whole `key=value` token**.
+- Prefer `--raw` when the parameter structure is nested or hard to express with flat `key=value` pairs.
+- When `--raw` is provided, `<Type>` and `key=value` args are ignored.
+
+### Custom recognition examples
+
+```bash
+# Flat key=value form
+maafw-cli --on game reco Custom custom_recognition=FindTextCustom 'custom_recognition_param={"expected":"START"}'
+
+# key=value form with spaces preserved inside JSON
+maafw-cli --on game reco Custom custom_recognition=FindTextCustom 'custom_recognition_param={"expected": "START", "threshold": 0.8}'
+
+# Raw JSON form (recommended for nested params)
+maafw-cli --on game reco --raw '{"recognition":"Custom","custom_recognition":"FindTextCustom","custom_recognition_param":{"expected":"START","threshold":0.8}}'
+```
+
+`custom_recognition_param` can be any JSON value. CLI turns the JSON text into a structured value for MaaFW, and MaaFW then serializes it back to a JSON string before passing it to your callback (`argv.custom_recognition_param`). Inside the callback, use `json.loads(...)` to decode it.
+
 ## Parameters
 
 Each recognition type accepts additional parameters (threshold, count, method, etc.).

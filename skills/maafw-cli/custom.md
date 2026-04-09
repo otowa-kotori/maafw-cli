@@ -28,6 +28,24 @@ maafw-cli --on game custom unload SharedName          # default: both
 maafw-cli --on game custom clear
 ```
 
+## Debug a CustomRecognition directly with `reco`
+
+Before wiring a callback into pipeline JSON, you can test it directly from CLI:
+
+```bash
+# Simple key=value form
+maafw-cli --on game reco Custom custom_recognition=FindTextCustom 'custom_recognition_param={"expected":"PLAY"}'
+
+# Raw JSON form (recommended for nested params)
+maafw-cli --on game reco --raw '{"recognition":"Custom","custom_recognition":"FindTextCustom","custom_recognition_param":{"expected":"PLAY","threshold":0.8}}'
+```
+
+Notes:
+
+- Quote the whole `key=value` token when the value contains JSON or spaces.
+- `custom_recognition_param` is still received by your callback as a JSON string via `argv.custom_recognition_param`.
+- This is a good way to debug recognition logic before embedding it into a pipeline node.
+
 ## Pipeline JSON — Custom nodes
 
 Set `"recognition": "Custom"` or `"action": "Custom"` and provide the registered name:

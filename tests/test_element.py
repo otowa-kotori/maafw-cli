@@ -1,5 +1,5 @@
 """Tests for the Element system."""
-from maa.define import BoxAndCountResult, BoxAndScoreResult, OCRResult
+from maa.define import BoxAndCountResult, BoxAndScoreResult, CustomRecognitionResult, OCRResult
 
 from maafw_cli.core.element import Element, ElementStore
 
@@ -126,3 +126,19 @@ class TestBuildFromResults:
         store = ElementStore()
         elems = store.build_from_results([], "TemplateMatch")
         assert elems == []
+
+    def test_custom_results(self):
+        results = [
+            CustomRecognitionResult(
+                box=[10, 20, 30, 40],
+                detail={"text": "START", "score": 0.88, "count": 2},
+            )
+        ]
+        store = ElementStore()
+        elems = store.build_from_results(results, "Custom")
+        assert len(elems) == 1
+        assert elems[0].ref == "e1"
+        assert elems[0].text == "START"
+        assert elems[0].score == 0.88
+        assert elems[0].count == 2
+

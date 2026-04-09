@@ -11,7 +11,8 @@ import logging
 from dataclasses import dataclass, asdict
 from typing import Any
 
-from maa.define import BoxAndCountResult, BoxAndScoreResult, OCRResult
+from maa.define import BoxAndCountResult, BoxAndScoreResult, CustomRecognitionResult, OCRResult
+
 
 _log = logging.getLogger("maafw_cli.element")
 
@@ -67,7 +68,9 @@ class ElementStore:
         """Convert generic recognition results into numbered Elements.
 
         Handles ``BoxAndScoreResult`` (TemplateMatch), ``BoxAndCountResult``
-        (ColorMatch, FeatureMatch), and ``OCRResult``.
+        (ColorMatch, FeatureMatch), ``OCRResult``, and
+        ``CustomRecognitionResult``.
+
         """
         elements: list[Element] = []
         for i, r in enumerate(results, start=1):
@@ -95,6 +98,19 @@ class ElementStore:
                     text=None,
                     box=box,
                     score=round(float(r.score), 4),
+                )
+            elif isinstance(r, CustomRecognitionResult):
+                detail = r.detail if isinstance(r.detail, dict) else {}
+
+                text = detail.get("text") if isinstance(detail.get("text"), str) else None
+                score = detail.get("score")
+                count = detail.get("count")
+                elem = Element(
+                    ref=f"e{i}",
+                    text=text,
+                    box=box,
+                    score=round(float(score), 4) if isinstance(score, (int, float)) else 1.0,
+                    count=int(count) if isinstance(count, int) else None,
                 )
             else:
                 _log.warning("Unknown result type %s, skipping", type(r).__name__)

@@ -116,8 +116,18 @@ def _coerce(value: Any, annotation: Any, *, from_string: bool = False) -> Any:
     if origin is typing.Union:
         return _coerce_union(value, args, from_string=from_string)
 
-    # --- Any / unknown — passthrough ---
+    # --- Any ---
+    if annotation is Any:
+        if from_string and isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return value
+        return value
+
+    # --- unknown — passthrough ---
     return value
+
 
 
 def _coerce_list_from_string(value: str, elem_type: Any) -> list:
