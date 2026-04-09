@@ -353,7 +353,6 @@ class TestStandaloneCustomActionRunner:
     def test_run_custom_action_builds_directhit_temp_pipeline(self, mock_run_pipeline):
         from maafw_cli.maafw.action import (
             _TEMP_CUSTOM_ACTION_ENTRY,
-            _TEMP_CUSTOM_ACTION_POST_DELAY_MS,
             run_custom_action,
         )
 
@@ -385,7 +384,6 @@ class TestStandaloneCustomActionRunner:
                 "custom_action": "InputTextCustom",
                 "custom_action_param": {"text": "hello"},
                 "target_offset": [1, 2, 3, 4],
-                "post_delay": _TEMP_CUSTOM_ACTION_POST_DELAY_MS,
                 "next": [],
             }
         }
@@ -394,7 +392,6 @@ class TestStandaloneCustomActionRunner:
     def test_run_custom_action_omits_optional_fields_when_default(self, mock_run_pipeline):
         from maafw_cli.maafw.action import (
             _TEMP_CUSTOM_ACTION_ENTRY,
-            _TEMP_CUSTOM_ACTION_POST_DELAY_MS,
             run_custom_action,
         )
 
