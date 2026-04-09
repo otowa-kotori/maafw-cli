@@ -46,7 +46,35 @@ Notes:
 - `custom_recognition_param` is still received by your callback as a JSON string via `argv.custom_recognition_param`.
 - This is a good way to debug recognition logic before embedding it into a pipeline node.
 
+## Debug a CustomAction directly with `action custom`
+
+You can also run a registered `CustomAction` directly from CLI. Internally, maafw-cli builds a one-node temporary pipeline (`DirectHit` + `Custom`) so your callback receives a valid `argv.box` and can be debugged in isolation:
+
+
+```bash
+# Use an Element ref from the latest OCR/reco result
+maafw-cli --on game action custom ClickTargetCustom --target e1
+
+# Pass a literal point (treated as a 0-size box)
+maafw-cli --on game action custom InputTextCustom --target 452,387 'custom_action_param={"text":"hello"}'
+
+# Pass a full box directly
+maafw-cli --on game action custom ClickTargetCustom --target 10,20,80,40
+
+# Raw JSON form
+maafw-cli --on game action custom --raw '{"custom_action":"InputTextCustom","custom_action_param":{"text":"hello"},"target":[10,20,80,40]}'
+```
+
+Notes:
+
+- `--target` accepts `eN`, `x,y`, or `x,y,w,h`.
+- `eN` resolves to the full stored Element box, not just its center.
+- For `CustomAction`, CLI uses the parsed target as the callback `argv.box`.
+- `custom_action_param` is still received by your callback as a JSON string via `argv.custom_action_param`.
+- Standalone `action custom` is for direct callback debugging; pipeline-only concepts like referencing previous node names still belong in pipeline JSON.
+
 ## Pipeline JSON — Custom nodes
+
 
 Set `"recognition": "Custom"` or `"action": "Custom"` and provide the registered name:
 

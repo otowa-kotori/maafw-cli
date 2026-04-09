@@ -1,11 +1,16 @@
 """
 Interaction services — click, swipe, scroll, type, key, longpress,
-startapp/stopapp, shell, touch-down/move/up, key-down/up, mousemove.
+startapp/stopapp, shell, touch-down/move/up, key-down/up, mousemove,
+and standalone custom actions.
 """
 from __future__ import annotations
 
+import json
+from typing import Any
+
 from maafw_cli.core.errors import ActionError
 from maafw_cli.maafw.control import (
+
     click,
     swipe,
     scroll,
@@ -22,12 +27,54 @@ from maafw_cli.maafw.control import (
     run_shell,
     relative_move,
 )
+from maafw_cli.maafw.action import run_custom_action as execute_custom_action
 from maafw_cli.services.context import ServiceContext
 from maafw_cli.services.registry import service
 from maafw_cli.core.keymap import resolve_keycode
 
 
+def _parse_kv_params(params: list[str] | tuple[str, ...] | None) -> dict[str, str]:
+    if not params:
+        return {}
+
+    result: dict[str, str] = {}
+    for token in params:
+        if "=" not in token:
+            continue
+        key, _, value = token.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if key:
+            result[key] = value
+    return result
+
+
+def _parse_rect(raw: str, *, field_name: str) -> tuple[int, int, int, int]:
+    parts = [p.strip() for p in raw.split(",")]
+    if len(parts) != 4:
+        raise ActionError(f"Invalid {field_name} '{raw}'. Expected format: x,y,w,h")
+    try:
+        return tuple(int(p) for p in parts)  # type: ignore[return-value]
+    except ValueError:
+        raise ActionError(f"Invalid {field_name} '{raw}'. All values must be integers.")
+
+
+def _parse_custom_action_param(raw: str) -> Any:
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return raw
+
+
+def _resolve_custom_action_box(ctx: ServiceContext, target: str | None) -> tuple[tuple[int, int, int, int] | None, str | None]:
+    if target is None:
+        return None, None
+    resolved = ctx.resolve_target(target)
+    return resolved.box, resolved.source
+
+
 @service(human=lambda r: f"Clicked ({r['x']}, {r['y']})")
+
 def do_click(ctx: ServiceContext, target: str) -> dict:
     resolved = ctx.resolve_target(target)
     ok = click(ctx.controller, resolved.x, resolved.y)
@@ -218,6 +265,115 @@ def do_key_up(ctx: ServiceContext, keycode: str) -> dict:
     }
 
 
+def _human_custom_action(r: dict) -> str:
+    target_source = r.get("target_source")
+    box = r.get("box")
+    suffix = f" target={target_source} box={tuple(box)}" if target_source and box else ""
+    return f"Custom action '{r['custom_action']}' succeeded.{suffix}"
+
+
+@service(name="custom_action", human=_human_custom_action)
+def do_custom_action(
+    ctx: ServiceContext,
+    name: str | None = None,
+    params: list[str] | tuple[str, ...] | None = None,
+    raw: str | None = None,
+    target: str | None = None,
+    reco_detail: str | None = None,
+) -> dict:
+    parsed_params = _parse_kv_params(params) if raw is None else {}
+    target_source: str | None = None
+
+    if raw is not None:
+        target_box = None
+        try:
+            raw_data = json.loads(raw)
+
+        except json.JSONDecodeError as exc:
+            raise ActionError(f"Invalid JSON: {exc}")
+        if not isinstance(raw_data, dict):
+            raise ActionError("Raw JSON must be an object.")
+
+        raw_name = raw_data.pop("custom_action", None)
+        if name is None:
+            name = raw_name
+        elif raw_name is not None and raw_name != name:
+            raise ActionError(
+                f"Custom action mismatch: positional name '{name}' != raw custom_action '{raw_name}'."
+            )
+
+        raw_target = raw_data.pop("target", None)
+        if target is None and isinstance(raw_target, str):
+            target = raw_target
+        elif raw_target is not None and not isinstance(raw_target, str):
+            if isinstance(raw_target, (list, tuple)) and len(raw_target) in (2, 4):
+                if len(raw_target) == 2:
+                    target_box = (int(raw_target[0]), int(raw_target[1]), 0, 0)
+                    target_source = f"point:{raw_target[0]},{raw_target[1]}"
+                else:
+                    target_box = tuple(int(v) for v in raw_target)
+                    target_source = f"box:{','.join(str(int(v)) for v in raw_target)}"
+            elif raw_target in (None, True, False):
+                target_box = None
+            else:
+                raise ActionError("Raw JSON field 'target' must be a string, [x,y], or [x,y,w,h].")
+        else:
+            target_box = None
+
+        raw_param = raw_data.pop("custom_action_param", None)
+        raw_target_offset = raw_data.pop("target_offset", (0, 0, 0, 0))
+        if isinstance(raw_target_offset, str):
+            target_offset = _parse_rect(raw_target_offset, field_name="target_offset")
+        elif isinstance(raw_target_offset, (list, tuple)) and len(raw_target_offset) == 4:
+            target_offset = tuple(int(v) for v in raw_target_offset)
+        else:
+            raise ActionError("Raw JSON field 'target_offset' must be x,y,w,h or [x,y,w,h].")
+
+        if reco_detail is None:
+            raw_reco_detail = raw_data.pop("reco_detail", "")
+            reco_detail = raw_reco_detail if isinstance(raw_reco_detail, str) else json.dumps(raw_reco_detail, ensure_ascii=False)
+        custom_action_param = raw_param
+    else:
+        if name is None:
+            raise ActionError("Custom action name is required. Use: action custom <name> [params...] or --raw '{...}'")
+        target_box = None
+        raw_param = parsed_params.get("custom_action_param")
+        custom_action_param = _parse_custom_action_param(raw_param) if raw_param is not None else None
+        raw_target_offset = parsed_params.get("target_offset")
+        target_offset = _parse_rect(raw_target_offset, field_name="target_offset") if raw_target_offset else (0, 0, 0, 0)
+
+    if name is None:
+        raise ActionError("Custom action name is required.")
+
+    resolved_box, resolved_source = _resolve_custom_action_box(ctx, target)
+    if resolved_box is not None:
+        target_box = resolved_box
+        target_source = resolved_source
+
+    execute_custom_action(
+        ctx.session,
+        name,
+        custom_action_param=custom_action_param,
+        target_offset=target_offset,
+        box=target_box,
+        reco_detail=reco_detail or "",
+    )
+
+    result: dict[str, Any] = {
+        "action": "custom",
+        "custom_action": name,
+        "success": True,
+        "custom_action_param": custom_action_param,
+        "target_offset": list(target_offset),
+        "reco_detail": reco_detail or "",
+    }
+    if target_box is not None:
+        result["box"] = list(target_box)
+    if target_source is not None:
+        result["target_source"] = target_source
+    return result
+
+
 @service(human=lambda r: f"Mouse moved ({r['dx']}, {r['dy']})")
 def do_mousemove(ctx: ServiceContext, dx: int, dy: int) -> dict:
     if ctx.session_type != "win32":
@@ -226,3 +382,4 @@ def do_mousemove(ctx: ServiceContext, dx: int, dy: int) -> dict:
     if not ok:
         raise ActionError("Mouse move failed.")
     return {"action": "mousemove", "dx": dx, "dy": dy}
+

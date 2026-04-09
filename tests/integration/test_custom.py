@@ -12,8 +12,10 @@ Uses the pipeline mock window (Welcome -> Login -> Home flow).
 from __future__ import annotations
 
 from pathlib import Path
+import time
 
 import pytest
+
 
 from maafw_cli.cli import cli
 from .conftest import (
@@ -37,18 +39,13 @@ _CUSTOM_PIPELINE_DIR = str(_PIPELINE_FIXTURES_DIR)
 # ── fixtures ─────────────────────────────────────────────────
 
 
-@pytest.fixture(scope="module")
-def custom_window():
-    """Launch the pipeline mock window for custom callback tests.
-
-    Connects with Seize input, loads the custom callback script,
-    and loads the pipeline JSON including custom_flow.json.
-    """
+def _prepare_custom_window(session_name: str):
+    """Launch a fresh pipeline mock window and preload custom callbacks/resources."""
     window, proc = _launch_window(_PIPELINE_SCRIPT, "MaafwPipeline")
 
     try:
         ensure_connected(
-            window, session_name="custom",
+            window, session_name=session_name,
             input_method="Seize",
         )
     except RuntimeError as e:
@@ -56,25 +53,38 @@ def custom_window():
         proc.wait(timeout=5)
         pytest.skip(f"Could not connect: {e}")
 
-    # Load custom callbacks
-    r = invoke_on("custom", ["custom", "load", _CUSTOM_SCRIPT])
+    r = invoke_on(session_name, ["custom", "load", _CUSTOM_SCRIPT])
     if r.exit_code != 0:
         safe_print(f"custom load failed: {r.output}")
         proc.kill()
         proc.wait(timeout=5)
         pytest.skip(f"custom load failed: {r.output}")
 
-    # Load pipeline JSON (includes custom_flow.json)
-    r = invoke_on("custom", ["pipeline", "load", _CUSTOM_PIPELINE_DIR])
+    r = invoke_on(session_name, ["pipeline", "load", _CUSTOM_PIPELINE_DIR])
     if r.exit_code != 0:
         safe_print(f"pipeline load failed: {r.output}")
         proc.kill()
         proc.wait(timeout=5)
         pytest.skip(f"pipeline load failed: {r.output}")
 
-    yield window
+    return window, proc
 
+
+@pytest.fixture(scope="module")
+def custom_window():
+    """Shared custom callback window for stateless/module-safe tests."""
+    window, proc = _prepare_custom_window("custom")
+    yield window
     _teardown_fixture("custom", proc)
+
+
+@pytest.fixture
+def custom_action_window():
+    """Fresh session/window for stateful standalone custom action assertions."""
+    window, proc = _prepare_custom_window("custom_action")
+    yield window
+    _teardown_fixture("custom_action", proc)
+
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -174,8 +184,51 @@ class TestCustomRecoCommand:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Test Group 3: Pipeline execution with Custom nodes
+# Test Group 3: direct action Custom command
 # ═══════════════════════════════════════════════════════════════════
+
+
+class TestCustomActionCommand:
+    """Direct ``action custom`` command should support target refs and box passing."""
+
+    def test_action_custom_with_element_target(self, custom_action_window):
+        reco = invoke_on("custom_action", [
+            "--json", "reco", "Custom",
+            "custom_recognition=FindTextCustom",
+            'custom_recognition_param={"expected": "START"}',
+        ])
+        assert reco.exit_code == 0, reco.output
+        reco_data = parse_json_output(reco.output)
+        ref = reco_data["results"][0]["ref"]
+
+        action = invoke_on("custom_action", [
+            "--json", "action", "custom", "ClickTargetCustom",
+            "--target", ref,
+        ])
+        safe_print(action.output)
+        assert action.exit_code == 0, action.output
+        action_data = parse_json_output(action.output)
+        assert action_data["action"] == "custom"
+        assert action_data["custom_action"] == "ClickTargetCustom"
+        assert action_data["target_source"].startswith(f"ref:{ref}")
+        assert len(action_data["box"]) == 4
+
+        # Keep this consistent with existing Win32/Seize click tests:
+        # command success does not guarantee Tk has already processed the click callback.
+        time.sleep(0.3)
+
+        ocr = invoke_on("custom_action", ["--json", "ocr"])
+        assert ocr.exit_code == 0, ocr.output
+        ocr_data = parse_json_output(ocr.output)
+        all_text = " ".join(r["text"] for r in ocr_data["results"] if r.get("text"))
+        assert "LOGIN" in all_text, f"Expected LOGIN after custom action click, got: {all_text}"
+
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Test Group 4: Pipeline execution with Custom nodes
+# ═══════════════════════════════════════════════════════════════════
+
 
 
 class TestCustomPipelineRun:

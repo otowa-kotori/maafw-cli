@@ -56,12 +56,16 @@ tk.Label(welcome, text="WELCOME", font=("Arial", 56, "bold"), bg="white").pack(
 tk.Label(welcome, text="Pipeline Demo App", font=("Arial", 20), bg="white", fg="gray").pack(
     pady=10
 )
+def _on_start():
+    _show_stage("login")
+
+
 tk.Button(
     welcome,
     text="START",
     font=("Arial", 28),
     width=12,
-    command=lambda: _show_stage("login"),
+    command=_on_start,
 ).pack(pady=40)
 
 

@@ -16,8 +16,9 @@ from maafw_cli.services.interaction import (
     do_click, do_swipe, do_scroll, do_type, do_key,
     do_longpress, do_startapp, do_stopapp, do_shell,
     do_touch_down, do_touch_move, do_touch_up,
-    do_key_down, do_key_up, do_mousemove,
+    do_key_down, do_key_up, do_mousemove, do_custom_action,
 )
+
 from mock_controller import MockController
 
 
@@ -57,6 +58,15 @@ class TestClickService:
         assert result["x"] == 160  # 120 + 80//2
         assert result["y"] == 50   # 40 + 20//2
         assert mock.clicks == [(160, 50)]
+
+    def test_click_by_box_target(self):
+        mock = MockController()
+        ctx = _make_ctx(mock)
+        result = do_click(ctx, target="10,20,30,40")
+        assert result["x"] == 25
+        assert result["y"] == 40
+        assert mock.clicks == [(25, 40)]
+
 
     def test_click_invalid_target(self):
         ctx = _make_ctx()
@@ -431,10 +441,85 @@ class TestKeyUpService:
             do_key_up(ctx, keycode="ctrl")
 
 
+# ── custom action ──────────────────────────────────────────────
+
+
+class TestCustomActionService:
+    @patch("maafw_cli.services.interaction.execute_custom_action")
+    def test_custom_action_with_element_target(self, mock_execute):
+        ctx = _make_ctx()
+        ctx.session.element_store._elements = [
+            Element(ref="e1", text="Hello", box=[100, 50, 40, 20], score=0.9)
+        ]
+
+        result = do_custom_action(ctx, name="ClickTargetCustom", target="e1")
+
+        assert result["action"] == "custom"
+        assert result["custom_action"] == "ClickTargetCustom"
+        assert result["box"] == [100, 50, 40, 20]
+        assert result["target_source"].startswith("ref:e1")
+        mock_execute.assert_called_once_with(
+            ctx.session,
+            "ClickTargetCustom",
+            custom_action_param=None,
+            target_offset=(0, 0, 0, 0),
+            box=(100, 50, 40, 20),
+            reco_detail="",
+        )
+
+    @patch("maafw_cli.services.interaction.execute_custom_action")
+    def test_custom_action_with_box_target_and_json_param(self, mock_execute):
+        ctx = _make_ctx()
+
+        result = do_custom_action(
+            ctx,
+            name="InputTextCustom",
+            params=[
+                'custom_action_param={"text":"hello"}',
+                "target_offset=1,2,3,4",
+            ],
+            target="10,20,30,40",
+        )
+
+        assert result["custom_action_param"] == {"text": "hello"}
+        assert result["box"] == [10, 20, 30, 40]
+        assert result["target_offset"] == [1, 2, 3, 4]
+        mock_execute.assert_called_once_with(
+            ctx.session,
+            "InputTextCustom",
+            custom_action_param={"text": "hello"},
+            target_offset=(1, 2, 3, 4),
+            box=(10, 20, 30, 40),
+            reco_detail="",
+        )
+
+    @patch("maafw_cli.services.interaction.execute_custom_action")
+    def test_custom_action_raw_json_target(self, mock_execute):
+        ctx = _make_ctx()
+
+        result = do_custom_action(
+            ctx,
+            raw='{"custom_action":"InputTextCustom","custom_action_param":{"text":"hello"},"target":[300,400],"reco_detail":{"from":"test"}}',
+        )
+
+        assert result["custom_action"] == "InputTextCustom"
+        assert result["box"] == [300, 400, 0, 0]
+        assert result["reco_detail"] == '{"from": "test"}'
+        mock_execute.assert_called_once_with(
+            ctx.session,
+            "InputTextCustom",
+            custom_action_param={"text": "hello"},
+            target_offset=(0, 0, 0, 0),
+            box=(300, 400, 0, 0),
+            reco_detail='{"from": "test"}',
+        )
+
+
 # ── mousemove ──────────────────────────────────────────────────
 
 
 class TestMousemoveService:
+
     def test_mousemove(self):
         mock = MockController()
         ctx = _make_ctx(mock, session_type="win32")
@@ -471,8 +556,9 @@ class TestServiceContext:
     def test_resolve_target_coords(self):
         ctx = _make_ctx()
         resolved = ctx.resolve_target("300,400")
-        assert resolved.x == 300
-        assert resolved.y == 400
+        assert resolved.box == (300, 400, 0, 0)
+        assert resolved.center == (300, 400)
+
 
     def test_resolve_target_invalid(self):
         ctx = _make_ctx()

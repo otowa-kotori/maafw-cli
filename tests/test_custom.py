@@ -344,6 +344,93 @@ class TestCustomService:
 
 
 # ═══════════════════════════════════════════════════════════════════
+# maafw/action.py — standalone custom action runner
+# ═══════════════════════════════════════════════════════════════════
+
+
+class TestStandaloneCustomActionRunner:
+    @patch("maafw_cli.maafw.action.run_pipeline")
+    def test_run_custom_action_builds_directhit_temp_pipeline(self, mock_run_pipeline):
+        from maafw_cli.maafw.action import (
+            _TEMP_CUSTOM_ACTION_ENTRY,
+            _TEMP_CUSTOM_ACTION_POST_DELAY_MS,
+            run_custom_action,
+        )
+
+        detail = MagicMock()
+        detail.status = MagicMock(succeeded=True)
+        detail.nodes = [MagicMock(action=MagicMock(success=True))]
+        mock_run_pipeline.return_value = detail
+
+        session = MagicMock()
+        ok = run_custom_action(
+            session,
+            "InputTextCustom",
+            custom_action_param={"text": "hello"},
+            target_offset=(1, 2, 3, 4),
+            box=[10, 20, 30, 40],
+            reco_detail='{"ignored": true}',
+        )
+
+        assert ok is True
+        mock_run_pipeline.assert_called_once()
+        call_session, entry, override = mock_run_pipeline.call_args.args
+        assert call_session is session
+        assert entry == _TEMP_CUSTOM_ACTION_ENTRY
+        assert override == {
+            _TEMP_CUSTOM_ACTION_ENTRY: {
+                "recognition": "DirectHit",
+                "roi": [10, 20, 30, 40],
+                "action": "Custom",
+                "custom_action": "InputTextCustom",
+                "custom_action_param": {"text": "hello"},
+                "target_offset": [1, 2, 3, 4],
+                "post_delay": _TEMP_CUSTOM_ACTION_POST_DELAY_MS,
+                "next": [],
+            }
+        }
+
+    @patch("maafw_cli.maafw.action.run_pipeline")
+    def test_run_custom_action_omits_optional_fields_when_default(self, mock_run_pipeline):
+        from maafw_cli.maafw.action import (
+            _TEMP_CUSTOM_ACTION_ENTRY,
+            _TEMP_CUSTOM_ACTION_POST_DELAY_MS,
+            run_custom_action,
+        )
+
+        detail = MagicMock()
+        detail.status = MagicMock(succeeded=True)
+        detail.nodes = [MagicMock(action=MagicMock(success=True))]
+        mock_run_pipeline.return_value = detail
+
+        session = MagicMock()
+        run_custom_action(session, "ClickTargetCustom")
+
+        override = mock_run_pipeline.call_args.args[2]
+        assert override == {
+            _TEMP_CUSTOM_ACTION_ENTRY: {
+                "recognition": "DirectHit",
+                "roi": [0, 0, 0, 0],
+                "action": "Custom",
+                "custom_action": "ClickTargetCustom",
+                "next": [],
+            }
+        }
+
+    @patch("maafw_cli.maafw.action.run_pipeline")
+    def test_run_custom_action_raises_when_pipeline_action_fails(self, mock_run_pipeline):
+        from maafw_cli.maafw.action import run_custom_action
+
+        detail = MagicMock()
+        detail.status = MagicMock(succeeded=True)
+        detail.nodes = [MagicMock(action=MagicMock(success=False))]
+        mock_run_pipeline.return_value = detail
+
+        with pytest.raises(ActionError, match="Custom action 'ClickTargetCustom' failed"):
+            run_custom_action(MagicMock(), "ClickTargetCustom", box=(1, 2, 3, 4))
+
+
+# ═══════════════════════════════════════════════════════════════════
 # commands/custom.py — CLI wiring
 # ═══════════════════════════════════════════════════════════════════
 
@@ -381,3 +468,10 @@ class TestCustomCli:
     def test_custom_clear_help(self):
         result = runner.invoke(cli, ["custom", "clear", "--help"])
         assert result.exit_code == 0
+
+    def test_action_custom_help(self):
+        result = runner.invoke(cli, ["action", "custom", "--help"])
+        assert result.exit_code == 0
+        assert "NAME" in result.output
+        assert "--target" in result.output
+        assert "--raw" in result.output

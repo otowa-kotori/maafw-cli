@@ -20,30 +20,37 @@ class TestParseTarget:
         store = ElementStore()
         result = parse_target("452,387", store)
         assert isinstance(result, ResolvedTarget)
-        assert result.x == 452
-        assert result.y == 387
+        assert result.box == (452, 387, 0, 0)
+        assert result.center == (452, 387)
         assert "coords" in result.source
 
     def test_coord_with_spaces(self):
         store = ElementStore()
         result = parse_target(" 100 , 200 ", store)
         assert isinstance(result, ResolvedTarget)
-        assert result.x == 100
-        assert result.y == 200
+        assert result.box == (100, 200, 0, 0)
+
+    def test_box_target(self):
+        store = ElementStore()
+        result = parse_target("10,20,30,40", store)
+        assert isinstance(result, ResolvedTarget)
+        assert result.box == (10, 20, 30, 40)
+        assert result.center == (25, 40)
+        assert "box" in result.source
 
     def test_element_target(self):
         store = _make_store_with_elements()
         result = parse_target("e1", store)
         assert isinstance(result, ResolvedTarget)
-        # center of [120, 45, 80, 24] → (160, 57)
-        assert result.x == 160
-        assert result.y == 57
+        assert result.box == (120, 45, 80, 24)
+        assert result.center == (160, 57)
         assert "ref:e1" in result.source
 
     def test_element_case_insensitive(self):
         store = _make_store_with_elements()
         result = parse_target("E2", store)
         assert isinstance(result, ResolvedTarget)
+        assert result.box == (120, 89, 72, 24)
 
     def test_element_unknown(self):
         store = _make_store_with_elements()
@@ -67,12 +74,10 @@ class TestParseTarget:
         store = ElementStore()
         result = parse_target("-100,200", store)
         assert isinstance(result, ResolvedTarget)
-        assert result.x == -100
-        assert result.y == 200
+        assert result.box == (-100, 200, 0, 0)
 
     def test_both_negative_coords(self):
         store = ElementStore()
         result = parse_target("-50,-30", store)
         assert isinstance(result, ResolvedTarget)
-        assert result.x == -50
-        assert result.y == -30
+        assert result.box == (-50, -30, 0, 0)

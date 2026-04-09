@@ -9,11 +9,12 @@ from __future__ import annotations
 import click
 
 from maafw_cli.cli import pass_ctx, CliContext
+from maafw_cli.core.errors import MaafwError
 from maafw_cli.services.interaction import (
     do_click, do_swipe, do_scroll, do_type, do_key,
     do_longpress, do_startapp, do_stopapp, do_shell,
     do_touch_down, do_touch_move, do_touch_up,
-    do_key_down, do_key_up, do_mousemove,
+    do_key_down, do_key_up, do_mousemove, do_custom_action,
 )
 
 
@@ -273,6 +274,59 @@ def mousemove_cmd(ctx: CliContext, dx: int, dy: int) -> None:
     ctx.run(do_mousemove, dx=dx, dy=dy)
 
 
+@click.command("custom")
+@click.argument("name", required=False, default=None)
+@click.argument("params", nargs=-1)
+@click.option("--target", type=str, default=None,
+              help="Element ref, x,y, or x,y,w,h used as the callback box.")
+@click.option("--reco-detail", type=str, default=None,
+              help="Previous recognition detail string passed to the callback.")
+@click.option("--raw", type=str, default=None,
+              help='Raw JSON custom action config, e.g. \'{"custom_action":"InputTextCustom","custom_action_param":{"text":"hello"}}\'')
+@pass_ctx
+def custom_action_cmd(
+    ctx: CliContext,
+    name: str | None,
+    params: tuple[str, ...],
+    target: str | None,
+    reco_detail: str | None,
+    raw: str | None,
+) -> None:
+    """Run a registered CustomAction directly.
+
+    NAME is the registered CustomAction name.
+
+    PARAMS are key=value pairs such as:
+      custom_action_param={"text":"hello"}
+      target_offset=10,0,0,0
+
+    TARGET accepts an Element ref (e.g. e3), a point (e.g. 452,387),
+    or a box (e.g. 10,20,80,40).
+    """
+    fmt = ctx.fmt
+    params_list = list(params) if params else None
+
+    if raw is None and name is None:
+        fmt.error("Custom action name is required. Use: action custom <name> [params...] or action custom --raw '{...}'")
+        return
+
+    try:
+        result = ctx.run_raw(
+            do_custom_action,
+            name=name,
+            params=params_list,
+            raw=raw,
+            target=target,
+            reco_detail=reco_detail,
+        )
+    except MaafwError as e:
+        fmt.error(str(e), exit_code=e.exit_code)
+        return
+
+    if result is not None:
+        fmt.success(result)
+
+
 # ── register all sub-commands ────────────────────────────────────
 
 action.add_command(click_cmd, "click")
@@ -290,3 +344,4 @@ action.add_command(touch_up_cmd, "touch-up")
 action.add_command(key_down_cmd, "key-down")
 action.add_command(key_up_cmd, "key-up")
 action.add_command(mousemove_cmd, "mousemove")
+action.add_command(custom_action_cmd, "custom")

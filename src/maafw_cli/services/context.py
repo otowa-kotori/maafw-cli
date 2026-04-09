@@ -38,7 +38,8 @@ class ServiceContext:
         return self.session.element_store
 
     def resolve_target(self, target: str) -> ResolvedTarget:
-        """Parse e3 / 452,387 into (x, y).  Raises :class:`ActionError`."""
+        """Parse e3 / 452,387 / 10,20,30,40 into a resolved target box."""
+
         store = self.get_element_store()
         result = parse_target(target, store)
         if isinstance(result, str):
