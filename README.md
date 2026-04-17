@@ -101,6 +101,7 @@ maafw-cli screenshot
 | `action touch-down / touch-move / touch-up` | 低级触控 API |
 | `action key-down / key-up <KEYCODE>` | 按键按下 / 松开 |
 | `action mousemove <DX> <DY>` | 鼠标相对移动（仅 Win32） |
+| `action custom <NAME> [--target TARGET]` | 直接运行自定义 Action 回调 |
 | `resource download-ocr [--mirror] / status / load-image` | 管理资源（OCR 模型、图片模板） |
 | `pipeline load / list / show / validate / run` | Pipeline 自动化 |
 | `session list / default / close / close-all` | 管理命名会话 |

@@ -159,6 +159,7 @@ maafw-cli ocr --roi 0,0,400,300       # 只识别左上角区域
 | `FeatureMatch` | `template` | 特征匹配（对缩放/旋转/遮挡鲁棒） |
 | `ColorMatch` | `lower`, `upper` | 颜色范围匹配 |
 | `OCR` | (无) | 等同 `ocr` 命令 |
+| `Custom` | `custom_recognition` | 运行已注册的自定义 Recognition 回调 |
 
 **参数格式**：
 
@@ -169,6 +170,8 @@ maafw-cli ocr --roi 0,0,400,300       # 只识别左上角区域
 | `threshold` | `0.8` | TemplateMatch, OCR |
 | `lower` / `upper` | `R,G,B` | ColorMatch |
 | `expected` | `设置,显示` | OCR |
+| `custom_recognition` | 注册名 | Custom |
+| `custom_recognition_param` | JSON 字符串 | Custom |
 
 ```bash
 # 模板匹配（需先 resource load-image）
@@ -185,6 +188,10 @@ maafw-cli reco OCR expected=设置 roi=0,0,400,200
 
 # 原始 JSON 模式
 maafw-cli reco --raw '{"recognition":"TemplateMatch","template":["button.png"]}'
+
+# 自定义 Recognition（需先 custom load 注册回调）
+maafw-cli reco Custom custom_recognition=FindRedButton 'custom_recognition_param={"expected":"PLAY"}'
+maafw-cli reco --raw '{"recognition":"Custom","custom_recognition":"FindRedButton","custom_recognition_param":{"expected":"PLAY"}}'
 ```
 
 所有结果赋予 Element 引用（e1, e2, ...），可直接 `click e1`。
@@ -378,6 +385,31 @@ maafw-cli action key-up shift
 maafw-cli action mousemove 100 -50
 ```
 
+#### `action custom <NAME> [--target TARGET] [params...]`
+
+直接运行已注册的 CustomAction 回调（无需构建 pipeline）。内部构建临时 `DirectHit + Custom` 节点，确保回调收到有效的 `argv.box`。
+
+| 选项 | 默认 | 说明 |
+|------|------|------|
+| `--target` | (无) | 目标：`eN`（Element 引用）、`x,y`（坐标）或 `x,y,w,h`（矩形） |
+| `--raw` | (无) | 原始 JSON 模式 |
+
+```bash
+# 使用 Element 引用
+maafw-cli action custom ClickTargetCustom --target e1
+
+# 传坐标和参数
+maafw-cli action custom InputTextCustom --target 452,387 'custom_action_param={"text":"hello"}'
+
+# 传完整矩形
+maafw-cli action custom ClickTargetCustom --target 10,20,80,40
+
+# 原始 JSON 模式
+maafw-cli action custom --raw '{"custom_action":"InputTextCustom","custom_action_param":{"text":"hello"},"target":[10,20,80,40]}'
+```
+
+> 关于自定义回调脚本的编写和注册，详见 [skills/maafw-cli/references/custom.md](../skills/maafw-cli/references/custom.md)。
+
 ### `resource download-ocr`
 
 下载 OCR 模型（ppocr_v5 zh_cn）。如已存在则跳过。
@@ -500,7 +532,7 @@ maafw> quit
 
 管理自定义 Recognition 和 Action——加载用户 Python 脚本，注册到 session 的 Resource。
 
-详细的回调 API、参数说明和脚本编写指南见 [skills/maafw-cli/custom.md](../skills/maafw-cli/custom.md)。
+详细的回调 API、参数说明和脚本编写指南见 [skills/maafw-cli/references/custom.md](../skills/maafw-cli/references/custom.md)。
 
 #### `custom load <PATH> [--reload]`
 
