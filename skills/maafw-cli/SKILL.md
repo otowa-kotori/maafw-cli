@@ -84,13 +84,14 @@ maafw-cli action mousemove 100 -50                 # relative mouse move [Win32]
 3. **Refs are ephemeral** — each OCR/reco call resets refs; run it right before acting
 4. **Verify** — perceive again after actions to confirm effect
 5. **Show the user what you see** — summarize what's on screen when you perceive it
+6. **Win32 input failures → try Seize first** — if click/type/key has no effect on a Win32 window, the first thing to try is reconnecting with `--input-method Seize` (see [references/troubleshooting.md](references/troubleshooting.md#win32-input-not-working))
 
 ## More
 
-- [reco.md](reco.md) — template, feature, color matching & raw JSON mode
-- [pipeline.md](pipeline.md) — multi-node automation pipelines
-- [custom.md](custom.md) — custom recognition & action (user Python callbacks)
-- [node-params.md](node-params.md) — recognition & action parameter reference (shared by reco and pipeline)
-- [advanced.md](advanced.md) — multi-device, REPL, daemon, `--size`, global options
-- [troubleshooting.md](troubleshooting.md) — exit codes, platform notes, common issues
+- [references/reco.md](references/reco.md) — template, feature, color matching & raw JSON mode
+- [references/pipeline.md](references/pipeline.md) — multi-node automation pipelines
+- [references/custom.md](references/custom.md) — custom recognition & action (user Python callbacks)
+- [references/node-params.md](references/node-params.md) — recognition & action parameter reference (shared by reco and pipeline)
+- [references/advanced.md](references/advanced.md) — multi-device, REPL, daemon, `--size`, global options
+- [references/troubleshooting.md](references/troubleshooting.md) — exit codes, platform notes, common issues
 - MaaFramework Offcial Document (When you need more information for specialized usage): [中文](https://maafw.com/docs/1.1-QuickStarted) | [English](https://maafw.com/en/docs/1.1-QuickStarted)

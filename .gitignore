@@ -45,3 +45,6 @@ CLAUDE.md
 # Investigation / debug logs
 investigations/
 custom_callback_debug.log
+
+# Packaged skill zips (built by CI)
+*.zip

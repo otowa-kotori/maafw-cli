@@ -12,6 +12,7 @@
 ![stars](https://img.shields.io/github/stars/otowa-kotori/maafw-cli?style=social)
 [![MaaFramework](https://img.shields.io/badge/MaaFramework-v5-green)](https://github.com/MaaXYZ/MaaFramework)
 [![PyPI](https://img.shields.io/pypi/v/maafw-cli?logo=pypi&logoColor=white)](https://pypi.org/project/maafw-cli/)
+[![AI Skill](https://img.shields.io/badge/AI_Skill-Download_%E2%86%93-blueviolet)](https://github.com/otowa-kotori/maafw-cli/releases/latest/download/maafw-cli-skill.zip)
 
 [MaaFramework](https://github.com/MaaXYZ/MaaFramework) 命令行界面。让人、AI、脚本直接通过命令形式操作 Android / Win32 设备。
 

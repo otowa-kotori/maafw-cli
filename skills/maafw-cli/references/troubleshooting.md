@@ -18,6 +18,22 @@
 
 ## Common issues
 
+### Win32 input not working
+
+If click / type / key has no effect on a Win32 window (action succeeds but nothing happens on screen), the **first thing to try** is reconnecting with `--input-method Seize`:
+
+```bash
+maafw-cli --on <session> connect win32 <hwnd-or-title> --input-method Seize
+```
+
+Seize takes exclusive control of the window's input, which is required for certain apps (e.g. games, tkinter windows, DirectX surfaces) that ignore standard Win32 `SendMessage` / `PostMessage` input. Trade-off: mouse control is seized during the session, so avoid moving the mouse while Seize is active.
+
+If Seize still doesn't work, check:
+- The window is in the foreground and not minimized
+- The process is not running at a higher privilege level than the CLI
+
+---
+
 ### "No active session"
 
 Run `connect` first:
